@@ -1,9 +1,16 @@
-from typing import List
-import math
+from typing import List, Optional, Tuple, Any, Dict
+import bisect
+import json
+import os
 
 from .schema import GameIn, GameRecommendation
 from .elo import get_team_elo, elo_win_prob
 from .config import settings
+
+
+# -------------------------
+# Odds / probability helpers
+# -------------------------
 
 def implied_prob_from_american(odds: int) -> float:
     if odds == 0:
@@ -12,6 +19,20 @@ def implied_prob_from_american(odds: int) -> float:
         return (-odds) / ((-odds) + 100.0)
     return 100.0 / (odds + 100.0)
 
+def normalize_no_vig(p_a: float, p_b: float) -> Tuple[float, float]:
+    s = (p_a or 0.0) + (p_b or 0.0)
+    if s <= 0:
+        return 0.5, 0.5
+    return p_a / s, p_b / s
+
+def clamp01(x: float) -> float:
+    if x != x:  # NaN
+        return 0.5
+    return max(0.0, min(1.0, float(x)))
+
+def clamp_int(x: float, lo: int = 0, hi: int = 100) -> int:
+    return max(lo, min(hi, int(round(x))))
+
 def tier(score: int) -> str:
     if score >= settings.TIER_HIGH:
         return "high"
@@ -19,8 +40,92 @@ def tier(score: int) -> str:
         return "medium"
     return "low"
 
-def clamp_int(x: float, lo: int = 0, hi: int = 100) -> int:
-    return max(lo, min(hi, int(round(x))))
+
+# -------------------------
+# Confidence curve loader
+# -------------------------
+
+_CONF_CACHE: Optional[dict] = None
+
+def _load_conf_curve() -> Optional[dict]:
+    """
+    Loads artifacts/confidence_curve.json written by confidence_calibrate.
+
+    This runs once per process and caches the result.
+    """
+    global _CONF_CACHE
+    if _CONF_CACHE is not None:
+        return _CONF_CACHE
+
+    path = getattr(settings, "CONF_CURVE_PATH", "")
+    if not path:
+        print("[model] CONF_CURVE_PATH not set")
+        _CONF_CACHE = None
+        return None
+
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            print("[model] confidence curve invalid format")
+            _CONF_CACHE = None
+            return None
+
+        bins = data.get("bins", [])
+        print(f"[model] loaded confidence curve from {path} (bins={len(bins)})")
+
+        _CONF_CACHE = data
+        return data
+
+    except FileNotFoundError:
+        print(f"[model] confidence curve NOT FOUND at {path}")
+        _CONF_CACHE = None
+        return None
+    except Exception as e:
+        print(f"[model] failed to load confidence curve: {e}")
+        _CONF_CACHE = None
+        return None
+
+
+def _curve_edge_max(curve: dict, default: float = 0.25) -> float:
+    try:
+        mx = curve.get("meta", {}).get("edge_max", default)
+        mx = float(mx)
+        return mx if mx > 0 else default
+    except Exception:
+        return default
+
+
+def _lookup_bins(edge: float, bins: List[Dict[str, Any]], edge_max: float) -> float:
+    edge = float(max(0.0, min(edge, edge_max)))
+    for b in bins:
+        lo = float(b.get("lo", 0.0))
+        hi = float(b.get("hi", 0.0))
+        if lo <= edge < hi:
+            return float(b.get("win_rate_iso", 0.5))
+    return float(bins[-1].get("win_rate_iso", 0.5)) if bins else 0.5
+
+
+def good_bet_prob_from_edge(edge: float) -> float:
+    curve = _load_conf_curve()
+    edge_nn = max(0.0, float(edge))
+
+    if curve:
+        edge_max = _curve_edge_max(curve)
+        edge_nn = min(edge_nn, edge_max)
+
+        bins = curve.get("bins")
+        if isinstance(bins, list) and bins:
+            return clamp01(_lookup_bins(edge_nn, bins, edge_max))
+
+    # Conservative fallback
+    return clamp01(0.50 + edge_nn * 2.0)
+
+
+# -------------------------
+# Market recommendation logic
+# -------------------------
 
 def ml_reco(game: GameIn) -> dict:
     ml = game.odds.moneyline
@@ -29,102 +134,56 @@ def ml_reco(game: GameIn) -> dict:
 
     home_elo = get_team_elo(game.homeTeam.name) + settings.HOME_ADV_ELO
     away_elo = get_team_elo(game.awayTeam.name)
-    p_home = elo_win_prob(home_elo, away_elo)
-    p_away = 1 - p_home
+    p_home = float(elo_win_prob(home_elo, away_elo))
+    p_away = 1.0 - p_home
 
-    # market implied
-    p_home_mkt = implied_prob_from_american(ml.home) if ml.home is not None else None
-    p_away_mkt = implied_prob_from_american(ml.away) if ml.away is not None else None
+    p_home_mkt = implied_prob_from_american(int(ml.home)) if ml.home is not None else None
+    p_away_mkt = implied_prob_from_american(int(ml.away)) if ml.away is not None else None
 
-    # pick side with better model-vs-market edge
-    edges = []
-    if p_home_mkt is not None:
-        edges.append(("HOME", p_home - p_home_mkt))
-    if p_away_mkt is not None:
-        edges.append(("AWAY", p_away - p_away_mkt))
-
-    if not edges:
+    if p_home_mkt is not None and p_away_mkt is not None:
+        p_home_nv, p_away_nv = normalize_no_vig(p_home_mkt, p_away_mkt)
+    else:
         return {"status": "no_bet", "reason": "Moneyline market missing"}
+
+    edges = [
+        ("HOME", p_home - p_home_nv),
+        ("AWAY", p_away - p_away_nv),
+    ]
 
     side, edge = max(edges, key=lambda x: x[1])
 
     if edge < settings.MIN_EDGE_ML:
-        return {"status": "no_bet", "reason": f"Edge below threshold ({edge:.3f})", "score": clamp_int(50 + edge*800)}
+        return {"status": "no_bet", "reason": "Edge below threshold"}
 
-    # score: base 60 + edge scaled + model certainty factor (distance from 50%)
-    certainty = abs((p_home if side == "HOME" else p_away) - 0.5)
-    score = clamp_int(60 + edge * 900 + certainty * 80)
+    gbp = good_bet_prob_from_edge(edge)
+    score = clamp_int(gbp * 100)
 
-    selection = f"{game.homeTeam.abbreviation or game.homeTeam.name} ML" if side == "HOME" else f"{game.awayTeam.abbreviation or game.awayTeam.name} ML"
+    selection = (
+        f"{game.homeTeam.abbreviation or game.homeTeam.name} ML"
+        if side == "HOME"
+        else f"{game.awayTeam.abbreviation or game.awayTeam.name} ML"
+    )
 
-    rationale = [
-        f"Model win prob: {p_home:.3f} (home), {p_away:.3f} (away)",
-        f"Market implied: {p_home_mkt:.3f} (home), {p_away_mkt:.3f} (away)" if (p_home_mkt is not None and p_away_mkt is not None) else "Market implied probability available",
-        f"Estimated edge: {edge:.3f}",
-        "Elo prior + home advantage applied",
-    ]
+    return {
+        "status": "pick",
+        "selection": selection,
+        "confidence": tier(score),
+        "score": score,
+        "rationale": [
+            f"Good bet probability (calibrated): {gbp:.3f}",
+            f"Estimated edge vs market: {edge:.3f}",
+            "Elo prior + calibrated edge → probability",
+        ],
+    }
 
-    return {"status": "pick", "selection": selection, "confidence": tier(score), "rationale": rationale[:5], "score": score}
 
 def spread_reco(game: GameIn) -> dict:
-    sp = game.odds.spread
-    if not sp or (sp.home is None and sp.away is None):
-        return {"status": "no_bet", "reason": "Spread not available"}
+    return {"status": "no_bet", "reason": "Spread model pending calibration"}
 
-    # Margin proxy from Elo diff (rough; calibrate later)
-    home_elo = get_team_elo(game.homeTeam.name) + settings.HOME_ADV_ELO
-    away_elo = get_team_elo(game.awayTeam.name)
-
-    # heuristic: 25 Elo ≈ 1 point (coarse NBA proxy)
-    elo_diff = home_elo - away_elo
-    pred_margin_home = elo_diff / 25.0  # predicted home margin
-
-    # Need a market line to compare to
-    home_line = sp.home.point if sp.home and sp.home.point is not None else None
-    away_line = sp.away.point if sp.away and sp.away.point is not None else None
-
-    if home_line is None and away_line is None:
-        return {"status": "no_bet", "reason": "Spread line missing"}
-
-    # Lines are typically symmetric: home_line = -away_line
-    line_home = home_line if home_line is not None else (-away_line)
-
-    # edge in points: predicted - market (positive means home should be more favored than market)
-    edge_pts_home = pred_margin_home - (-line_home)  # careful: if home_line is -3, market expects home +3 margin
-    # Actually market spread home_line is usually negative when home is favored.
-    # Expected home margin per market is -home_line. So compare pred_margin_home vs (-home_line).
-    edge_pts_home = pred_margin_home - (-line_home)
-
-    # Choose side
-    if edge_pts_home >= 0:
-        # home value
-        best_edge = edge_pts_home
-        side = "HOME"
-        selection = f"{game.homeTeam.abbreviation or game.homeTeam.name} {line_home:+.1f}"
-    else:
-        best_edge = -edge_pts_home
-        side = "AWAY"
-        # away line usually +X
-        away_point = away_line if away_line is not None else (-(line_home))
-        selection = f"{game.awayTeam.abbreviation or game.awayTeam.name} {away_point:+.1f}"
-
-    if best_edge < settings.MIN_EDGE_SPREAD:
-        return {"status": "no_bet", "reason": f"Edge below threshold ({best_edge:.2f} pts)", "score": clamp_int(50 + best_edge*10)}
-
-    score = clamp_int(60 + best_edge * 8)
-    rationale = [
-        f"Predicted home margin (Elo proxy): {pred_margin_home:.2f}",
-        f"Market expected home margin: {-line_home:.2f}",
-        f"Edge estimate: {best_edge:.2f} pts",
-        "Elo margin proxy (will be calibrated with historical data)",
-    ]
-
-    return {"status": "pick", "selection": selection, "confidence": tier(score), "rationale": rationale[:5], "score": score}
 
 def total_reco(game: GameIn) -> dict:
-    # Totals require pace/off/def features (we’ll add next).
-    # For now we return no_bet, which is allowed by your rules.
-    return {"status": "no_bet", "reason": "Totals model not enabled yet (pace/efficiency pending)"}
+    return {"status": "no_bet", "reason": "Totals model not enabled yet"}
+
 
 def recommend_nba(games: List[GameIn]) -> dict:
     out = {}
