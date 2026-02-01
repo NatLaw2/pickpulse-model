@@ -1,0 +1,159 @@
+{
+  "meta": {
+    "method": "edge_bins_isotonic",
+    "edge_definition": "selected_side_edge = p_model_selected - p_market_novig_selected",
+    "elo_k": 10.0,
+    "home_adv_elo": 40.0,
+    "edge_max": 0.25,
+    "n_bins": 18,
+    "rows_train": 316
+  },
+  "bins": [
+    {
+      "lo": 0.0,
+      "hi": 0.013888888888888888,
+      "n": 24,
+      "win_rate_raw": 0.5,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.013888888888888888,
+      "hi": 0.027777777777777776,
+      "n": 20,
+      "win_rate_raw": 0.5,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.027777777777777776,
+      "hi": 0.041666666666666664,
+      "n": 27,
+      "win_rate_raw": 0.48148148148148145,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.041666666666666664,
+      "hi": 0.05555555555555555,
+      "n": 14,
+      "win_rate_raw": 0.42857142857142855,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.05555555555555555,
+      "hi": 0.06944444444444445,
+      "n": 31,
+      "win_rate_raw": 0.3870967741935484,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.06944444444444445,
+      "hi": 0.08333333333333333,
+      "n": 16,
+      "win_rate_raw": 0.25,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.08333333333333333,
+      "hi": 0.09722222222222221,
+      "n": 19,
+      "win_rate_raw": 0.3157894736842105,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.09722222222222221,
+      "hi": 0.1111111111111111,
+      "n": 20,
+      "win_rate_raw": 0.35,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.1111111111111111,
+      "hi": 0.125,
+      "n": 17,
+      "win_rate_raw": 0.29411764705882354,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.125,
+      "hi": 0.1388888888888889,
+      "n": 17,
+      "win_rate_raw": 0.47058823529411764,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.1388888888888889,
+      "hi": 0.15277777777777776,
+      "n": 11,
+      "win_rate_raw": 0.18181818181818182,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.15277777777777776,
+      "hi": 0.16666666666666666,
+      "n": 9,
+      "win_rate_raw": 0.4444444444444444,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.16666666666666666,
+      "hi": 0.18055555555555555,
+      "n": 10,
+      "win_rate_raw": 0.6,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.18055555555555555,
+      "hi": 0.19444444444444442,
+      "n": 9,
+      "win_rate_raw": 0.1111111111111111,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.19444444444444442,
+      "hi": 0.20833333333333331,
+      "n": 11,
+      "win_rate_raw": 0.45454545454545453,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.20833333333333331,
+      "hi": 0.2222222222222222,
+      "n": 10,
+      "win_rate_raw": 0.1,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.2222222222222222,
+      "hi": 0.2361111111111111,
+      "n": 14,
+      "win_rate_raw": 0.35714285714285715,
+      "win_rate_iso": 0.3829787234042553
+    },
+    {
+      "lo": 0.2361111111111111,
+      "hi": 0.25,
+      "n": 3,
+      "win_rate_raw": 0.3333333333333333,
+      "win_rate_iso": 0.3829787234042553
+    }
+  ],
+  "notes": [
+    "We pick the side with the larger Elo-vs-market no-vig edge (home or away).",
+    "Edge is clipped to EDGE_MAX to reduce tail noise.",
+    "Bins are isotonic-smoothed (monotone non-decreasing) to avoid jagged confidence.",
+    "At runtime, we map computed edge -> confidence via this curve."
+  ],
+  "formulas": {
+    "p_home_elo": "elo_win_prob(elo_home + HOME_ADV_ELO, elo_away)",
+    "p_home_nv": "normalize(implied_prob(home_odds), implied_prob(away_odds)).home",
+    "edge_home": "p_home_elo - p_home_nv",
+    "edge_away": "(1 - p_home_elo) - (1 - p_home_nv)  (equivalently p_home_nv - p_home_elo)",
+    "confidence": "lookup_isotonic_bin(edge_selected)"
+  },
+  "val": {
+    "rows_val": 71,
+    "logloss": 0.6642172639269415,
+    "brier": 0.2356748002728914,
+    "avg_conf": 0.38297872340425543,
+    "avg_win": 0.38028169014084506
+  }
+}
