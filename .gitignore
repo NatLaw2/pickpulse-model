@@ -1,0 +1,6 @@
+.DS_Store
+.env.py
+app/__pycache__/
+app/data/
+data/
+artifacts/
