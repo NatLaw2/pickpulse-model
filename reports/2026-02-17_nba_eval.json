@@ -1,0 +1,129 @@
+{
+  "generated_at": "2026-02-17T21:30:35.427481+00:00",
+  "lookback_days": 90,
+  "total_graded": 18,
+  "overall": {
+    "n": 18,
+    "wins": 3,
+    "losses": 15,
+    "pushes": 0,
+    "win_pct": 16.7,
+    "units": -10.116,
+    "roi_pct": -56.2
+  },
+  "by_market": {
+    "moneyline": {
+      "n": 18,
+      "wins": 3,
+      "losses": 15,
+      "pushes": 0,
+      "win_pct": 16.7,
+      "units": -10.116,
+      "roi_pct": -56.2
+    }
+  },
+  "by_tier": {
+    "strong_lean": {
+      "n": 1,
+      "wins": 0,
+      "losses": 1,
+      "pushes": 0,
+      "win_pct": 0.0,
+      "units": -1.0,
+      "roi_pct": -100.0
+    },
+    "top_pick": {
+      "n": 12,
+      "wins": 3,
+      "losses": 9,
+      "pushes": 0,
+      "win_pct": 25.0,
+      "units": -4.116,
+      "roi_pct": -34.3
+    },
+    "watchlist": {
+      "n": 5,
+      "wins": 0,
+      "losses": 5,
+      "pushes": 0,
+      "win_pct": 0.0,
+      "units": -5.0,
+      "roi_pct": -100.0
+    }
+  },
+  "by_market_tier": {
+    "moneyline": {
+      "strong_lean": {
+        "n": 1,
+        "wins": 0,
+        "losses": 1,
+        "pushes": 0,
+        "win_pct": 0.0,
+        "units": -1.0,
+        "roi_pct": -100.0
+      },
+      "top_pick": {
+        "n": 12,
+        "wins": 3,
+        "losses": 9,
+        "pushes": 0,
+        "win_pct": 25.0,
+        "units": -4.116,
+        "roi_pct": -34.3
+      },
+      "watchlist": {
+        "n": 5,
+        "wins": 0,
+        "losses": 5,
+        "pushes": 0,
+        "win_pct": 0.0,
+        "units": -5.0,
+        "roi_pct": -100.0
+      }
+    }
+  },
+  "calibration": [
+    {
+      "bin_lo": 0.61,
+      "bin_hi": 0.65,
+      "n": 3,
+      "predicted_avg": 0.627,
+      "actual_win_rate": 0.0
+    },
+    {
+      "bin_lo": 0.65,
+      "bin_hi": 0.7,
+      "n": 3,
+      "predicted_avg": 0.667,
+      "actual_win_rate": 0.0
+    },
+    {
+      "bin_lo": 0.74,
+      "bin_hi": 0.82,
+      "n": 3,
+      "predicted_avg": 0.783,
+      "actual_win_rate": 0.667
+    },
+    {
+      "bin_lo": 0.84,
+      "bin_hi": 0.88,
+      "n": 3,
+      "predicted_avg": 0.857,
+      "actual_win_rate": 0.333
+    },
+    {
+      "bin_lo": 0.92,
+      "bin_hi": 1,
+      "n": 3,
+      "predicted_avg": 0.947,
+      "actual_win_rate": 0.0
+    },
+    {
+      "bin_lo": 1,
+      "bin_hi": 1,
+      "n": 3,
+      "predicted_avg": 1.0,
+      "actual_win_rate": 0.0
+    }
+  ]
+}

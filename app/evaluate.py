@@ -129,6 +129,63 @@ def fetch_results() -> Dict[str, Dict[str, Any]]:
     return {str(r["event_id"]): r for r in rows}
 
 
+CLOSING_LINE_COLS = ",".join([
+    "event_id", "market", "outcome_name", "price", "point", "bookmaker_key",
+])
+
+
+def fetch_closing_lines(book: str = "fanduel") -> Dict[str, List[Dict[str, Any]]]:
+    """Fetch closing_lines for NBA from preferred book, keyed by event_id."""
+    rows = _sb_get_all("/rest/v1/closing_lines", {
+        "select": CLOSING_LINE_COLS,
+        "sport": "eq.nba",
+        "bookmaker_key": f"eq.{book}",
+    })
+    by_eid: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rows:
+        by_eid.setdefault(str(r["event_id"]), []).append(r)
+    return by_eid
+
+
+def _enrich_result(
+    result: Dict[str, Any],
+    closing: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, Any]:
+    """Fill null closing odds in game_results from closing_lines table."""
+    eid = str(result.get("event_id", ""))
+    lines = closing.get(eid, [])
+    if not lines:
+        return result
+
+    r = dict(result)  # shallow copy
+    home = (r.get("home_team") or "").strip().lower()
+    away = (r.get("away_team") or "").strip().lower()
+
+    for cl in lines:
+        name = (cl.get("outcome_name") or "").strip().lower()
+        mkt = cl.get("market", "")
+        price = cl.get("price")
+        point = cl.get("point")
+
+        is_home = home and name == home
+        is_away = away and name == away
+
+        if mkt == "h2h":
+            if is_home and r.get("closing_ml_home") is None:
+                r["closing_ml_home"] = price
+            elif is_away and r.get("closing_ml_away") is None:
+                r["closing_ml_away"] = price
+        elif mkt == "spreads":
+            if is_home and r.get("closing_spread_home_point") is None:
+                r["closing_spread_home_point"] = point
+                r["closing_spread_home_price"] = price
+            elif is_away and r.get("closing_spread_away_point") is None:
+                r["closing_spread_away_point"] = point
+                r["closing_spread_away_price"] = price
+
+    return r
+
+
 # ---------------------------------------------------------------------------
 # Grading
 # ---------------------------------------------------------------------------
@@ -408,6 +465,13 @@ def main():
 
     results = fetch_results()
     print(f"  game_results rows:   {len(results)}")
+
+    closing = fetch_closing_lines()
+    print(f"  closing_lines eids:  {len(closing)}")
+
+    # Enrich game_results with closing_lines odds where missing
+    for eid in results:
+        results[eid] = _enrich_result(results[eid], closing)
 
     # Grade
     graded: List[Dict[str, Any]] = []
