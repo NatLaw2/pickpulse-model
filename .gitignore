@@ -4,3 +4,10 @@ app/__pycache__/
 app/data/
 data/
 artifacts/
+
+# Secrets & local artifacts
+.env
+.env.*
+*.zip
+__pycache__/
+.DS_Store

@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+
+@layer base {
+  :root {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
+    --card-hover: 222 47% 12%;
+
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 142 70% 45%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 222 30% 18%;
+    --secondary-foreground: 210 40% 90%;
+
+    --muted: 222 30% 14%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 38 92% 50%;
+    --accent-foreground: 222 47% 6%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 222 47% 6%;
+
+    --border: 222 30% 18%;
+    --input: 222 30% 18%;
+    --ring: 142 70% 45%;
+
+    --radius: 0.75rem;
+
+    /* Sport-specific accent colors */
+    --sport-nba: 25 95% 53%;
+    --sport-mlb: 0 72% 51%;
+    --sport-nhl: 210 100% 50%;
+    --sport-ncaab: 262 83% 58%;
+    --sport-ncaaf: 142 70% 45%;
+    --sport-nfl: 222 47% 40%;
+
+    /* Confidence tiers */
+    --confidence-high: 142 70% 45%;
+    --confidence-medium: 38 92% 50%;
+    --confidence-low: 215 20% 55%;
+
+    /* Sidebar defaults */
+    --sidebar-background: 222 47% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 142 70% 45%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 222 30% 14%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 30% 18%;
+    --sidebar-ring: 142 70% 45%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 142 70% 45%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 222 30% 18%;
+    --secondary-foreground: 210 40% 90%;
+    --muted: 222 30% 14%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 38 92% 50%;
+    --accent-foreground: 222 47% 6%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 30% 18%;
+    --input: 222 30% 18%;
+    --ring: 142 70% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .sport-badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider;
+  }
+
+  .sport-badge-nba {
+    @apply bg-[hsl(var(--sport-nba)/0.15)] text-[hsl(var(--sport-nba))];
+  }
+
+  .sport-badge-mlb {
+    @apply bg-[hsl(var(--sport-mlb)/0.15)] text-[hsl(var(--sport-mlb))];
+  }
+
+  .sport-badge-nhl {
+    @apply bg-[hsl(var(--sport-nhl)/0.15)] text-[hsl(var(--sport-nhl))];
+  }
+
+  .sport-badge-ncaab {
+    @apply bg-[hsl(var(--sport-ncaab)/0.15)] text-[hsl(var(--sport-ncaab))];
+  }
+
+  .sport-badge-ncaaf {
+    @apply bg-[hsl(var(--sport-ncaaf)/0.15)] text-[hsl(var(--sport-ncaaf))];
+  }
+
+  .sport-badge-nfl {
+    @apply bg-[hsl(var(--sport-nfl)/0.15)] text-[hsl(var(--sport-nfl))];
+  }
+
+  .confidence-badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+
+  .confidence-high {
+    @apply bg-[hsl(var(--confidence-high)/0.15)] text-[hsl(var(--confidence-high))];
+  }
+
+  .confidence-medium {
+    @apply bg-[hsl(var(--confidence-medium)/0.15)] text-[hsl(var(--confidence-medium))];
+  }
+
+  .confidence-low {
+    @apply bg-[hsl(var(--confidence-low)/0.15)] text-[hsl(var(--confidence-low))];
+  }
+
+  .stat-card {
+    @apply bg-card rounded-xl p-6 border border-border transition-all duration-200 hover:border-primary/30;
+  }
+
+  .game-card {
+    @apply bg-card rounded-xl border border-border overflow-hidden transition-all duration-200 hover:border-primary/30 hover:bg-card-hover;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.2);
+  }
+}
