@@ -779,8 +779,35 @@ export const GamesPage = () => {
               </div>
             ) : (
               <>
+                {/* Top Pick performance (if available) */}
+                {perfSummary!.topPick && perfSummary!.topPick.picks > 0 ? (
+                  <div className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <div className="text-xs font-semibold text-foreground mb-2">Daily Top Pick</div>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="text-center">
+                        <p className="text-xl font-bold font-mono text-foreground">
+                          {perfSummary!.topPick.wins}-{perfSummary!.topPick.losses}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">Record</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xl font-bold font-mono text-foreground">
+                          {perfSummary!.topPick.percentage}%
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">Win Rate</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-xl font-bold font-mono ${perfSummary!.topPick.units >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                          {perfSummary!.topPick.units >= 0 ? "+" : ""}{perfSummary!.topPick.units.toFixed(2)}u
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">Units</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Overall stats row */}
-                <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-4 gap-3 mb-4">
                   <div className="rounded-lg border border-border bg-background/40 p-3 text-center">
                     <p className="text-2xl font-bold font-mono text-foreground">
                       {perfSummary!.overall.percentage}%
@@ -799,6 +826,14 @@ export const GamesPage = () => {
                     </p>
                     <p className="text-xs text-muted-foreground">Total Picks</p>
                   </div>
+                  {typeof perfSummary!.overall.units === "number" ? (
+                    <div className="rounded-lg border border-border bg-background/40 p-3 text-center">
+                      <p className={`text-2xl font-bold font-mono ${perfSummary!.overall.units >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                        {perfSummary!.overall.units >= 0 ? "+" : ""}{perfSummary!.overall.units.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Units</p>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Per-sport chips */}
