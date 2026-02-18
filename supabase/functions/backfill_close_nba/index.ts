@@ -100,17 +100,16 @@ function historicalUrl(apiKey: string, dateIso: string) {
 async function upsertClosingLines(rows: ClosingLineInsert[]) {
   if (rows.length === 0) return { upserted: 0 };
 
-  // Must match your UNIQUE constraint:
-  // (sport, event_id, bookmaker_key, market, outcome_name, COALESCE(point, 0))
-  // Since point is NOT NULL now, we just use point.
-  const path =
-    `/rest/v1/closing_lines?on_conflict=` +
-    `sport,event_id,bookmaker_key,market,outcome_name,point`;
+  // Insert rows; skip duplicates silently.
+  // After the closing_lines_snap_unique migration, the unique index
+  // includes date_trunc('minute', captured_at), so historical rows
+  // with different timestamps always create new rows.
+  const path = `/rest/v1/closing_lines`;
 
   const { resp, text } = await supaFetch(path, {
     method: "POST",
     headers: {
-      Prefer: "resolution=merge-duplicates,return=representation",
+      Prefer: "resolution=ignore-duplicates,return=representation",
     },
     body: JSON.stringify(rows),
   });

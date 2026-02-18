@@ -103,8 +103,9 @@ def _compute_pick_clv(
 ) -> Optional[Dict[str, Any]]:
     """Compute CLV for a single locked pick.
 
-    Locked odds  = latest snapshot with captured_at <= locked_at
-    Closing odds = latest snapshot with captured_at <= game_start_time
+    Locked odds  = latest closing_lines snapshot with captured_at <= locked_at
+                   (falls back to locked_ml_*/locked_spread_* from locked_picks)
+    Closing odds = latest closing_lines snapshot with captured_at <= game_start_time
     """
     market = pick.get("market", "")
     locked_at = pick.get("locked_at")
@@ -113,7 +114,19 @@ def _compute_pick_clv(
     locked_odds = _extract_odds_at(lines, locked_at)
     closing_odds = _extract_odds_at(lines, game_start)
 
-    if not locked_odds or not closing_odds:
+    # Fallback: if no closing_lines snapshot exists at lock time,
+    # use the locked_ml_*/locked_spread_* columns stored in locked_picks
+    if not locked_odds:
+        locked_odds = {
+            "ml_home": pick.get("locked_ml_home"),
+            "ml_away": pick.get("locked_ml_away"),
+            "spread_home_point": pick.get("locked_spread_home_point"),
+            "spread_home_price": pick.get("locked_spread_home_price"),
+            "spread_away_point": pick.get("locked_spread_away_point"),
+            "spread_away_price": pick.get("locked_spread_away_price"),
+        }
+
+    if not closing_odds:
         return None
 
     # Use the canonical home/away from closing_lines for side resolution

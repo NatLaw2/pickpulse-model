@@ -210,37 +210,24 @@ serve(async (req) => {
         }
       }
 
-      // Upsert summary row (conflict key includes point coalesce in index, so summary won't collide since market/outcome are 'summary')
-      {
+      // Insert summary + market rows.
+      // After the closing_lines_snap_unique migration, the unique index
+      // includes date_trunc('minute', captured_at), so each minute's run
+      // creates new rows.  Same-minute re-runs are silently skipped.
+      const allRowsForEvent = [summaryRow, ...marketRows];
+      if (allRowsForEvent.length > 0) {
         const { error } = await supabase
           .from("closing_lines")
-          .upsert(summaryRow, {
+          .upsert(allRowsForEvent, {
             onConflict: "sport,event_id,bookmaker_key,market,outcome_name,point",
+            ignoreDuplicates: true,
           });
 
         if (error) {
-          console.log("[close_nba] summary upsert error", e.id, error.message);
+          console.log("[close_nba] insert error", e.id, error.message);
           skipped++;
           continue;
         }
-      }
-
-      // Upsert market rows (this is the important part — duplicates become updates, not failures)
-      if (marketRows.length > 0) {
-        const { error, data } = await supabase
-          .from("closing_lines")
-          .upsert(marketRows, {
-            onConflict: "sport,event_id,bookmaker_key,market,outcome_name,point",
-          });
-
-        if (error) {
-          console.log("[close_nba] market upsert error", e.id, error.message);
-          skipped++;
-          continue;
-        }
-
-        // Supabase upsert doesn't reliably return per-row inserted vs updated counts,
-        // so we treat successful upsert as "captured".
         inserted++;
       } else {
         skipped++;

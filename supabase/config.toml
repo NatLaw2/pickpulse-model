@@ -388,3 +388,6 @@ verify_jwt = false
 
 [functions.lock-picks-at-start]
 verify_jwt = false
+
+[functions.snap_odds_nba_near_tip]
+verify_jwt = false
