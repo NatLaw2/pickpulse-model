@@ -1,0 +1,52 @@
+{
+  "experiment": "clv_filter_sweep",
+  "timestamp": "2026-02-18T23:58:56.268336+00:00",
+  "days": 90,
+  "n_picks": 20,
+  "coverage": {
+    "total": 20,
+    "has_lock_snap": 20,
+    "has_close_snap": 20,
+    "has_both": 20,
+    "has_clv": 20,
+    "has_steam": 0,
+    "skipped": 0
+  },
+  "filters": {
+    "baseline": {
+      "n": 20,
+      "n_with_clv": 20,
+      "mean_clv": 0.0,
+      "pct_positive_clv": 0.0,
+      "n_graded": 18,
+      "wins": 3,
+      "win_rate": 16.7,
+      "units": -10.12,
+      "roi_pct": -56.2
+    },
+    "steam_15m >= 0": {
+      "n": 0
+    },
+    "steam_15m >= 0.005": {
+      "n": 0
+    },
+    "range_30m <= 0.03": {
+      "n": 0
+    },
+    "range_30m <= 0.02": {
+      "n": 0
+    },
+    "snap_gap_close <= 300s": {
+      "n": 0
+    },
+    "snap_gap_close <= 120s": {
+      "n": 0
+    },
+    "clv_prob > 0": {
+      "n": 0
+    },
+    "clv_prob > 0.01": {
+      "n": 0
+    }
+  }
+}

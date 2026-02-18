@@ -4,6 +4,11 @@ Locked odds:  latest closing_lines snapshot with captured_at <= locked_at
 Closing odds: latest closing_lines snapshot with captured_at <= game_start_time
 Home/away mapping: uses outcome_name matched against home_team/away_team from
 the closing_lines row itself (authoritative for the event).
+
+Now integrates the CLV Timing Layer (app/clv_timing) for enhanced metrics:
+  - True CLV from p_lock vs p_close using snapshot-nearest timestamps
+  - Steam/velocity/range/std timing features
+  - Snapshot coverage stats
 """
 from __future__ import annotations
 
@@ -71,7 +76,11 @@ def _extract_odds_at(
     if not home_lower or not away_lower:
         return {}
 
-    out: Dict[str, Any] = {"_home_team": home, "_away_team": away}
+    out: Dict[str, Any] = {
+        "_home_team": home,
+        "_away_team": away,
+        "_snapshot_ts": latest_ts,
+    }
     for r in snapshot:
         name = (r.get("outcome_name") or "").strip().lower()
         mkt = r.get("market", "")
@@ -164,6 +173,9 @@ def _compute_pick_clv(
         rec["locked_ml_away"] = locked_odds.get("ml_away")
         rec["closing_ml_home"] = closing_odds.get("ml_home")
         rec["closing_ml_away"] = closing_odds.get("ml_away")
+        # Snapshot timestamps used
+        rec["lock_snap_ts"] = locked_odds.get("_snapshot_ts")
+        rec["close_snap_ts"] = closing_odds.get("_snapshot_ts")
 
     elif market == "spread":
         side_key = "home" if side == "home" else "away"
@@ -180,6 +192,8 @@ def _compute_pick_clv(
         rec["locked_spread_price"] = locked_odds.get(f"spread_{side_key}_price")
         rec["closing_spread_point"] = closing_odds.get(f"spread_{side_key}_point")
         rec["closing_spread_price"] = closing_odds.get(f"spread_{side_key}_price")
+        rec["lock_snap_ts"] = locked_odds.get("_snapshot_ts")
+        rec["close_snap_ts"] = closing_odds.get("_snapshot_ts")
 
     else:
         return None
@@ -265,6 +279,8 @@ def _build_debug(clv_picks: List[Dict[str, Any]], n: int = 5) -> List[Dict[str, 
             "side": p.get("side"),
             "locked_at": p.get("locked_at"),
             "game_start_time": p.get("game_start_time"),
+            "lock_snap_ts": p.get("lock_snap_ts"),
+            "close_snap_ts": p.get("close_snap_ts"),
             "clv": p.get("clv"),
         }
         if p.get("market") == "moneyline":
@@ -290,6 +306,56 @@ def _build_debug(clv_picks: List[Dict[str, Any]], n: int = 5) -> List[Dict[str, 
 
 
 # ---------------------------------------------------------------------------
+# Timing layer integration
+# ---------------------------------------------------------------------------
+
+def _compute_timing_features(
+    locked: List[Dict[str, Any]],
+    closing: Dict[str, List[Dict[str, Any]]],
+) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+    """Compute CLV timing features for all picks using the timing layer."""
+    try:
+        from app.clv_timing.features import compute_batch
+        return compute_batch(locked, closing)
+    except ImportError as e:
+        print(f"[clv_auditor] Timing layer import failed: {e}")
+        return [], {"total": len(locked), "error": str(e)}
+
+
+def _timing_summary(
+    timing_features: List[Dict[str, Any]],
+    coverage: Dict[str, int],
+) -> Dict[str, Any]:
+    """Build timing summary section for the report."""
+    try:
+        from app.clv_timing.report import summarize_features
+        md = summarize_features(timing_features, coverage)
+    except ImportError:
+        md = ""
+
+    # Extract numeric summary
+    clvs = [f["clv_prob"] for f in timing_features
+            if f.get("clv_prob") is not None and math.isfinite(f["clv_prob"])]
+    clv_stats = {}
+    if clvs:
+        n = len(clvs)
+        clvs_sorted = sorted(clvs)
+        median = clvs_sorted[n // 2] if n % 2 == 1 else (clvs_sorted[n // 2 - 1] + clvs_sorted[n // 2]) / 2
+        clv_stats = {
+            "n": n,
+            "mean": round(sum(clvs) / n, 5),
+            "median": round(median, 5),
+            "pct_positive": round(sum(1 for c in clvs if c > 0) / n * 100, 1),
+        }
+
+    return {
+        "coverage": coverage,
+        "clv_prob_stats": clv_stats,
+        "markdown": md,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main run
 # ---------------------------------------------------------------------------
 
@@ -304,7 +370,7 @@ def run(days: int = 180, dry_run: bool = False) -> Dict[str, Any]:
     closing = fetch_closing_lines()
     print(f"[clv_auditor] Closing line events: {len(closing)}")
 
-    # Compute per-pick CLV
+    # Compute per-pick CLV (original method)
     clv_picks: List[Dict[str, Any]] = []
     skipped = 0
     for pick in locked:
@@ -325,9 +391,25 @@ def run(days: int = 180, dry_run: bool = False) -> Dict[str, Any]:
         for d in debug_picks:
             print(f"  {d['event_id']} | {d['market']} {d['side']} | "
                   f"locked_at={d['locked_at']} | "
+                  f"lock_snap={d.get('lock_snap_ts', '?')} | "
+                  f"close_snap={d.get('close_snap_ts', '?')} | "
                   f"locked={d.get('locked_odds')} | "
                   f"closing={d.get('closing_odds')} | "
                   f"CLV={d['clv']}")
+
+    # --- Timing layer features ---
+    print("[clv_auditor] Computing timing layer features...")
+    timing_features, timing_coverage = _compute_timing_features(locked, closing)
+    timing_section = _timing_summary(timing_features, timing_coverage)
+
+    total = timing_coverage.get("total", 0)
+    has_both = timing_coverage.get("has_both", 0)
+    has_clv = timing_coverage.get("has_clv", 0)
+    has_steam = timing_coverage.get("has_steam", 0)
+    print(f"[clv_auditor] Timing coverage: {total} picks, "
+          f"{has_both} have both snaps ({has_both/total*100:.0f}%), "
+          f"{has_clv} have CLV, {has_steam} have steam"
+          if total > 0 else "[clv_auditor] No picks for timing analysis")
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -340,6 +422,7 @@ def run(days: int = 180, dry_run: bool = False) -> Dict[str, Any]:
         "by_confidence_bucket": _confidence_buckets(clv_picks),
         "leakage_flags": _detect_leakage(clv_picks),
         "debug_sample": debug_picks,
+        "timing": timing_section,
         "picks": clv_picks,
     }
 

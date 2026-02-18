@@ -6,22 +6,25 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
  * snap_odds_nba_near_tip
  *
  * Captures odds snapshots into closing_lines for NBA games starting
- * within the next 30 minutes.  Runs every 2 minutes via cron.
+ * within a configurable window (default 90 minutes, covering T-90 through T-0).
  *
- * Unlike close_nba (which upserts and overwrites), this function
- * INSERTs with ignoreDuplicates so that each 2-minute run creates
- * a new snapshot row (deduplicated per minute by the unique index
- * closing_lines_snap_unique).
+ * Runs every 2 minutes via cron.  INSERTs with deduplication so each
+ * 2-minute run creates new snapshot rows (deduplicated per minute by
+ * the closing_lines_snap_unique index).
+ *
+ * Window tiers:
+ *   - T-90 to T-30: captures for early steam detection / T-60 snapshots
+ *   - T-30 to T-0:  captures for closing line / T-15 lock snapshots
  *
  * Requires:
- *   - The closing_lines_snap_unique index (see migration
- *     20260218_closing_lines_add_captured_at_to_unique.sql)
+ *   - The closing_lines_snap_unique index
  *   - Env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ODDS_API_KEY
+ *   - Optional: SNAP_WINDOW_MINUTES (default 90)
  *
- * Cron: every 2 minutes (configure in Supabase dashboard)
+ * Cron: every 2 minutes
  */
 
-const VERSION = "snap_odds_nba_near_tip@2026-02-18_v1";
+const VERSION = "snap_odds_nba_near_tip@2026-02-18_v2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -163,6 +166,9 @@ serve(async (req) => {
     const ODDS_API_KEY = getEnv("ODDS_API_KEY");
     const bookmakerKey = (Deno.env.get("PREFERRED_BOOKMAKER") ?? "fanduel").toLowerCase();
 
+    // Configurable window: default 90 minutes to capture T-90 through T-0
+    const SNAP_WINDOW_MINUTES = Number(Deno.env.get("SNAP_WINDOW_MINUTES") || "90");
+
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
@@ -170,13 +176,13 @@ serve(async (req) => {
     const now = new Date();
     const capturedAt = now.toISOString();
 
-    // Window: games starting between now and now + 30 minutes
-    const windowEndMs = now.getTime() + 30 * 60 * 1000;
+    // Window: games starting between now and now + SNAP_WINDOW_MINUTES
+    const windowEndMs = now.getTime() + SNAP_WINDOW_MINUTES * 60 * 1000;
 
     // Fetch all NBA odds from The Odds API
     const events = await fetchNbaOdds(ODDS_API_KEY);
 
-    // Filter to games within the 30-minute window
+    // Filter to games within the window
     const nearTip = events.filter((e) => {
       const ct = new Date(e.commence_time).getTime();
       return ct > now.getTime() && ct <= windowEndMs;
@@ -186,7 +192,7 @@ serve(async (req) => {
       return json({
         ok: true,
         version: VERSION,
-        message: "No NBA games starting within 30 minutes",
+        message: `No NBA games starting within ${SNAP_WINDOW_MINUTES} minutes`,
         captured_at: capturedAt,
         events_total: events.length,
         near_tip: 0,
@@ -245,6 +251,7 @@ serve(async (req) => {
       version: VERSION,
       captured_at: capturedAt,
       bookmaker: bookmakerKey,
+      snap_window_minutes: SNAP_WINDOW_MINUTES,
       events_total: events.length,
       near_tip: nearTip.length,
       rows_built: allRows.length,
