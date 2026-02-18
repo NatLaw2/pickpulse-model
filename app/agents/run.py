@@ -70,7 +70,7 @@ def main() -> None:
 
     deployed = report.get("deployed_config")
     if deployed:
-        print(f"Deployed: K={deployed['K']}, HFA={deployed['HFA']}, MIN_EDGE={deployed['MIN_EDGE']}")
+        print(f"Deployed: C={deployed['C']}, MIN_EDGE={deployed['MIN_EDGE']}")
 
 
 if __name__ == "__main__":

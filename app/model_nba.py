@@ -42,48 +42,30 @@ def tier(score: int) -> str:
 
 
 # -------------------------
-# Confidence curve loader
+# Confidence curve loader (Elo fallback)
 # -------------------------
 
 _CONF_CACHE: Optional[dict] = None
 
 def _load_conf_curve() -> Optional[dict]:
-    """
-    Loads artifacts/confidence_curve.json written by confidence_calibrate.
-
-    This runs once per process and caches the result.
-    """
     global _CONF_CACHE
     if _CONF_CACHE is not None:
         return _CONF_CACHE
 
     path = getattr(settings, "CONF_CURVE_PATH", "")
     if not path:
-        print("[model] CONF_CURVE_PATH not set")
         _CONF_CACHE = None
         return None
 
     try:
         with open(path, "r") as f:
             data = json.load(f)
-
         if not isinstance(data, dict):
-            print("[model] confidence curve invalid format")
             _CONF_CACHE = None
             return None
-
-        bins = data.get("bins", [])
-        print(f"[model] loaded confidence curve from {path} (bins={len(bins)})")
-
         _CONF_CACHE = data
         return data
-
-    except FileNotFoundError:
-        print(f"[model] confidence curve NOT FOUND at {path}")
-        _CONF_CACHE = None
-        return None
-    except Exception as e:
-        print(f"[model] failed to load confidence curve: {e}")
+    except (FileNotFoundError, Exception):
         _CONF_CACHE = None
         return None
 
@@ -110,17 +92,92 @@ def _lookup_bins(edge: float, bins: List[Dict[str, Any]], edge_max: float) -> fl
 def good_bet_prob_from_edge(edge: float) -> float:
     curve = _load_conf_curve()
     edge_nn = max(0.0, float(edge))
-
     if curve:
         edge_max = _curve_edge_max(curve)
         edge_nn = min(edge_nn, edge_max)
-
         bins = curve.get("bins")
         if isinstance(bins, list) and bins:
             return clamp01(_lookup_bins(edge_nn, bins, edge_max))
-
-    # Conservative fallback
     return clamp01(0.50 + edge_nn * 2.0)
+
+
+# -------------------------
+# ML model path (new)
+# -------------------------
+
+def _try_ml_reco(game: GameIn) -> Optional[dict]:
+    """Try the trained ML probability model. Returns pick dict or None if unavailable."""
+    try:
+        from .ml.predict import is_available, predict_win_prob
+    except ImportError:
+        return None
+
+    if not is_available():
+        return None
+
+    ml = game.odds.moneyline
+    if not ml or ml.home is None or ml.away is None:
+        return None
+
+    p_home_mkt = implied_prob_from_american(int(ml.home))
+    p_away_mkt = implied_prob_from_american(int(ml.away))
+    p_home_nv, p_away_nv = normalize_no_vig(p_home_mkt, p_away_mkt)
+
+    # Get spread if available
+    sp_point = 0.0
+    if game.odds.spread and game.odds.spread.home and game.odds.spread.home.point is not None:
+        sp_point = float(game.odds.spread.home.point)
+
+    # Predict for both sides, pick the higher probability
+    p_home = predict_win_prob(
+        locked_home_nv=p_home_nv,
+        locked_away_nv=p_away_nv,
+        spread_home_point=sp_point,
+        is_home=1,
+    )
+    p_away = predict_win_prob(
+        locked_home_nv=p_home_nv,
+        locked_away_nv=p_away_nv,
+        spread_home_point=sp_point,
+        is_home=0,
+    )
+
+    if p_home is None or p_away is None:
+        return None
+
+    # Pick side with higher win probability
+    if p_home >= p_away:
+        side = "HOME"
+        win_prob = p_home
+        edge = p_home - p_home_nv
+    else:
+        side = "AWAY"
+        win_prob = p_away
+        edge = p_away - p_away_nv
+
+    # Require minimum edge vs market
+    if edge < settings.MIN_EDGE_ML:
+        return {"status": "no_bet", "reason": f"ML edge {edge:.3f} below threshold {settings.MIN_EDGE_ML}"}
+
+    score = clamp_int(win_prob * 100)
+
+    selection = (
+        f"{game.homeTeam.abbreviation or game.homeTeam.name} ML"
+        if side == "HOME"
+        else f"{game.awayTeam.abbreviation or game.awayTeam.name} ML"
+    )
+
+    return {
+        "status": "pick",
+        "selection": selection,
+        "confidence": tier(score),
+        "score": score,
+        "rationale": [
+            f"ML win probability (calibrated): {win_prob:.3f}",
+            f"Edge vs market: {edge:.3f}",
+            "Logistic regression + isotonic calibration",
+        ],
+    }
 
 
 # -------------------------
@@ -128,6 +185,12 @@ def good_bet_prob_from_edge(edge: float) -> float:
 # -------------------------
 
 def ml_reco(game: GameIn) -> dict:
+    # Try ML model first
+    ml_result = _try_ml_reco(game)
+    if ml_result is not None:
+        return ml_result
+
+    # Elo fallback
     ml = game.odds.moneyline
     if not ml or (ml.home is None and ml.away is None):
         return {"status": "no_bet", "reason": "Moneyline not available"}
@@ -172,7 +235,7 @@ def ml_reco(game: GameIn) -> dict:
         "rationale": [
             f"Good bet probability (calibrated): {gbp:.3f}",
             f"Estimated edge vs market: {edge:.3f}",
-            "Elo prior + calibrated edge → probability",
+            "Elo prior + calibrated edge → probability (fallback)",
         ],
     }
 

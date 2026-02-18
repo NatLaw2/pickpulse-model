@@ -19,7 +19,6 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
  *   - Env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ODDS_API_KEY
  *
  * Cron: every 2 minutes (configure in Supabase dashboard)
- *   */2 * * * *   snap_odds_nba_near_tip
  */
 
 const VERSION = "snap_odds_nba_near_tip@2026-02-18_v1";

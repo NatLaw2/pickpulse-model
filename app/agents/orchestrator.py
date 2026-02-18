@@ -30,7 +30,10 @@ from . import strategy_tournament
 # Deployment gating
 # ---------------------------------------------------------------------------
 
-_GATE_MIN_SAMPLE = 100
+_GATE_MIN_SAMPLE = 200
+_GATE_LOGLOSS_IMPROVEMENT_PCT = 2.0  # challenger must improve LL by >= 2%
+_GATE_ROI_REGRESSION_MAX = 2.0  # units per 100 bets
+_GATE_OVERCONFIDENCE_MAX = 0.62
 
 
 def _check_gates(
@@ -47,7 +50,7 @@ def _check_gates(
             "checks": [{"gate": "data", "passed": False, "reason": "Missing champion or challenger data"}],
         }
 
-    # Gate 1: Sample size >= 100
+    # Gate 1: Sample size >= 200 graded picks
     n = challenger.get("n_bets", 0)
     checks.append({
         "gate": "sample_size",
@@ -56,54 +59,69 @@ def _check_gates(
         "threshold": _GATE_MIN_SAMPLE,
     })
 
-    # Gate 2: Challenger mean CLV > champion mean CLV
-    ch_clv = champion.get("mean_clv", 0)
-    cl_clv = challenger.get("mean_clv", 0)
-    checks.append({
-        "gate": "mean_clv",
-        "passed": cl_clv > ch_clv,
-        "champion": ch_clv,
-        "challenger": cl_clv,
-    })
-
-    # Gate 3: Challenger % positive CLV > champion
-    ch_pct = champion.get("pct_positive_clv", 0)
-    cl_pct = challenger.get("pct_positive_clv", 0)
-    checks.append({
-        "gate": "pct_positive_clv",
-        "passed": cl_pct > ch_pct,
-        "champion": ch_pct,
-        "challenger": cl_pct,
-    })
-
-    # Gate 4: Challenger logloss <= champion logloss
+    # Gate 2: Challenger log-loss improves champion by >= 2%
     ch_ll = champion.get("logloss", float("inf"))
     cl_ll = challenger.get("logloss", float("inf"))
+    if ch_ll > 0 and ch_ll != float("inf"):
+        ll_improvement_pct = (ch_ll - cl_ll) / ch_ll * 100
+    else:
+        ll_improvement_pct = 0.0
     checks.append({
-        "gate": "logloss",
-        "passed": cl_ll <= ch_ll,
-        "champion": ch_ll,
-        "challenger": cl_ll,
+        "gate": "logloss_improvement",
+        "passed": ll_improvement_pct >= _GATE_LOGLOSS_IMPROVEMENT_PCT,
+        "champion_ll": ch_ll,
+        "challenger_ll": cl_ll,
+        "improvement_pct": round(ll_improvement_pct, 2),
+        "threshold_pct": _GATE_LOGLOSS_IMPROVEMENT_PCT,
     })
 
-    # Gate 5: Challenger ROI >= champion ROI - 5%
+    # Gate 3: CLV gate — mean CLV > 0 OR pct positive CLV >= 52%
+    cl_clv = challenger.get("mean_clv", 0)
+    cl_pct = challenger.get("pct_positive_clv", 0)
+    clv_passed = cl_clv > 0 or cl_pct >= 52.0
+    checks.append({
+        "gate": "clv",
+        "passed": clv_passed,
+        "mean_clv": cl_clv,
+        "pct_positive_clv": cl_pct,
+        "rule": "mean_clv > 0 OR pct_positive_clv >= 52%",
+    })
+
+    # Gate 4: ROI not worse than champion by > 2 units per 100 bets
     ch_roi = champion.get("roi_pct", 0)
     cl_roi = challenger.get("roi_pct", 0)
+    roi_regression = ch_roi - cl_roi
     checks.append({
         "gate": "roi_regression",
-        "passed": cl_roi >= ch_roi - 5.0,
-        "champion": ch_roi,
-        "challenger": cl_roi,
-        "threshold": ch_roi - 5.0,
+        "passed": roi_regression <= _GATE_ROI_REGRESSION_MAX,
+        "champion_roi": ch_roi,
+        "challenger_roi": cl_roi,
+        "regression": round(roi_regression, 2),
+        "max_allowed": _GATE_ROI_REGRESSION_MAX,
     })
 
-    # Gate 6: Rolling window check (placeholder — requires 30/90 day sub-runs)
-    # For now, auto-pass if other gates pass. Full implementation needs
-    # sub-window tournament runs.
+    # Gate 5: Overconfidence — avg predicted confidence <= 0.62
+    # unless backed by actual win rate within 3pp
+    cl_win_pct = challenger.get("win_pct")
+    cl_avg_conf = None
+    if calibration and calibration.get("metrics"):
+        cl_avg_conf = calibration["metrics"].get("avg_confidence")
+    if cl_avg_conf is None:
+        # Fall back: estimate from n_wins / n_bets
+        n_wins = challenger.get("n_wins", 0)
+        n_bets_c = challenger.get("n_bets", 1)
+        cl_avg_conf = n_wins / n_bets_c if n_bets_c > 0 else 0.5
+
+    conf_ok = cl_avg_conf <= _GATE_OVERCONFIDENCE_MAX
+    if not conf_ok and cl_win_pct is not None:
+        # Allow if win rate backs it up (within 3pp)
+        conf_ok = abs(cl_avg_conf - cl_win_pct / 100.0) <= 0.03
     checks.append({
-        "gate": "rolling_window",
-        "passed": True,
-        "note": "Rolling window check requires sub-period tournament runs (future enhancement)",
+        "gate": "overconfidence",
+        "passed": conf_ok,
+        "avg_confidence": round(cl_avg_conf, 4) if cl_avg_conf else None,
+        "threshold": _GATE_OVERCONFIDENCE_MAX,
+        "win_pct": cl_win_pct,
     })
 
     all_passed = all(c["passed"] for c in checks)
@@ -188,14 +206,14 @@ def _build_markdown(report: Dict[str, Any]) -> str:
     tourney = report.get("strategy_tournament", {})
     top5 = tourney.get("top_5", [])
     if top5:
-        lines.append("## Strategy Tournament")
+        lines.append("## Model Tournament")
         champ = tourney.get("champion")
         if champ:
-            lines.append(f"- Champion: K={champ['K']}, HFA={champ['HFA']}, MIN_EDGE={champ['MIN_EDGE']} -> LL={champ['logloss']}, CLV={champ['mean_clv']}, ROI={champ['roi_pct']}%")
+            lines.append(f"- Champion: C={champ['C']}, MIN_EDGE={champ['MIN_EDGE']} -> LL={champ['logloss']}, CLV={champ['mean_clv']}, ROI={champ['roi_pct']}%")
         lines.append("- Top 5 variants:")
         for i, v in enumerate(top5, 1):
             lines.append(
-                f"  {i}. K={v['K']}, HFA={v['HFA']}, ME={v['MIN_EDGE']} "
+                f"  {i}. C={v['C']}, ME={v['MIN_EDGE']} "
                 f"-> LL={v['logloss']}, CLV={v['mean_clv']}, ROI={v['roi_pct']}%, "
                 f"n={v['n_bets']}"
             )
@@ -321,22 +339,23 @@ def run(
         if deploy and gating["passed"] and top:
             print("\n[orchestrator] ALL GATES PASSED — deploying challenger")
             config = {
-                "K": top["K"],
-                "HFA": top["HFA"],
+                "C": top["C"],
                 "MIN_EDGE": top["MIN_EDGE"],
                 "deployed_at": datetime.now(timezone.utc).isoformat(),
                 "metrics": {
                     "logloss": top["logloss"],
                     "mean_clv": top["mean_clv"],
+                    "pct_positive_clv": top["pct_positive_clv"],
                     "roi_pct": top["roi_pct"],
                     "n_bets": top["n_bets"],
+                    "win_pct": top.get("win_pct"),
                 },
             }
             if not dry_run:
                 os.makedirs("artifacts", exist_ok=True)
-                with open("artifacts/champion_config.json", "w") as f:
+                with open("artifacts/champion_model.json", "w") as f:
                     json.dump(config, f, indent=2)
-                print("[orchestrator] Wrote artifacts/champion_config.json")
+                print("[orchestrator] Wrote artifacts/champion_model.json")
             report["deployed_config"] = config
         elif deploy:
             print("\n[orchestrator] GATES BLOCKED — no deployment")
