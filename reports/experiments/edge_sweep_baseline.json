@@ -1,0 +1,917 @@
+{
+  "experiment": "edge_sweep",
+  "timestamp": "2026-02-18T21:23:58.163677+00:00",
+  "data_rows": 3334,
+  "date_range": {
+    "start": "2022-10-18",
+    "end": "2025-02-28"
+  },
+  "thresholds": [
+    0.005,
+    0.01,
+    0.015,
+    0.02,
+    0.025,
+    0.03,
+    0.04,
+    0.05
+  ],
+  "all_games_baseline": {
+    "n_bets": 3334,
+    "wins": 1943,
+    "win_rate": 0.5828,
+    "units": 120.64,
+    "roi_pct": 3.62,
+    "avg_edge": 0.0197,
+    "avg_prob": 0.5716,
+    "avg_market_nv": 0.5519,
+    "brier": 0.20372,
+    "logloss": 0.59057,
+    "calibration_bins": [
+      {
+        "bin_lo": 0.1,
+        "bin_hi": 0.3232,
+        "n": 333,
+        "predicted_avg": 0.2303,
+        "actual_win_rate": 0.2673,
+        "cal_error": 0.0369
+      },
+      {
+        "bin_lo": 0.3232,
+        "bin_hi": 0.3613,
+        "n": 333,
+        "predicted_avg": 0.3425,
+        "actual_win_rate": 0.3514,
+        "cal_error": 0.0089
+      },
+      {
+        "bin_lo": 0.3613,
+        "bin_hi": 0.4298,
+        "n": 333,
+        "predicted_avg": 0.3804,
+        "actual_win_rate": 0.4024,
+        "cal_error": 0.022
+      },
+      {
+        "bin_lo": 0.4298,
+        "bin_hi": 0.5415,
+        "n": 333,
+        "predicted_avg": 0.4791,
+        "actual_win_rate": 0.5075,
+        "cal_error": 0.0284
+      },
+      {
+        "bin_lo": 0.5415,
+        "bin_hi": 0.5702,
+        "n": 333,
+        "predicted_avg": 0.556,
+        "actual_win_rate": 0.5465,
+        "cal_error": 0.0094
+      },
+      {
+        "bin_lo": 0.5702,
+        "bin_hi": 0.6154,
+        "n": 333,
+        "predicted_avg": 0.5973,
+        "actual_win_rate": 0.6186,
+        "cal_error": 0.0214
+      },
+      {
+        "bin_lo": 0.6154,
+        "bin_hi": 0.726,
+        "n": 333,
+        "predicted_avg": 0.6559,
+        "actual_win_rate": 0.6517,
+        "cal_error": 0.0042
+      },
+      {
+        "bin_lo": 0.726,
+        "bin_hi": 0.7812,
+        "n": 333,
+        "predicted_avg": 0.7598,
+        "actual_win_rate": 0.7688,
+        "cal_error": 0.009
+      },
+      {
+        "bin_lo": 0.7812,
+        "bin_hi": 0.8225,
+        "n": 333,
+        "predicted_avg": 0.8112,
+        "actual_win_rate": 0.8108,
+        "cal_error": 0.0004
+      },
+      {
+        "bin_lo": 0.8225,
+        "bin_hi": 0.99,
+        "n": 333,
+        "predicted_avg": 0.898,
+        "actual_win_rate": 0.8979,
+        "cal_error": 0.0001
+      },
+      {
+        "bin_lo": 0.99,
+        "bin_hi": 0.99,
+        "n": 4,
+        "predicted_avg": 0.99,
+        "actual_win_rate": 1.0,
+        "cal_error": 0.01
+      }
+    ],
+    "threshold": 0.0
+  },
+  "results": [
+    {
+      "n_bets": 2781,
+      "wins": 1660,
+      "win_rate": 0.5969,
+      "units": 137.17,
+      "roi_pct": 4.93,
+      "avg_edge": 0.0231,
+      "avg_prob": 0.5843,
+      "avg_market_nv": 0.5611,
+      "brier": 0.20304,
+      "logloss": 0.58846,
+      "calibration_bins": [
+        {
+          "bin_lo": 0.1,
+          "bin_hi": 0.3232,
+          "n": 278,
+          "predicted_avg": 0.2331,
+          "actual_win_rate": 0.2734,
+          "cal_error": 0.0403
+        },
+        {
+          "bin_lo": 0.3232,
+          "bin_hi": 0.3613,
+          "n": 278,
+          "predicted_avg": 0.3464,
+          "actual_win_rate": 0.3849,
+          "cal_error": 0.0385
+        },
+        {
+          "bin_lo": 0.3613,
+          "bin_hi": 0.4553,
+          "n": 278,
+          "predicted_avg": 0.4062,
+          "actual_win_rate": 0.4065,
+          "cal_error": 0.0003
+        },
+        {
+          "bin_lo": 0.4553,
+          "bin_hi": 0.5476,
+          "n": 278,
+          "predicted_avg": 0.5065,
+          "actual_win_rate": 0.5612,
+          "cal_error": 0.0546
+        },
+        {
+          "bin_lo": 0.5476,
+          "bin_hi": 0.5702,
+          "n": 278,
+          "predicted_avg": 0.5636,
+          "actual_win_rate": 0.5432,
+          "cal_error": 0.0204
+        },
+        {
+          "bin_lo": 0.5702,
+          "bin_hi": 0.6154,
+          "n": 278,
+          "predicted_avg": 0.6041,
+          "actual_win_rate": 0.6115,
+          "cal_error": 0.0074
+        },
+        {
+          "bin_lo": 0.6154,
+          "bin_hi": 0.7595,
+          "n": 278,
+          "predicted_avg": 0.6756,
+          "actual_win_rate": 0.6763,
+          "cal_error": 0.0006
+        },
+        {
+          "bin_lo": 0.7595,
+          "bin_hi": 0.8085,
+          "n": 278,
+          "predicted_avg": 0.7767,
+          "actual_win_rate": 0.7842,
+          "cal_error": 0.0075
+        },
+        {
+          "bin_lo": 0.8085,
+          "bin_hi": 0.8225,
+          "n": 278,
+          "predicted_avg": 0.8164,
+          "actual_win_rate": 0.8129,
+          "cal_error": 0.0034
+        },
+        {
+          "bin_lo": 0.8225,
+          "bin_hi": 0.99,
+          "n": 278,
+          "predicted_avg": 0.9126,
+          "actual_win_rate": 0.9137,
+          "cal_error": 0.0011
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 1,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        }
+      ],
+      "threshold": 0.005
+    },
+    {
+      "n_bets": 2250,
+      "wins": 1369,
+      "win_rate": 0.6084,
+      "units": 126.28,
+      "roi_pct": 5.61,
+      "avg_edge": 0.0268,
+      "avg_prob": 0.5969,
+      "avg_market_nv": 0.5701,
+      "brier": 0.20057,
+      "logloss": 0.58208,
+      "calibration_bins": [
+        {
+          "bin_lo": 0.163,
+          "bin_hi": 0.3232,
+          "n": 225,
+          "predicted_avg": 0.2408,
+          "actual_win_rate": 0.3022,
+          "cal_error": 0.0614
+        },
+        {
+          "bin_lo": 0.3232,
+          "bin_hi": 0.3613,
+          "n": 225,
+          "predicted_avg": 0.3505,
+          "actual_win_rate": 0.3911,
+          "cal_error": 0.0406
+        },
+        {
+          "bin_lo": 0.3613,
+          "bin_hi": 0.4553,
+          "n": 225,
+          "predicted_avg": 0.4254,
+          "actual_win_rate": 0.4044,
+          "cal_error": 0.021
+        },
+        {
+          "bin_lo": 0.4553,
+          "bin_hi": 0.5476,
+          "n": 225,
+          "predicted_avg": 0.5227,
+          "actual_win_rate": 0.5556,
+          "cal_error": 0.0328
+        },
+        {
+          "bin_lo": 0.5476,
+          "bin_hi": 0.5702,
+          "n": 225,
+          "predicted_avg": 0.5647,
+          "actual_win_rate": 0.5511,
+          "cal_error": 0.0136
+        },
+        {
+          "bin_lo": 0.5702,
+          "bin_hi": 0.6154,
+          "n": 225,
+          "predicted_avg": 0.6033,
+          "actual_win_rate": 0.6178,
+          "cal_error": 0.0145
+        },
+        {
+          "bin_lo": 0.6154,
+          "bin_hi": 0.7708,
+          "n": 225,
+          "predicted_avg": 0.7165,
+          "actual_win_rate": 0.76,
+          "cal_error": 0.0435
+        },
+        {
+          "bin_lo": 0.7708,
+          "bin_hi": 0.8125,
+          "n": 225,
+          "predicted_avg": 0.794,
+          "actual_win_rate": 0.7467,
+          "cal_error": 0.0473
+        },
+        {
+          "bin_lo": 0.8125,
+          "bin_hi": 0.9,
+          "n": 225,
+          "predicted_avg": 0.8208,
+          "actual_win_rate": 0.8222,
+          "cal_error": 0.0014
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.99,
+          "n": 225,
+          "predicted_avg": 0.9304,
+          "actual_win_rate": 0.9333,
+          "cal_error": 0.0029
+        }
+      ],
+      "threshold": 0.01
+    },
+    {
+      "n_bets": 1803,
+      "wins": 1128,
+      "win_rate": 0.6256,
+      "units": 75.23,
+      "roi_pct": 4.17,
+      "avg_edge": 0.0304,
+      "avg_prob": 0.6187,
+      "avg_market_nv": 0.5882,
+      "brier": 0.19504,
+      "logloss": 0.56782,
+      "calibration_bins": [
+        {
+          "bin_lo": 0.163,
+          "bin_hi": 0.3542,
+          "n": 180,
+          "predicted_avg": 0.2686,
+          "actual_win_rate": 0.2778,
+          "cal_error": 0.0092
+        },
+        {
+          "bin_lo": 0.3542,
+          "bin_hi": 0.4553,
+          "n": 180,
+          "predicted_avg": 0.3657,
+          "actual_win_rate": 0.4111,
+          "cal_error": 0.0454
+        },
+        {
+          "bin_lo": 0.4553,
+          "bin_hi": 0.5415,
+          "n": 180,
+          "predicted_avg": 0.4746,
+          "actual_win_rate": 0.4611,
+          "cal_error": 0.0134
+        },
+        {
+          "bin_lo": 0.5415,
+          "bin_hi": 0.5549,
+          "n": 180,
+          "predicted_avg": 0.5452,
+          "actual_win_rate": 0.5722,
+          "cal_error": 0.027
+        },
+        {
+          "bin_lo": 0.5549,
+          "bin_hi": 0.5702,
+          "n": 180,
+          "predicted_avg": 0.5696,
+          "actual_win_rate": 0.5667,
+          "cal_error": 0.0029
+        },
+        {
+          "bin_lo": 0.6,
+          "bin_hi": 0.7222,
+          "n": 180,
+          "predicted_avg": 0.6146,
+          "actual_win_rate": 0.6222,
+          "cal_error": 0.0077
+        },
+        {
+          "bin_lo": 0.7222,
+          "bin_hi": 0.7812,
+          "n": 180,
+          "predicted_avg": 0.7695,
+          "actual_win_rate": 0.7778,
+          "cal_error": 0.0083
+        },
+        {
+          "bin_lo": 0.7812,
+          "bin_hi": 0.8125,
+          "n": 180,
+          "predicted_avg": 0.8034,
+          "actual_win_rate": 0.7667,
+          "cal_error": 0.0367
+        },
+        {
+          "bin_lo": 0.8125,
+          "bin_hi": 0.9,
+          "n": 180,
+          "predicted_avg": 0.8328,
+          "actual_win_rate": 0.85,
+          "cal_error": 0.0172
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.99,
+          "n": 180,
+          "predicted_avg": 0.9365,
+          "actual_win_rate": 0.9444,
+          "cal_error": 0.0079
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 3,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        }
+      ],
+      "threshold": 0.015
+    },
+    {
+      "n_bets": 1373,
+      "wins": 898,
+      "win_rate": 0.654,
+      "units": 61.69,
+      "roi_pct": 4.49,
+      "avg_edge": 0.0344,
+      "avg_prob": 0.6441,
+      "avg_market_nv": 0.6097,
+      "brier": 0.18841,
+      "logloss": 0.552,
+      "calibration_bins": [
+        {
+          "bin_lo": 0.163,
+          "bin_hi": 0.3542,
+          "n": 137,
+          "predicted_avg": 0.2891,
+          "actual_win_rate": 0.3212,
+          "cal_error": 0.032
+        },
+        {
+          "bin_lo": 0.3542,
+          "bin_hi": 0.4553,
+          "n": 137,
+          "predicted_avg": 0.408,
+          "actual_win_rate": 0.4088,
+          "cal_error": 0.0008
+        },
+        {
+          "bin_lo": 0.4553,
+          "bin_hi": 0.5415,
+          "n": 137,
+          "predicted_avg": 0.5139,
+          "actual_win_rate": 0.5693,
+          "cal_error": 0.0554
+        },
+        {
+          "bin_lo": 0.5415,
+          "bin_hi": 0.5702,
+          "n": 137,
+          "predicted_avg": 0.553,
+          "actual_win_rate": 0.5401,
+          "cal_error": 0.0129
+        },
+        {
+          "bin_lo": 0.5702,
+          "bin_hi": 0.6154,
+          "n": 137,
+          "predicted_avg": 0.5801,
+          "actual_win_rate": 0.5839,
+          "cal_error": 0.0039
+        },
+        {
+          "bin_lo": 0.6154,
+          "bin_hi": 0.7708,
+          "n": 137,
+          "predicted_avg": 0.6926,
+          "actual_win_rate": 0.7591,
+          "cal_error": 0.0666
+        },
+        {
+          "bin_lo": 0.7708,
+          "bin_hi": 0.8085,
+          "n": 137,
+          "predicted_avg": 0.7852,
+          "actual_win_rate": 0.7226,
+          "cal_error": 0.0626
+        },
+        {
+          "bin_lo": 0.8085,
+          "bin_hi": 0.8225,
+          "n": 137,
+          "predicted_avg": 0.8123,
+          "actual_win_rate": 0.8394,
+          "cal_error": 0.0271
+        },
+        {
+          "bin_lo": 0.8225,
+          "bin_hi": 0.9,
+          "n": 137,
+          "predicted_avg": 0.8553,
+          "actual_win_rate": 0.854,
+          "cal_error": 0.0013
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.99,
+          "n": 137,
+          "predicted_avg": 0.944,
+          "actual_win_rate": 0.9343,
+          "cal_error": 0.0097
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 3,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        }
+      ],
+      "threshold": 0.02
+    },
+    {
+      "n_bets": 1042,
+      "wins": 706,
+      "win_rate": 0.6775,
+      "units": 33.05,
+      "roi_pct": 3.17,
+      "avg_edge": 0.0383,
+      "avg_prob": 0.6744,
+      "avg_market_nv": 0.6361,
+      "brier": 0.18159,
+      "logloss": 0.53342,
+      "calibration_bins": [
+        {
+          "bin_lo": 0.163,
+          "bin_hi": 0.4553,
+          "n": 104,
+          "predicted_avg": 0.32,
+          "actual_win_rate": 0.3269,
+          "cal_error": 0.007
+        },
+        {
+          "bin_lo": 0.4553,
+          "bin_hi": 0.5415,
+          "n": 104,
+          "predicted_avg": 0.4778,
+          "actual_win_rate": 0.5096,
+          "cal_error": 0.0318
+        },
+        {
+          "bin_lo": 0.5415,
+          "bin_hi": 0.5476,
+          "n": 104,
+          "predicted_avg": 0.5451,
+          "actual_win_rate": 0.5769,
+          "cal_error": 0.0318
+        },
+        {
+          "bin_lo": 0.5476,
+          "bin_hi": 0.5702,
+          "n": 104,
+          "predicted_avg": 0.5652,
+          "actual_win_rate": 0.5385,
+          "cal_error": 0.0268
+        },
+        {
+          "bin_lo": 0.5702,
+          "bin_hi": 0.7647,
+          "n": 104,
+          "predicted_avg": 0.6013,
+          "actual_win_rate": 0.5865,
+          "cal_error": 0.0148
+        },
+        {
+          "bin_lo": 0.7647,
+          "bin_hi": 0.7812,
+          "n": 104,
+          "predicted_avg": 0.7722,
+          "actual_win_rate": 0.8365,
+          "cal_error": 0.0643
+        },
+        {
+          "bin_lo": 0.7812,
+          "bin_hi": 0.8125,
+          "n": 104,
+          "predicted_avg": 0.7994,
+          "actual_win_rate": 0.7308,
+          "cal_error": 0.0687
+        },
+        {
+          "bin_lo": 0.8125,
+          "bin_hi": 0.8225,
+          "n": 104,
+          "predicted_avg": 0.8155,
+          "actual_win_rate": 0.7981,
+          "cal_error": 0.0174
+        },
+        {
+          "bin_lo": 0.8225,
+          "bin_hi": 0.9,
+          "n": 104,
+          "predicted_avg": 0.8829,
+          "actual_win_rate": 0.8942,
+          "cal_error": 0.0114
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.99,
+          "n": 104,
+          "predicted_avg": 0.9588,
+          "actual_win_rate": 0.9712,
+          "cal_error": 0.0123
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 2,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        }
+      ],
+      "threshold": 0.025
+    },
+    {
+      "n_bets": 787,
+      "wins": 539,
+      "win_rate": 0.6849,
+      "units": 16.91,
+      "roi_pct": 2.15,
+      "avg_edge": 0.0419,
+      "avg_prob": 0.6927,
+      "avg_market_nv": 0.6508,
+      "brier": 0.17915,
+      "logloss": 0.52659,
+      "calibration_bins": [
+        {
+          "bin_lo": 0.163,
+          "bin_hi": 0.4553,
+          "n": 78,
+          "predicted_avg": 0.3341,
+          "actual_win_rate": 0.3846,
+          "cal_error": 0.0505
+        },
+        {
+          "bin_lo": 0.4553,
+          "bin_hi": 0.5476,
+          "n": 78,
+          "predicted_avg": 0.5171,
+          "actual_win_rate": 0.5,
+          "cal_error": 0.0171
+        },
+        {
+          "bin_lo": 0.5476,
+          "bin_hi": 0.5549,
+          "n": 78,
+          "predicted_avg": 0.5501,
+          "actual_win_rate": 0.5128,
+          "cal_error": 0.0373
+        },
+        {
+          "bin_lo": 0.5549,
+          "bin_hi": 0.5702,
+          "n": 78,
+          "predicted_avg": 0.5701,
+          "actual_win_rate": 0.5897,
+          "cal_error": 0.0197
+        },
+        {
+          "bin_lo": 0.5702,
+          "bin_hi": 0.7708,
+          "n": 78,
+          "predicted_avg": 0.6711,
+          "actual_win_rate": 0.6538,
+          "cal_error": 0.0172
+        },
+        {
+          "bin_lo": 0.7708,
+          "bin_hi": 0.7812,
+          "n": 78,
+          "predicted_avg": 0.7751,
+          "actual_win_rate": 0.7564,
+          "cal_error": 0.0187
+        },
+        {
+          "bin_lo": 0.7812,
+          "bin_hi": 0.8125,
+          "n": 78,
+          "predicted_avg": 0.8017,
+          "actual_win_rate": 0.8077,
+          "cal_error": 0.006
+        },
+        {
+          "bin_lo": 0.8125,
+          "bin_hi": 0.8225,
+          "n": 78,
+          "predicted_avg": 0.8161,
+          "actual_win_rate": 0.7308,
+          "cal_error": 0.0853
+        },
+        {
+          "bin_lo": 0.8225,
+          "bin_hi": 0.9,
+          "n": 78,
+          "predicted_avg": 0.898,
+          "actual_win_rate": 0.8974,
+          "cal_error": 0.0006
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.99,
+          "n": 78,
+          "predicted_avg": 0.9669,
+          "actual_win_rate": 0.9872,
+          "cal_error": 0.0203
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 7,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        }
+      ],
+      "threshold": 0.03
+    },
+    {
+      "n_bets": 328,
+      "wins": 265,
+      "win_rate": 0.8079,
+      "units": 31.53,
+      "roi_pct": 9.61,
+      "avg_edge": 0.052,
+      "avg_prob": 0.7766,
+      "avg_market_nv": 0.7246,
+      "brier": 0.11911,
+      "logloss": 0.37378,
+      "calibration_bins": [
+        {
+          "bin_lo": 0.163,
+          "bin_hi": 0.5476,
+          "n": 32,
+          "predicted_avg": 0.3579,
+          "actual_win_rate": 0.4375,
+          "cal_error": 0.0796
+        },
+        {
+          "bin_lo": 0.5702,
+          "bin_hi": 0.5702,
+          "n": 32,
+          "predicted_avg": 0.5702,
+          "actual_win_rate": 0.5625,
+          "cal_error": 0.0077
+        },
+        {
+          "bin_lo": 0.5702,
+          "bin_hi": 0.7647,
+          "n": 32,
+          "predicted_avg": 0.6979,
+          "actual_win_rate": 0.6875,
+          "cal_error": 0.0104
+        },
+        {
+          "bin_lo": 0.7647,
+          "bin_hi": 0.7708,
+          "n": 32,
+          "predicted_avg": 0.7701,
+          "actual_win_rate": 0.875,
+          "cal_error": 0.1049
+        },
+        {
+          "bin_lo": 0.7708,
+          "bin_hi": 0.7812,
+          "n": 32,
+          "predicted_avg": 0.7757,
+          "actual_win_rate": 0.75,
+          "cal_error": 0.0257
+        },
+        {
+          "bin_lo": 0.7812,
+          "bin_hi": 0.8125,
+          "n": 32,
+          "predicted_avg": 0.8027,
+          "actual_win_rate": 0.8438,
+          "cal_error": 0.041
+        },
+        {
+          "bin_lo": 0.8125,
+          "bin_hi": 0.9,
+          "n": 32,
+          "predicted_avg": 0.8891,
+          "actual_win_rate": 0.9062,
+          "cal_error": 0.0172
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.9,
+          "n": 32,
+          "predicted_avg": 0.9,
+          "actual_win_rate": 0.9688,
+          "cal_error": 0.0687
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.99,
+          "n": 32,
+          "predicted_avg": 0.9591,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.0409
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 32,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 8,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        }
+      ],
+      "threshold": 0.04
+    },
+    {
+      "n_bets": 134,
+      "wins": 123,
+      "win_rate": 0.9179,
+      "units": 7.26,
+      "roi_pct": 5.42,
+      "avg_edge": 0.0633,
+      "avg_prob": 0.8969,
+      "avg_market_nv": 0.8336,
+      "brier": 0.06736,
+      "logloss": 0.22766,
+      "calibration_bins": [
+        {
+          "bin_lo": 0.7647,
+          "bin_hi": 0.7647,
+          "n": 22,
+          "predicted_avg": 0.7647,
+          "actual_win_rate": 0.8182,
+          "cal_error": 0.0535
+        },
+        {
+          "bin_lo": 0.7647,
+          "bin_hi": 0.9,
+          "n": 22,
+          "predicted_avg": 0.7876,
+          "actual_win_rate": 0.7727,
+          "cal_error": 0.0149
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.9,
+          "n": 22,
+          "predicted_avg": 0.9,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.1
+        },
+        {
+          "bin_lo": 0.9,
+          "bin_hi": 0.99,
+          "n": 22,
+          "predicted_avg": 0.9409,
+          "actual_win_rate": 0.9091,
+          "cal_error": 0.0318
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 22,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 22,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        },
+        {
+          "bin_lo": 0.99,
+          "bin_hi": 0.99,
+          "n": 2,
+          "predicted_avg": 0.99,
+          "actual_win_rate": 1.0,
+          "cal_error": 0.01
+        }
+      ],
+      "threshold": 0.05
+    }
+  ],
+  "recommendation": {
+    "recommended_threshold": 0.04,
+    "n_bets": 328,
+    "win_rate": 0.8079,
+    "roi_pct": 9.61,
+    "brier": 0.11911,
+    "logloss": 0.37378,
+    "reason": "Best composite score: 328 bets, 80.8% WR, +9.6% ROI, Brier=0.11911"
+  }
+}
