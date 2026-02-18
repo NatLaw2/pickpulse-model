@@ -205,6 +205,9 @@ function extractCandidates(
 
     for (const game of games) {
       const st = new Date(game.startTime);
+      // Hard guard: never lock a game that has already started
+      const rightNow = new Date();
+      if (st <= rightNow) continue;
       if (st < windowStart || st > windowEnd) continue;
 
       const homeName = teamDisplayName(game?.homeTeam);
@@ -347,9 +350,9 @@ serve(async (req) => {
     const now = new Date();
     const runDate = ymdInTZ(now, RUN_TZ);
 
-    // T-15 window: games starting in [now+10m, now+20m]
-    const windowStartMs = now.getTime() + 10 * 60 * 1000;
-    const windowEndMs = now.getTime() + 20 * 60 * 1000;
+    // T-15 window: games starting in [now+13m, now+17m] (true T-15 ± 2 min)
+    const windowStartMs = now.getTime() + 13 * 60 * 1000;
+    const windowEndMs = now.getTime() + 17 * 60 * 1000;
     const windowStart = new Date(windowStartMs);
     const windowEnd = new Date(windowEndMs);
 
