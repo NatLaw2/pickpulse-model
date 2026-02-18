@@ -1,6 +1,10 @@
 """Load trained model artifacts and return calibrated win probability.
 
 Used by model_nba.py at inference time (FastAPI endpoint).
+
+Supports two artifact formats:
+  - joblib (preferred): artifacts/ml_model.joblib + ml_calibrator.joblib
+  - JSON (legacy): artifacts/ml_model.json + ml_calibrator.json
 """
 from __future__ import annotations
 
@@ -10,55 +14,89 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
-from .calibrate import apply_calibrator, load_calibrator
-
 
 # ---------------------------------------------------------------------------
 # Artifact loading (cached per-process)
 # ---------------------------------------------------------------------------
 
-_MODEL_CACHE: Optional[Dict[str, Any]] = None
-_CAL_CACHE: Optional[Dict[str, Any]] = None
+_MODEL = None          # sklearn LogisticRegression (joblib) or dict (JSON)
+_CALIBRATOR = None     # sklearn IsotonicRegression (joblib) or dict (JSON)
+_FEATURES = None       # list of feature names
+_FORMAT = None         # "joblib" or "json"
 _LOADED = False
 
 
-def _load_artifacts() -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-    global _MODEL_CACHE, _CAL_CACHE, _LOADED
+def _load_artifacts():
+    global _MODEL, _CALIBRATOR, _FEATURES, _FORMAT, _LOADED
     if _LOADED:
-        return _MODEL_CACHE, _CAL_CACHE
+        return
 
-    model_path = os.getenv("ML_MODEL_PATH", "artifacts/ml_model.json")
-    cal_path = os.getenv("ML_CALIBRATOR_PATH", "artifacts/ml_calibrator.json")
+    # Try joblib first (preferred)
+    model_joblib = os.getenv("ML_MODEL_PATH", "artifacts/ml_model.joblib")
+    cal_joblib = os.getenv("ML_CALIBRATOR_PATH", "artifacts/ml_calibrator.joblib")
 
-    try:
-        with open(model_path, "r") as f:
-            _MODEL_CACHE = json.load(f)
-        print(f"[ml.predict] Loaded model from {model_path}")
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"[ml.predict] Model not found at {model_path}: {e}")
-        _MODEL_CACHE = None
+    if os.path.exists(model_joblib):
+        try:
+            import joblib
+            _MODEL = joblib.load(model_joblib)
+            print(f"[ml.predict] Loaded model from {model_joblib}")
 
-    _CAL_CACHE = load_calibrator(cal_path)
-    if _CAL_CACHE:
-        print(f"[ml.predict] Loaded calibrator from {cal_path}")
-    else:
-        print(f"[ml.predict] Calibrator not found at {cal_path}")
+            # Load features from metadata
+            meta_path = os.path.join(os.path.dirname(model_joblib), "ml_metadata.json")
+            if os.path.exists(meta_path):
+                with open(meta_path) as f:
+                    meta = json.load(f)
+                _FEATURES = meta.get("features", [])
 
-    _LOADED = True
-    return _MODEL_CACHE, _CAL_CACHE
+            if os.path.exists(cal_joblib):
+                _CALIBRATOR = joblib.load(cal_joblib)
+                print(f"[ml.predict] Loaded calibrator from {cal_joblib}")
+
+            _FORMAT = "joblib"
+            _LOADED = True
+            return
+        except Exception as e:
+            print(f"[ml.predict] Failed to load joblib artifacts: {e}")
+
+    # Fallback to JSON format
+    model_json = os.getenv("ML_MODEL_JSON_PATH", "artifacts/ml_model.json")
+    cal_json = os.getenv("ML_CALIBRATOR_JSON_PATH", "artifacts/ml_calibrator.json")
+
+    if os.path.exists(model_json):
+        try:
+            with open(model_json) as f:
+                _MODEL = json.load(f)
+            print(f"[ml.predict] Loaded model from {model_json} (JSON legacy)")
+
+            model_info = _MODEL.get("model", {})
+            _FEATURES = model_info.get("features", [])
+
+            if os.path.exists(cal_json):
+                with open(cal_json) as f:
+                    _CALIBRATOR = json.load(f)
+                print(f"[ml.predict] Loaded calibrator from {cal_json}")
+
+            _FORMAT = "json"
+            _LOADED = True
+            return
+        except Exception as e:
+            print(f"[ml.predict] Failed to load JSON artifacts: {e}")
+
+    print("[ml.predict] No model artifacts found")
+    _LOADED = True  # Don't retry
 
 
 def is_available() -> bool:
     """Check if ML model artifacts are available."""
-    model, _ = _load_artifacts()
-    return model is not None
+    _load_artifacts()
+    return _MODEL is not None
 
 
 def predict_win_prob(
     locked_home_nv: float,
     locked_away_nv: float,
-    spread_home_point: float,
-    is_home: int,
+    spread_home_point: float = 0.0,
+    is_home: int = 1,
 ) -> Optional[float]:
     """Predict calibrated win probability for a pick.
 
@@ -71,11 +109,77 @@ def predict_win_prob(
     Returns:
         Calibrated probability of winning (0-1), or None if model unavailable.
     """
-    model_data, cal_data = _load_artifacts()
-    if model_data is None:
+    _load_artifacts()
+    if _MODEL is None:
         return None
 
-    model_info = model_data.get("model", {})
+    if _FORMAT == "joblib":
+        return _predict_joblib(locked_home_nv, locked_away_nv, is_home)
+    else:
+        return _predict_json(locked_home_nv, locked_away_nv, spread_home_point, is_home)
+
+
+def _predict_joblib(
+    locked_home_nv: float,
+    locked_away_nv: float,
+    is_home: int,
+) -> Optional[float]:
+    """Predict using sklearn joblib artifacts.
+
+    The model is trained on home-win labels with is_home=1 for all rows.
+    It always outputs P(home wins). When is_home=0 (asking for away side),
+    we return 1 - P(home wins).
+    """
+    eps = 1e-6
+
+    # Always build features from home perspective (matching training)
+    feature_map = {
+        "p_home_nv": locked_home_nv,
+        "p_away_nv": locked_away_nv,
+        "is_home": 1.0,  # Always predict from home perspective
+        "favorite_nv": max(locked_home_nv, locked_away_nv),
+        "underdog_nv": min(locked_home_nv, locked_away_nv),
+        "log_odds_ratio": float(np.log((locked_home_nv + eps) / (locked_away_nv + eps))),
+        "snapshot_offset_minutes": 15.0,  # Assume T-15 in production
+        # Legacy feature names (for JSON model compat)
+        "locked_home_nv": locked_home_nv,
+        "locked_away_nv": locked_away_nv,
+        "spread_home_point": 0.0,
+        "selected_nv": locked_home_nv,
+        "opponent_nv": locked_away_nv,
+    }
+
+    features = _FEATURES or list(feature_map.keys())
+    x = np.array([[feature_map.get(f, 0.0) for f in features]], dtype=np.float64)
+
+    try:
+        raw_prob = _MODEL.predict_proba(x)[0, 1]  # P(home wins)
+
+        if _CALIBRATOR is not None:
+            p_home = float(_CALIBRATOR.predict(np.array([raw_prob]))[0])
+        else:
+            p_home = float(raw_prob)
+
+        p_home = float(np.clip(p_home, 0.01, 0.99))
+
+        # If asking for away side, return complement
+        if is_home == 0:
+            return float(np.clip(1.0 - p_home, 0.01, 0.99))
+        return p_home
+
+    except Exception as e:
+        print(f"[ml.predict] Prediction error: {e}")
+        return None
+
+
+def _predict_json(
+    locked_home_nv: float,
+    locked_away_nv: float,
+    spread_home_point: float,
+    is_home: int,
+) -> Optional[float]:
+    """Predict using JSON-serialized model (legacy path)."""
+    model_info = _MODEL.get("model", {})
     features = model_info.get("features", [])
     coef = model_info.get("coefficients", [])
     intercept = model_info.get("intercept", 0.0)
@@ -83,9 +187,6 @@ def predict_win_prob(
     if not coef or not features:
         return None
 
-    # Build feature vector matching training feature order
-    # Features: locked_home_nv, locked_away_nv, spread_home_point, is_home,
-    #           selected_nv, opponent_nv
     selected_nv = locked_home_nv if is_home == 1 else locked_away_nv
     opponent_nv = locked_away_nv if is_home == 1 else locked_home_nv
 
@@ -99,14 +200,12 @@ def predict_win_prob(
     }
 
     x = np.array([feature_map.get(f, 0.0) for f in features], dtype=np.float64)
-
-    # Logistic regression: p = sigmoid(x @ coef + intercept)
     logit = float(np.dot(x, coef) + intercept)
     raw_prob = 1.0 / (1.0 + np.exp(-logit))
 
-    # Apply calibrator if available
-    if cal_data is not None:
-        calibrated = apply_calibrator(cal_data, np.array([raw_prob]))[0]
+    if _CALIBRATOR is not None and isinstance(_CALIBRATOR, dict):
+        from .calibrate import apply_calibrator
+        calibrated = apply_calibrator(_CALIBRATOR, np.array([raw_prob]))[0]
         return float(np.clip(calibrated, 0.01, 0.99))
 
     return float(np.clip(raw_prob, 0.01, 0.99))

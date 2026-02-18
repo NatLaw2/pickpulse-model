@@ -1,13 +1,20 @@
 .DS_Store
 .env.py
-app/__pycache__/
-app/data/
-data/
-artifacts/
+__pycache__/
 
-# Secrets & local artifacts
+# Local data files (CSVs)
+/data/
+
+# Secrets
 .env
 .env.*
 *.zip
-__pycache__/
-.DS_Store
+
+# Ignore artifacts contents but whitelist model files
+artifacts/*
+!artifacts/ml_model.joblib
+!artifacts/ml_calibrator.joblib
+!artifacts/ml_calibrator.json
+!artifacts/ml_metadata.json
+!artifacts/confidence_curve.json
+!artifacts/elo_params.json

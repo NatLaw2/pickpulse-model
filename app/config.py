@@ -14,8 +14,8 @@ class Settings(BaseModel):
     TIER_HIGH: int = int(os.getenv("TIER_HIGH", "75"))
     TIER_MED: int = int(os.getenv("TIER_MED", "60"))
 
-    # ML model artifact paths
-    ML_MODEL_PATH: str = os.getenv("ML_MODEL_PATH", "artifacts/ml_model.json")
-    ML_CALIBRATOR_PATH: str = os.getenv("ML_CALIBRATOR_PATH", "artifacts/ml_calibrator.json")
+    # ML model artifact paths (joblib preferred, JSON fallback)
+    ML_MODEL_PATH: str = os.getenv("ML_MODEL_PATH", "artifacts/ml_model.joblib")
+    ML_CALIBRATOR_PATH: str = os.getenv("ML_CALIBRATOR_PATH", "artifacts/ml_calibrator.joblib")
 
 settings = Settings()

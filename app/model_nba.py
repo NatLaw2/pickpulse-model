@@ -188,9 +188,11 @@ def ml_reco(game: GameIn) -> dict:
     # Try ML model first
     ml_result = _try_ml_reco(game)
     if ml_result is not None:
+        print(f"[model_nba] ML model used for {game.homeTeam.name} vs {game.awayTeam.name}")
         return ml_result
 
     # Elo fallback
+    print(f"[model_nba] Elo fallback used for {game.homeTeam.name} vs {game.awayTeam.name}")
     ml = game.odds.moneyline
     if not ml or (ml.home is None and ml.away is None):
         return {"status": "no_bet", "reason": "Moneyline not available"}
