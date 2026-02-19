@@ -1,6 +1,6 @@
 {
   "version": "ml_v2",
-  "trained_at": "2026-02-19T00:11:05.765189+00:00",
+  "trained_at": "2026-02-19T00:45:17.394722+00:00",
   "data_source": "data/nba_calibration_ml.csv",
   "C": 1.0,
   "features": [
