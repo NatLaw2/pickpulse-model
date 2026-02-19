@@ -97,6 +97,7 @@ def predict_win_prob(
     locked_away_nv: float,
     spread_home_point: float = 0.0,
     is_home: int = 1,
+    structural_features: Optional[Dict[str, float]] = None,
 ) -> Optional[float]:
     """Predict calibrated win probability for a pick.
 
@@ -105,6 +106,9 @@ def predict_win_prob(
         locked_away_nv: no-vig implied prob for away at lock/current time
         spread_home_point: home spread point (0 if unavailable)
         is_home: 1 if picking home, 0 if picking away
+        structural_features: optional dict of schedule/injury features
+            (keys like home_rest_days, away_travel_miles, etc.)
+            Missing keys default to 0.0.
 
     Returns:
         Calibrated probability of winning (0-1), or None if model unavailable.
@@ -114,7 +118,7 @@ def predict_win_prob(
         return None
 
     if _FORMAT == "joblib":
-        return _predict_joblib(locked_home_nv, locked_away_nv, is_home)
+        return _predict_joblib(locked_home_nv, locked_away_nv, is_home, structural_features)
     else:
         return _predict_json(locked_home_nv, locked_away_nv, spread_home_point, is_home)
 
@@ -123,6 +127,7 @@ def _predict_joblib(
     locked_home_nv: float,
     locked_away_nv: float,
     is_home: int,
+    structural_features: Optional[Dict[str, float]] = None,
 ) -> Optional[float]:
     """Predict using sklearn joblib artifacts.
 
@@ -148,6 +153,10 @@ def _predict_joblib(
         "selected_nv": locked_home_nv,
         "opponent_nv": locked_away_nv,
     }
+
+    # Structural features default to 0.0 (safe for production)
+    if structural_features:
+        feature_map.update(structural_features)
 
     features = _FEATURES or list(feature_map.keys())
     x = np.array([[feature_map.get(f, 0.0) for f in features]], dtype=np.float64)

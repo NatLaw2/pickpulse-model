@@ -29,6 +29,8 @@ import numpy as np
 import pandas as pd
 
 from .calibrate import fit_calibrator, apply_calibrator, save_calibrator
+from ..features.nba_schedule_features import add_schedule_features, SCHEDULE_FEATURE_COLS
+from ..features.injuries.factory import get_injury_provider
 
 
 # ---------------------------------------------------------------------------
@@ -46,6 +48,8 @@ DERIVED_FEATURES = [
     "underdog_nv",     # no-vig prob of the opponent
     "log_odds_ratio",  # log(p_home_nv / p_away_nv) — line magnitude signal
 ]
+
+STRUCTURAL_FEATURES = SCHEDULE_FEATURE_COLS  # rest, travel, timezone features
 
 ALL_FEATURES = FEATURE_COLS + DERIVED_FEATURES
 
@@ -91,6 +95,51 @@ def _load_supabase_dataset(days: int) -> pd.DataFrame:
     return df
 
 
+def _add_structural_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add schedule/rest/travel and injury features to a games DataFrame.
+
+    Requires columns: date, home_team, away_team.
+    Safe: returns original df on any error.
+    """
+    required = {"date", "home_team", "away_team"}
+    if not required.issubset(df.columns):
+        print("[train] Skipping structural features — missing columns")
+        return df
+
+    try:
+        work = add_schedule_features(df)
+        print(f"[train] Added schedule features ({len(SCHEDULE_FEATURE_COLS)} cols)")
+    except Exception as e:
+        print(f"[train] Schedule features failed: {e}")
+        work = df.copy()
+        for col in SCHEDULE_FEATURE_COLS:
+            work[col] = 0.0
+
+    # Injury features (pluggable provider)
+    try:
+        provider = get_injury_provider()
+        injury_cols = ["home_injury_count", "away_injury_count",
+                       "home_injury_impact", "away_injury_impact",
+                       "home_star_out", "away_star_out"]
+        for col in injury_cols:
+            work[col] = 0.0
+
+        for idx, row in work.iterrows():
+            feats = provider.get_game_injury_features(
+                str(row["date"]), str(row["home_team"]), str(row["away_team"]),
+            )
+            for k, v in feats.items():
+                if k in work.columns:
+                    work.at[idx, k] = v
+
+        nonzero = sum(1 for col in injury_cols if work[col].sum() > 0)
+        print(f"[train] Added injury features ({nonzero}/{len(injury_cols)} cols have data)")
+    except Exception as e:
+        print(f"[train] Injury features failed: {e}")
+
+    return work
+
+
 def _build_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str], pd.DataFrame]:
     """Build feature matrix for home-win prediction.
 
@@ -109,11 +158,20 @@ def _build_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]
         (work["p_home_nv"] + eps) / (work["p_away_nv"] + eps)
     )
 
+    # Add structural features (schedule + injuries)
+    work = _add_structural_features(work)
+
     # Optional: snapshot_offset_minutes as feature if available
     features = ALL_FEATURES.copy()
     if "snapshot_offset_minutes" in work.columns:
         work["snapshot_offset_minutes"] = work["snapshot_offset_minutes"].fillna(60.0)
         features.append("snapshot_offset_minutes")
+
+    # Add structural features that have any non-zero variance
+    for col in STRUCTURAL_FEATURES:
+        if col in work.columns:
+            work[col] = work[col].fillna(0.0)
+            features.append(col)
 
     # Drop rows with NaN in feature columns
     work = work.dropna(subset=features)
@@ -125,16 +183,21 @@ def _build_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]
 
 
 def _train_logistic(X: np.ndarray, y: np.ndarray, C: float = 1.0):
-    """Train logistic regression optimizing log-loss."""
+    """Train logistic regression with feature scaling, optimizing log-loss."""
     from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
 
-    model = LogisticRegression(
-        C=C,
-        penalty="l2",
-        solver="lbfgs",
-        max_iter=1000,
-        random_state=42,
-    )
+    model = Pipeline([
+        ("scaler", StandardScaler()),
+        ("lr", LogisticRegression(
+            C=C,
+            penalty="l2",
+            solver="lbfgs",
+            max_iter=2000,
+            random_state=42,
+        )),
+    ])
     model.fit(X, y)
     return model
 
@@ -281,8 +344,9 @@ def train(
         val_probs_cal = calibrator.predict(val_probs_raw)
         val_metrics_cal = _evaluate(val_probs_cal, y_val, "Val (calibrated)")
 
-    # Feature importance
-    coef = model.coef_[0]
+    # Feature importance (extract from pipeline)
+    lr = model.named_steps["lr"] if hasattr(model, "named_steps") else model
+    coef = lr.coef_[0]
     importance = []
     for i, name in enumerate(feature_names):
         importance.append({"feature": name, "coefficient": round(float(coef[i]), 5)})
