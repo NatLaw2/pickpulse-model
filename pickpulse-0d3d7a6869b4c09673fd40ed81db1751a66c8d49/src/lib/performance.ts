@@ -50,6 +50,7 @@ export type PerformanceSummaryResponse = {
   overall: { wins: number; losses: number; picks: number; percentage: number; units?: number };
   topPick?: TopPickPerformance;
   confidenceBuckets?: ConfidenceBuckets;
+  updatedAt?: string | null;
   sports: SportPerformance[];
 };
 

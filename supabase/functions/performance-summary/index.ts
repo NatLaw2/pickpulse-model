@@ -111,10 +111,10 @@ serve(async (req) => {
 
     const startTime = rangeToStart(range);
 
-    // Pull graded picks — now also selecting confidence for bucket classification
+    // Pull graded picks — selecting confidence for bucket classification + graded_at for freshness
     const { data, error } = await supabase
       .from("pick_results")
-      .select("sport, market, result, tier, units, confidence")
+      .select("sport, market, result, tier, units, confidence, graded_at")
       .eq("source", source)
       .gte("start_time", startTime)
       .in("result", ["win", "loss", "push"]);
@@ -150,8 +150,16 @@ serve(async (req) => {
       medium: emptyBucket(),
     };
 
+    // Track most recent graded_at for freshness indicator
+    let latestGradedAt: string | null = null;
+
     // Accumulate
     for (const r of rows) {
+      // Track latest graded_at
+      const ga = r.graded_at as string | null;
+      if (ga && (!latestGradedAt || ga > latestGradedAt)) {
+        latestGradedAt = ga;
+      }
       const s = r.sport;
       if (!bySport[s]) continue;
 
@@ -260,6 +268,7 @@ serve(async (req) => {
         overall,
         topPick,
         confidenceBuckets,
+        updatedAt: latestGradedAt,
         sports: sportList,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },

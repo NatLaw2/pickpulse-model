@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { TimeRangeSelector } from "@/components/performance/TimeRangeSelector";
 import { SportPerformanceCard } from "@/components/performance/SportPerformanceCard";
-import { BarChart3, Trophy, Target, AlertCircle, Activity } from "lucide-react";
+import { BarChart3, Trophy, Target, AlertCircle, Activity, Clock } from "lucide-react";
 import {
   fetchPerformanceSummary,
   fetchModelHealth,
@@ -175,6 +175,14 @@ export const PerformancePage = () => {
             </div>
           ) : null}
         </div>
+
+        {/* Last Updated Indicator */}
+        {summary?.updatedAt ? (
+          <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>Last graded: {fmtDateTime(summary.updatedAt)}</span>
+          </div>
+        ) : null}
 
         {/* Confidence Breakdown Cards */}
         {summary?.confidenceBuckets ? (() => {
