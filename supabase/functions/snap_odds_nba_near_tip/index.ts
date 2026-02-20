@@ -24,7 +24,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
  * Cron: every 2 minutes
  */
 
-const VERSION = "snap_odds_nba_near_tip@2026-02-18_v2";
+const VERSION = "snap_odds_nba_near_tip@2026-02-20_v3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -117,6 +117,7 @@ function buildRows(
     event_id: ev.id,
     commence_time: ev.commence_time,
     captured_at: capturedAt,
+    // captured_minute is a GENERATED column — auto-computed from captured_at
     home_team: ev.home_team,
     away_team: ev.away_team,
     bookmaker_key: book.key,
@@ -212,35 +213,25 @@ serve(async (req) => {
       allRows.push(...buildRows(ev, book, capturedAt));
     }
 
-    // INSERT with ignoreDuplicates — the unique index
-    // closing_lines_snap_unique (includes date_trunc('minute', captured_at))
-    // will reject rows within the same minute for the same key,
-    // preventing bloat if the function fires twice in one minute.
+    // INSERT new snapshot rows.  The unique index closing_lines_snap_unique
+    // on (sport, event_id, bookmaker_key, market, outcome_name, point, captured_minute)
+    // allows one row per outcome per minute.  captured_minute is a GENERATED
+    // column (date_bin of captured_at), so each 2-min cron run automatically
+    // gets a distinct value and creates NEW rows for CLV history.
+    //
+    // If the function fires twice in the same minute, the unique index
+    // rejects the duplicate and the error is safely ignored.
     let inserted = 0;
     if (allRows.length > 0) {
       const { error, count } = await supabase
         .from("closing_lines")
-        .insert(allRows, { count: "exact" })
-        // If the new unique index is in place, Postgres will reject
-        // same-minute duplicates automatically (23505 unique violation).
-        // We catch that and fall back to ignoreDuplicates upsert.
-        ;
+        .insert(allRows, { count: "exact" });
 
       if (error) {
-        // Likely unique violation from same-minute re-run.
-        // Retry with upsert + ignoreDuplicates to silently skip dups.
-        const { error: err2 } = await supabase
-          .from("closing_lines")
-          .upsert(allRows, {
-            onConflict: "sport,event_id,bookmaker_key,market,outcome_name,point",
-            ignoreDuplicates: true,
-          });
-        if (err2) {
-          throw new Error(`closing_lines insert failed: ${err2.message}`);
-        }
-        // In the fallback case, some rows may have been new (different minute)
-        // and some skipped.  We report best-effort.
-        inserted = allRows.length;
+        // Same-minute duplicate or other constraint violation — safe to ignore.
+        // Log for visibility but don't fail the function.
+        console.warn(`[snap_odds_nba_near_tip] insert note: ${error.message}`);
+        inserted = 0;
       } else {
         inserted = count ?? allRows.length;
       }

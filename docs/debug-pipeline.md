@@ -38,7 +38,7 @@ performance-summary     <--  pick_results   (API for frontend)
 
 | Table | Written by | Key columns |
 |-------|-----------|-------------|
-| `closing_lines` | snap_odds_nba_near_tip, backfill_close_nba | event_id, captured_at, market, price, point |
+| `closing_lines` | snap_odds_nba_near_tip, backfill_close_nba | event_id, captured_at, captured_minute, market, price, point |
 | `events` | slate-with-picks | event_id, start_time, home_team, away_team |
 | `locked_picks` | lock_picks_tminus15 | event_id, tier, score, confidence, locked_at, locked_ml_*, graded_at |
 | `game_results` | final_nba, capture_closing_nba | event_id, home_score, away_score, closing_ml_* |
@@ -60,6 +60,7 @@ performance-summary     <--  pick_results   (API for frontend)
 2. **Locked picks = 0**: Cron not firing (see above), or no games in T-15 window.
 3. **Performance not updating**: `final_nba` not running → no scores in `game_results` → `grade_picks` can't grade.
 4. **CLV = 0**: Only 1 daily backfill snapshot per event. Need near-tip snapshots from `snap_odds_nba_near_tip`.
+5. **Snapshots not accumulating**: Old unique indexes (closing_lines_unique_row, _v2) block new rows. Fix: drop old indexes, keep closing_lines_snap_unique which includes captured_minute.
 
 ## Tier / Confidence Mapping
 
@@ -88,8 +89,15 @@ SELECT * FROM locked_picks WHERE run_date = current_date ORDER BY locked_at DESC
 SELECT id, event_id, game_start_time, graded_at
 FROM locked_picks WHERE graded_at IS NULL AND game_start_time < now();
 
--- Snapshot density
-SELECT event_id, COUNT(*) snaps, MIN(captured_at) first, MAX(captured_at) last
-FROM closing_lines WHERE captured_at > now() - interval '24 hours'
-GROUP BY event_id ORDER BY MAX(commence_time) DESC;
+-- Snapshot density (should show min != max after fix)
+SELECT * FROM v_snapshot_density;
+
+-- Recent locked picks (canonical view)
+SELECT * FROM v_recent_locked_picks LIMIT 20;
+
+-- Recent graded results (canonical view — pick_results has NO locked_at column)
+SELECT * FROM v_recent_pick_results LIMIT 20;
+
+-- Snapshot unique index (should include captured_minute)
+SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'closing_lines';
 ```
