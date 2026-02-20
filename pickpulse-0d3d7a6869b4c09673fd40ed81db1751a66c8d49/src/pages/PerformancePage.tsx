@@ -9,6 +9,7 @@ import {
   PerformanceRange,
   PerformanceSource,
   ModelHealth,
+  ConfidenceBucketPerformance,
 } from "@/lib/performance";
 
 function fmtDateTime(iso: string | null) {
@@ -175,41 +176,71 @@ export const PerformancePage = () => {
           ) : null}
         </div>
 
-        {/* Top Pick Performance Card */}
-        {summary?.topPick && summary.topPick.picks > 0 ? (
-          <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/5 p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Trophy className="h-5 w-5 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Daily Top Pick Performance</h3>
+        {/* Confidence Breakdown Cards */}
+        {summary?.confidenceBuckets ? (() => {
+          const bucketConfig: Array<{
+            key: keyof NonNullable<typeof summary.confidenceBuckets>;
+            label: string;
+            borderColor: string;
+            bgColor: string;
+          }> = [
+            { key: "top", label: "Top Picks", borderColor: "border-primary/30", bgColor: "bg-primary/5" },
+            { key: "high", label: "High Confidence", borderColor: "border-emerald-500/20", bgColor: "bg-emerald-500/5" },
+            { key: "medium", label: "Medium Confidence", borderColor: "border-amber-500/20", bgColor: "bg-amber-500/5" },
+          ];
+          const hasBucketData = bucketConfig.some(
+            (b) => (summary.confidenceBuckets?.[b.key]?.picks ?? 0) > 0,
+          );
+          if (!hasBucketData) return null;
+          return (
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {bucketConfig.map((cfg) => {
+                const b: ConfidenceBucketPerformance | undefined = summary.confidenceBuckets?.[cfg.key];
+                if (!b || b.picks === 0) return (
+                  <div key={cfg.key} className={`rounded-2xl border ${cfg.borderColor} ${cfg.bgColor} p-5`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Trophy className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="text-sm font-semibold text-foreground">{cfg.label}</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">No graded picks</p>
+                  </div>
+                );
+                return (
+                  <div key={cfg.key} className={`rounded-2xl border ${cfg.borderColor} ${cfg.bgColor} p-5`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Trophy className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-semibold text-foreground">{cfg.label}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-2xl font-bold font-mono text-foreground">
+                          {b.wins}-{b.losses}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Record</p>
+                      </div>
+                      <div>
+                        <p className={`text-2xl font-bold font-mono ${b.percentage >= 50 ? "text-emerald-600" : "text-red-500"}`}>
+                          {b.percentage}%
+                        </p>
+                        <p className="text-xs text-muted-foreground">Win Rate</p>
+                      </div>
+                      <div>
+                        <p className={`text-lg font-bold font-mono ${b.units >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                          {b.units >= 0 ? "+" : ""}{b.units.toFixed(2)}u
+                        </p>
+                        <p className="text-xs text-muted-foreground">Units</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold font-mono text-foreground">{b.picks}</p>
+                        <p className="text-xs text-muted-foreground">Picks</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-2xl font-bold font-mono text-foreground">
-                  {summary.topPick.wins}-{summary.topPick.losses}
-                </p>
-                <p className="text-xs text-muted-foreground">Record</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold font-mono text-foreground">
-                  {summary.topPick.percentage}%
-                </p>
-                <p className="text-xs text-muted-foreground">Win Rate</p>
-              </div>
-              <div>
-                <p className={`text-2xl font-bold font-mono ${summary.topPick.units >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                  {summary.topPick.units >= 0 ? "+" : ""}{summary.topPick.units.toFixed(2)}u
-                </p>
-                <p className="text-xs text-muted-foreground">Units</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold font-mono text-foreground">
-                  {summary.topPick.picks}
-                </p>
-                <p className="text-xs text-muted-foreground">Total Picks</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
+          );
+        })() : null}
 
         {/* Overall Stats Banner */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

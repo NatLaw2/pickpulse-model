@@ -28,12 +28,28 @@ export type TopPickPerformance = {
   units: number;
 };
 
+export type ConfidenceBucketPerformance = {
+  wins: number;
+  losses: number;
+  pushes: number;
+  picks: number;
+  percentage: number;
+  units: number;
+};
+
+export type ConfidenceBuckets = {
+  top: ConfidenceBucketPerformance;
+  high: ConfidenceBucketPerformance;
+  medium: ConfidenceBucketPerformance;
+};
+
 export type PerformanceSummaryResponse = {
   ok: boolean;
   source: PerformanceSource;
   range: PerformanceRange;
   overall: { wins: number; losses: number; picks: number; percentage: number; units?: number };
   topPick?: TopPickPerformance;
+  confidenceBuckets?: ConfidenceBuckets;
   sports: SportPerformance[];
 };
 

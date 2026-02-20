@@ -30,6 +30,48 @@ function roundUnits(u: number): number {
 
 const SPORTS = ["nba", "mlb", "nhl", "ncaab", "ncaaf", "nfl"];
 
+// ---------------------------------------------------------------------------
+// Confidence bucket classification
+// ---------------------------------------------------------------------------
+
+type ConfidenceBucket = "top" | "high" | "medium";
+
+function classifyBucket(
+  tier: string | null,
+  confidence: number | null,
+): ConfidenceBucket | null {
+  // Tier-based classification takes priority
+  if (tier === "top_pick") return "top";
+  if (tier === "strong_lean") return "high";
+  if (tier === "watchlist") return "medium";
+
+  // Fallback to confidence number
+  if (typeof confidence === "number") {
+    if (confidence >= 0.80) return "top";
+    if (confidence >= 0.65) return "high";
+    if (confidence >= 0.55) return "medium";
+  }
+
+  return null; // Exclude from confidence breakdown
+}
+
+type BucketStats = {
+  wins: number;
+  losses: number;
+  pushes: number;
+  picks: number;
+  percentage: number;
+  units: number;
+};
+
+function emptyBucket(): BucketStats {
+  return { wins: 0, losses: 0, pushes: 0, picks: 0, percentage: 0, units: 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
+
 serve(async (req) => {
   // Preflight
   if (req.method === "OPTIONS") {
@@ -69,10 +111,10 @@ serve(async (req) => {
 
     const startTime = rangeToStart(range);
 
-    // Pull graded picks (win/loss/push) with tier and units
+    // Pull graded picks — now also selecting confidence for bucket classification
     const { data, error } = await supabase
       .from("pick_results")
-      .select("sport, market, result, tier, units")
+      .select("sport, market, result, tier, units, confidence")
       .eq("source", source)
       .gte("start_time", startTime)
       .in("result", ["win", "loss", "push"]);
@@ -95,11 +137,18 @@ serve(async (req) => {
       };
     }
 
-    // Top Pick aggregates
+    // Top Pick aggregates (kept for backwards compat)
     let topPickWins = 0;
     let topPickLosses = 0;
     let topPickPushes = 0;
     let topPickUnits = 0;
+
+    // Confidence bucket aggregates
+    const buckets: Record<ConfidenceBucket, BucketStats> = {
+      top: emptyBucket(),
+      high: emptyBucket(),
+      medium: emptyBucket(),
+    };
 
     // Accumulate
     for (const r of rows) {
@@ -108,11 +157,20 @@ serve(async (req) => {
 
       const u = typeof r.units === "number" ? r.units : 0;
 
-      // Top Pick tracking
+      // Top Pick tracking (backwards compat)
       if (r.tier === "top_pick") {
         if (r.result === "win") { topPickWins++; topPickUnits += u; }
         else if (r.result === "loss") { topPickLosses++; topPickUnits += u; }
         else { topPickPushes++; }
+      }
+
+      // Confidence bucket tracking
+      const bucket = classifyBucket(r.tier, r.confidence);
+      if (bucket) {
+        buckets[bucket].picks++;
+        if (r.result === "win") { buckets[bucket].wins++; buckets[bucket].units += u; }
+        else if (r.result === "loss") { buckets[bucket].losses++; buckets[bucket].units += u; }
+        else { buckets[bucket].pushes++; }
       }
 
       if (r.result === "push") {
@@ -184,6 +242,16 @@ serve(async (req) => {
       units: roundUnits(topPickUnits),
     };
 
+    // Finalize confidence bucket percentages
+    const confidenceBuckets: Record<string, BucketStats> = {};
+    for (const [key, b] of Object.entries(buckets)) {
+      confidenceBuckets[key] = {
+        ...b,
+        percentage: pct(b.wins, b.losses),
+        units: roundUnits(b.units),
+      };
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
@@ -191,6 +259,7 @@ serve(async (req) => {
         range,
         overall,
         topPick,
+        confidenceBuckets,
         sports: sportList,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
