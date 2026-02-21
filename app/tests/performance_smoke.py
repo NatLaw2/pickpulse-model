@@ -72,8 +72,10 @@ def check_finished_games(days: int = 3) -> bool:
 
 
 def check_graded_picks(days: int = 7) -> bool:
-    """Check if pick_results has graded rows."""
+    """Check if pick_results has graded rows (by start_time or graded_at)."""
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    # Try by start_time first (normal case: recent games)
     rows = _sb_get("/rest/v1/pick_results", {
         "select": "tier,confidence,result,units,home_team,away_team,selection_team,graded_at",
         "start_time": f"gte.{since}",
@@ -81,6 +83,17 @@ def check_graded_picks(days: int = 7) -> bool:
         "order": "graded_at.desc",
         "limit": "20",
     })
+
+    # Fallback: check by graded_at (catches older games graded recently)
+    if not rows or not isinstance(rows, list) or len(rows) == 0:
+        rows = _sb_get("/rest/v1/pick_results", {
+            "select": "tier,confidence,result,units,home_team,away_team,selection_team,graded_at",
+            "graded_at": f"gte.{since}",
+            "result": "in.(win,loss,push)",
+            "order": "graded_at.desc",
+            "limit": "20",
+        })
+
     n = len(rows) if isinstance(rows, list) else 0
     if n > 0:
         wins = sum(1 for r in rows if r.get("result") == "win")
