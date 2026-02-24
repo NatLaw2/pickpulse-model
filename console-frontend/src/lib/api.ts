@@ -1,4 +1,4 @@
-const BASE = '/api';
+const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
 const MOD = 'churn';
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {

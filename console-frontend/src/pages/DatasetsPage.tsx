@@ -51,7 +51,7 @@ export function DatasetsPage() {
               className="px-2.5 py-1 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/25 rounded-lg text-[10px] font-bold tracking-widest uppercase text-[var(--color-warning)]"
               title="Illustrative metrics from a sample dataset. Upload your own data for production-grade insights."
             >
-              Demo
+              Sample Data
             </span>
           )}
         </div>
@@ -66,7 +66,7 @@ export function DatasetsPage() {
             <div className="text-sm font-medium truncate">{dataset.name}</div>
             <div className="text-xs text-[var(--color-text-muted)]">
               {dataset.rows.toLocaleString()} rows, {dataset.columns} columns
-              {dataset.is_demo && ' — synthetic demo data'}
+              {dataset.is_demo && ' — sample data'}
             </div>
           </div>
           <span className="text-xs text-[var(--color-text-muted)] shrink-0">
