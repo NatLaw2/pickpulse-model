@@ -33,11 +33,19 @@ app.add_middleware(
 
 # ---------------------------------------------------------------------------
 # Persistent dataset state — survives server restarts
+# On Render, DATA_DIR points to a persistent disk mount (e.g. /data).
+# Locally it defaults to the repo-relative "data/" directory.
 # ---------------------------------------------------------------------------
-DATASET_STATE_PATH = "data/.dataset_state.json"
-UPLOAD_DIR = "data/uploads"
-SAMPLE_DIR = "data/sample"
+DATA_DIR = os.environ.get("DATA_DIR", "data")
+DATASET_STATE_PATH = os.path.join(DATA_DIR, ".dataset_state.json")
+UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
+SAMPLE_DIR = os.path.join(DATA_DIR, "sample")
 MODULE_NAME = "churn"
+
+# Ensure data directories exist at startup
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(SAMPLE_DIR, exist_ok=True)
 
 
 def _load_persisted_datasets() -> Dict[str, Any]:

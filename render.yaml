@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: pickpulse-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.console_api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: DATA_DIR
+        value: /data
+    disk:
+      name: pickpulse-data
+      mountPath: /data
+      sizeGB: 1
