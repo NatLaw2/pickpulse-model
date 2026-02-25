@@ -1,0 +1,196 @@
+{
+  "module": "sales",
+  "evaluated_at": "2026-02-23T19:29:44.396518+00:00",
+  "n": 400,
+  "base_rate": 0.54,
+  "auc": 0.60495,
+  "pr_auc": 0.62221,
+  "brier": 0.24436,
+  "logloss": 0.68178,
+  "confusion_matrix": [
+    [
+      122,
+      62
+    ],
+    [
+      107,
+      109
+    ]
+  ],
+  "accuracy": 0.5775,
+  "precision": 0.6374,
+  "recall": 0.5046,
+  "calibration_bins": [
+    {
+      "bin_lo": 0.3051,
+      "bin_hi": 0.4264,
+      "n": 50,
+      "predicted_avg": 0.3874,
+      "actual_rate": 0.4,
+      "delta": -0.0126
+    },
+    {
+      "bin_lo": 0.4276,
+      "bin_hi": 0.4482,
+      "n": 50,
+      "predicted_avg": 0.4389,
+      "actual_rate": 0.4,
+      "delta": 0.0389
+    },
+    {
+      "bin_lo": 0.4483,
+      "bin_hi": 0.4722,
+      "n": 50,
+      "predicted_avg": 0.4619,
+      "actual_rate": 0.48,
+      "delta": -0.0181
+    },
+    {
+      "bin_lo": 0.4722,
+      "bin_hi": 0.4889,
+      "n": 50,
+      "predicted_avg": 0.4802,
+      "actual_rate": 0.54,
+      "delta": -0.0598
+    },
+    {
+      "bin_lo": 0.4889,
+      "bin_hi": 0.5088,
+      "n": 50,
+      "predicted_avg": 0.4987,
+      "actual_rate": 0.54,
+      "delta": -0.0413
+    },
+    {
+      "bin_lo": 0.5089,
+      "bin_hi": 0.529,
+      "n": 50,
+      "predicted_avg": 0.5195,
+      "actual_rate": 0.74,
+      "delta": -0.2205
+    },
+    {
+      "bin_lo": 0.5303,
+      "bin_hi": 0.5461,
+      "n": 50,
+      "predicted_avg": 0.5377,
+      "actual_rate": 0.56,
+      "delta": -0.0223
+    },
+    {
+      "bin_lo": 0.5467,
+      "bin_hi": 0.6321,
+      "n": 50,
+      "predicted_avg": 0.5737,
+      "actual_rate": 0.66,
+      "delta": -0.0863
+    }
+  ],
+  "calibration_error": 0.0625,
+  "lift_table": [
+    {
+      "decile": 1,
+      "n": 40,
+      "avg_prob": 0.5796,
+      "actual_rate": 0.625,
+      "lift": 1.16,
+      "cumulative_capture": 0.1157
+    },
+    {
+      "decile": 2,
+      "n": 40,
+      "avg_prob": 0.5426,
+      "actual_rate": 0.675,
+      "lift": 1.25,
+      "cumulative_capture": 0.2407
+    },
+    {
+      "decile": 3,
+      "n": 40,
+      "avg_prob": 0.5299,
+      "actual_rate": 0.5,
+      "lift": 0.93,
+      "cumulative_capture": 0.3333
+    },
+    {
+      "decile": 4,
+      "n": 40,
+      "avg_prob": 0.5134,
+      "actual_rate": 0.75,
+      "lift": 1.39,
+      "cumulative_capture": 0.4722
+    },
+    {
+      "decile": 5,
+      "n": 40,
+      "avg_prob": 0.4964,
+      "actual_rate": 0.575,
+      "lift": 1.06,
+      "cumulative_capture": 0.5787
+    },
+    {
+      "decile": 6,
+      "n": 40,
+      "avg_prob": 0.4819,
+      "actual_rate": 0.55,
+      "lift": 1.02,
+      "cumulative_capture": 0.6806
+    },
+    {
+      "decile": 7,
+      "n": 40,
+      "avg_prob": 0.4683,
+      "actual_rate": 0.425,
+      "lift": 0.79,
+      "cumulative_capture": 0.7593
+    },
+    {
+      "decile": 8,
+      "n": 40,
+      "avg_prob": 0.4502,
+      "actual_rate": 0.55,
+      "lift": 1.02,
+      "cumulative_capture": 0.8611
+    },
+    {
+      "decile": 9,
+      "n": 40,
+      "avg_prob": 0.4317,
+      "actual_rate": 0.325,
+      "lift": 0.6,
+      "cumulative_capture": 0.9213
+    },
+    {
+      "decile": 10,
+      "n": 40,
+      "avg_prob": 0.3786,
+      "actual_rate": 0.425,
+      "lift": 0.79,
+      "cumulative_capture": 1.0
+    }
+  ],
+  "lift_at_top10": 1.16,
+  "capture_at_top10": 0.1157,
+  "tier_breakdown": {
+    "Moderate": {
+      "count": 371,
+      "actual_rate": 0.5526,
+      "avg_probability": 0.4967,
+      "total_value": 33113736.0,
+      "value_at_risk": 16442005.23
+    },
+    "Watchlist": {
+      "count": 29,
+      "actual_rate": 0.3793,
+      "avg_probability": 0.3669,
+      "total_value": 2428217.0,
+      "value_at_risk": 871626.19
+    }
+  },
+  "business_impact": {
+    "total_value": 35541953.0,
+    "value_in_top_decile": 3787582.0,
+    "positives_in_top_decile": 25,
+    "total_positives": 216
+  }
+}

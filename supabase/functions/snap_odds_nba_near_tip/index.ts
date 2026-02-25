@@ -1,7 +1,6 @@
 /// <reference lib="deno.ns" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
 /**
  * snap_odds_nba_near_tip
  *
@@ -22,96 +21,48 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
  *   - Optional: SNAP_WINDOW_MINUTES (default 90)
  *
  * Cron: every 2 minutes
- */
-
-const VERSION = "snap_odds_nba_near_tip@2026-02-20_v3";
-
+ */ const VERSION = "snap_odds_nba_near_tip@2026-02-20_v3";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
 };
-
-// ---------------------------------------------------------------------------
-// Types (same shape as The Odds API v4)
-// ---------------------------------------------------------------------------
-
-type OddsOutcome = {
-  name: string;
-  price: number;
-  point?: number;
-};
-
-type OddsMarket = {
-  key: string; // "h2h" | "spreads"
-  outcomes: OddsOutcome[];
-};
-
-type OddsBookmaker = {
-  key: string;
-  title?: string;
-  markets: OddsMarket[];
-};
-
-type OddsEvent = {
-  id: string;
-  sport_key: string;
-  commence_time: string;
-  home_team: string;
-  away_team: string;
-  bookmakers: OddsBookmaker[];
-};
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function getEnv(name: string): string {
+function getEnv(name) {
   const v = Deno.env.get(name);
   if (!v) throw new Error(`Missing env var: ${name}`);
   return v;
 }
-
-function json(body: unknown, status = 200) {
+function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json"
+    }
   });
 }
-
 // ---------------------------------------------------------------------------
 // Odds API fetch
 // ---------------------------------------------------------------------------
-
-async function fetchNbaOdds(apiKey: string): Promise<OddsEvent[]> {
-  const url =
-    `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/` +
-    `?apiKey=${encodeURIComponent(apiKey)}` +
-    `&regions=us` +
-    `&markets=h2h,spreads` +
-    `&oddsFormat=american` +
-    `&dateFormat=iso`;
-
-  const res = await fetch(url, { method: "GET" });
+async function fetchNbaOdds(apiKey) {
+  const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/` + `?apiKey=${encodeURIComponent(apiKey)}` + `&regions=us` + `&markets=h2h,spreads` + `&oddsFormat=american` + `&dateFormat=iso`;
+  const res = await fetch(url, {
+    method: "GET"
+  });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
+    const body = await res.text().catch(()=>"");
     throw new Error(`Odds API ${res.status}: ${body.slice(0, 300)}`);
   }
-  return (await res.json()) as OddsEvent[];
+  return await res.json();
 }
-
 // ---------------------------------------------------------------------------
 // Build closing_lines rows
 // ---------------------------------------------------------------------------
-
-function buildRows(
-  ev: OddsEvent,
-  book: OddsBookmaker,
-  capturedAt: string,
-): Record<string, unknown>[] {
-  const rows: Record<string, unknown>[] = [];
-
+function buildRows(ev, book, capturedAt) {
+  const rows = [];
   const base = {
     sport: "nba",
     event_id: ev.id,
@@ -121,74 +72,64 @@ function buildRows(
     home_team: ev.home_team,
     away_team: ev.away_team,
     bookmaker_key: book.key,
-    bookmaker_title: book.title ?? book.key,
+    bookmaker_title: book.title ?? book.key
   };
-
-  const h2h = book.markets.find((m) => m.key === "h2h");
-  const spreads = book.markets.find((m) => m.key === "spreads");
-
+  const h2h = book.markets.find((m)=>m.key === "h2h");
+  const spreads = book.markets.find((m)=>m.key === "spreads");
   if (h2h) {
-    for (const o of h2h.outcomes) {
+    for (const o of h2h.outcomes){
       rows.push({
         ...base,
         market: "h2h",
         outcome_name: o.name,
         price: o.price,
-        point: 0, // h2h has no spread point; 0 matches existing convention
+        point: 0
       });
     }
   }
-
   if (spreads) {
-    for (const o of spreads.outcomes) {
+    for (const o of spreads.outcomes){
       rows.push({
         ...base,
         market: "spreads",
         outcome_name: o.name,
         price: o.price,
-        point: o.point ?? null,
+        point: o.point ?? null
       });
     }
   }
-
   return rows;
 }
-
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
+serve(async (req)=>{
+  if (req.method === "OPTIONS") return new Response("ok", {
+    headers: corsHeaders
+  });
   try {
     const SUPABASE_URL = getEnv("SUPABASE_URL");
     const SERVICE_ROLE_KEY = getEnv("SUPABASE_SERVICE_ROLE_KEY");
     const ODDS_API_KEY = getEnv("ODDS_API_KEY");
     const bookmakerKey = (Deno.env.get("PREFERRED_BOOKMAKER") ?? "fanduel").toLowerCase();
-
     // Configurable window: default 90 minutes to capture T-90 through T-0
     const SNAP_WINDOW_MINUTES = Number(Deno.env.get("SNAP_WINDOW_MINUTES") || "90");
-
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      auth: { persistSession: false },
+      auth: {
+        persistSession: false
+      }
     });
-
     const now = new Date();
     const capturedAt = now.toISOString();
-
     // Window: games starting between now and now + SNAP_WINDOW_MINUTES
     const windowEndMs = now.getTime() + SNAP_WINDOW_MINUTES * 60 * 1000;
-
     // Fetch all NBA odds from The Odds API
     const events = await fetchNbaOdds(ODDS_API_KEY);
-
     // Filter to games within the window
-    const nearTip = events.filter((e) => {
+    const nearTip = events.filter((e)=>{
       const ct = new Date(e.commence_time).getTime();
       return ct > now.getTime() && ct <= windowEndMs;
     });
-
     if (nearTip.length === 0) {
       return json({
         ok: true,
@@ -197,22 +138,17 @@ serve(async (req) => {
         captured_at: capturedAt,
         events_total: events.length,
         near_tip: 0,
-        inserted: 0,
+        inserted: 0
       });
     }
-
     // Build rows for each near-tip game
-    const allRows: Record<string, unknown>[] = [];
-
-    for (const ev of nearTip) {
+    const allRows = [];
+    for (const ev of nearTip){
       // Prefer FanDuel, else first bookmaker
-      const book =
-        ev.bookmakers.find((b) => b.key === bookmakerKey) ??
-        ev.bookmakers[0];
+      const book = ev.bookmakers.find((b)=>b.key === bookmakerKey) ?? ev.bookmakers[0];
       if (!book) continue;
       allRows.push(...buildRows(ev, book, capturedAt));
     }
-
     // INSERT new snapshot rows.  The unique index closing_lines_snap_unique
     // on (sport, event_id, bookmaker_key, market, outcome_name, point, captured_minute)
     // allows one row per outcome per minute.  captured_minute is a GENERATED
@@ -223,10 +159,9 @@ serve(async (req) => {
     // rejects the duplicate and the error is safely ignored.
     let inserted = 0;
     if (allRows.length > 0) {
-      const { error, count } = await supabase
-        .from("closing_lines")
-        .insert(allRows, { count: "exact" });
-
+      const { error, count } = await supabase.from("closing_lines").insert(allRows, {
+        count: "exact"
+      });
       if (error) {
         // Same-minute duplicate or other constraint violation — safe to ignore.
         // Log for visibility but don't fail the function.
@@ -236,7 +171,6 @@ serve(async (req) => {
         inserted = count ?? allRows.length;
       }
     }
-
     return json({
       ok: true,
       version: VERSION,
@@ -247,19 +181,20 @@ serve(async (req) => {
       near_tip: nearTip.length,
       rows_built: allRows.length,
       inserted,
-      near_tip_events: nearTip.map((e) => ({
-        id: e.id,
-        home: e.home_team,
-        away: e.away_team,
-        commence: e.commence_time,
-        mins_to_tip: Math.round(
-          (new Date(e.commence_time).getTime() - now.getTime()) / 60000,
-        ),
-      })),
+      near_tip_events: nearTip.map((e)=>({
+          id: e.id,
+          home: e.home_team,
+          away: e.away_team,
+          commence: e.commence_time,
+          mins_to_tip: Math.round((new Date(e.commence_time).getTime() - now.getTime()) / 60000)
+        }))
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[snap_odds_nba_near_tip] error: ${msg}`);
-    return json({ ok: false, error: msg }, 500);
+    return json({
+      ok: false,
+      error: msg
+    }, 500);
   }
 });

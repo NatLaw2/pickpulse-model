@@ -1,0 +1,684 @@
+{
+  "generated_at": "2026-02-18T19:15:42.171289+00:00",
+  "lookback_days": 180,
+  "mode": "shadow",
+  "timestamp": "20260218T191542Z",
+  "clv_auditor": {
+    "generated_at": "2026-02-18T19:15:44.472782+00:00",
+    "lookback_days": 180,
+    "n_picks": 20,
+    "n_skipped": 0,
+    "overall": {
+      "n": 20,
+      "mean": 0.0,
+      "median": 0.0,
+      "pct_positive": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "by_market": {
+      "moneyline": {
+        "n": 20,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "by_tier": {
+      "strong_lean": {
+        "n": 12,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "top_pick": {
+        "n": 3,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "watchlist": {
+        "n": 5,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "by_confidence_bucket": {
+      "mid": {
+        "n": 2,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "high": {
+        "n": 18,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "leakage_flags": [
+      "Only 0.0% of picks have positive CLV"
+    ],
+    "debug_sample": [
+      {
+        "event_id": "8864122f2c28fd6b7621c0ee000c41fc",
+        "market": "moneyline",
+        "side": "away",
+        "locked_at": "2026-02-08T14:10:01.664+00:00",
+        "game_start_time": "2026-02-08T20:10:00+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": -330,
+          "ml_away": 265
+        },
+        "closing_odds": {
+          "ml_home": -330,
+          "ml_away": 265
+        }
+      },
+      {
+        "event_id": "c2aacc97e9c2f14777db6a947e5b0772",
+        "market": "moneyline",
+        "side": "home",
+        "locked_at": "2026-02-08T16:10:01.19+00:00",
+        "game_start_time": "2026-02-08T17:40:00+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": -164,
+          "ml_away": 138
+        },
+        "closing_odds": {
+          "ml_home": -164,
+          "ml_away": 138
+        }
+      },
+      {
+        "event_id": "9a4bb2e3bc9fd308b6e40f29e43ab2f1",
+        "market": "moneyline",
+        "side": "away",
+        "locked_at": "2026-02-08T14:10:01.664+00:00",
+        "game_start_time": "2026-02-08T20:10:00+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": -360,
+          "ml_away": 290
+        },
+        "closing_odds": {
+          "ml_home": -360,
+          "ml_away": 290
+        }
+      },
+      {
+        "event_id": "c7739a581c938fedf4dd128cb53f31dc",
+        "market": "moneyline",
+        "side": "home",
+        "locked_at": "2026-02-08T13:10:01.313+00:00",
+        "game_start_time": "2026-02-08T19:10:00+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": 385,
+          "ml_away": -500
+        },
+        "closing_odds": {
+          "ml_home": 385,
+          "ml_away": -500
+        }
+      },
+      {
+        "event_id": "05cf7fd60949a0c52340284b261ae851",
+        "market": "moneyline",
+        "side": "home",
+        "locked_at": "2026-02-07T18:40:00.985+00:00",
+        "game_start_time": "2026-02-08T00:40:00+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": 110,
+          "ml_away": -130
+        },
+        "closing_odds": {
+          "ml_home": 110,
+          "ml_away": -130
+        }
+      }
+    ]
+  },
+  "error_attribution": {
+    "generated_at": "2026-02-18T19:15:45.088922+00:00",
+    "lookback_days": 180,
+    "n_losses": 15,
+    "summary": {
+      "calibration_gap": 15
+    },
+    "recommendations": [
+      "15 losses (100%) show calibration_gap (confidence >> actual win rate). The confidence curve may need re-fitting with more recent data."
+    ],
+    "categorized": [
+      {
+        "event_id": "c2aacc97e9c2f14777db6a947e5b0772",
+        "market": "moneyline",
+        "tier": "watchlist",
+        "confidence": 0.62,
+        "side": "BOS ML",
+        "home_team": "Boston Celtics",
+        "away_team": "New York Knicks",
+        "run_date": "2026-02-08",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.62
+      },
+      {
+        "event_id": "c7739a581c938fedf4dd128cb53f31dc",
+        "market": "moneyline",
+        "tier": "strong_lean",
+        "confidence": 0.92,
+        "side": "WAS ML",
+        "home_team": "Washington Wizards",
+        "away_team": "Miami Heat",
+        "run_date": "2026-02-08",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.7325
+      },
+      {
+        "event_id": "a54af649958eb60284f57114fdeeb472",
+        "market": "moneyline",
+        "tier": "strong_lean",
+        "confidence": 0.74,
+        "side": "UTA ML",
+        "home_team": "Orlando Magic",
+        "away_team": "Utah Jazz",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.5525
+      },
+      {
+        "event_id": "05cf7fd60949a0c52340284b261ae851",
+        "market": "moneyline",
+        "tier": "strong_lean",
+        "confidence": 0.84,
+        "side": "ATL ML",
+        "home_team": "Atlanta Hawks",
+        "away_team": "Charlotte Hornets",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.6525
+      },
+      {
+        "event_id": "e9a14346272a3fc89154cc1bf1c5da1b",
+        "market": "moneyline",
+        "tier": "strong_lean",
+        "confidence": 0.7,
+        "side": "CHI ML",
+        "home_team": "Chicago Bulls",
+        "away_team": "Denver Nuggets",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.5125
+      },
+      {
+        "event_id": "076f5eadf0573f4dd2ace4f26ae28ef2",
+        "market": "moneyline",
+        "tier": "watchlist",
+        "confidence": 0.65,
+        "side": "GSW ML",
+        "home_team": "Los Angeles Lakers",
+        "away_team": "Golden State Warriors",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.4625
+      },
+      {
+        "event_id": "a809adbd88558364e25c834bbb5a88f0",
+        "market": "moneyline",
+        "tier": "watchlist",
+        "confidence": 0.61,
+        "side": "PHX ML",
+        "home_team": "Phoenix Suns",
+        "away_team": "Philadelphia 76ers",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.61
+      },
+      {
+        "event_id": "e4c99c288d8e1b1baf8bd7af1678ddb5",
+        "market": "moneyline",
+        "tier": "top_pick",
+        "confidence": 1.0,
+        "side": "MEM ML",
+        "home_team": "Portland Trail Blazers",
+        "away_team": "Memphis Grizzlies",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.8125
+      },
+      {
+        "event_id": "7b28a8f5733ef01c824181e1b5a42341",
+        "market": "moneyline",
+        "tier": "strong_lean",
+        "confidence": 1.0,
+        "side": "SAC ML",
+        "home_team": "Sacramento Kings",
+        "away_team": "Cleveland Cavaliers",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.8125
+      },
+      {
+        "event_id": "b321b271a38a3a225bb32d4cda89c2ca",
+        "market": "moneyline",
+        "tier": "watchlist",
+        "confidence": 0.65,
+        "side": "WAS ML",
+        "home_team": "Brooklyn Nets",
+        "away_team": "Washington Wizards",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.4625
+      },
+      {
+        "event_id": "734128222c2a03269132090adb3c593d",
+        "market": "moneyline",
+        "tier": "watchlist",
+        "confidence": 0.65,
+        "side": "OKC ML",
+        "home_team": "Oklahoma City Thunder",
+        "away_team": "Houston Rockets",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.4625
+      },
+      {
+        "event_id": "b69d85cac76c01181ada3299bc50ed54",
+        "market": "moneyline",
+        "tier": "strong_lean",
+        "confidence": 1.0,
+        "side": "DAL ML",
+        "home_team": "San Antonio Spurs",
+        "away_team": "Dallas Mavericks",
+        "run_date": "2026-02-07",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.8125
+      },
+      {
+        "event_id": "ef8ae24fd705cab52010cac25b6abbba",
+        "market": "moneyline",
+        "tier": "top_pick",
+        "confidence": 1.0,
+        "side": "MEM ML",
+        "home_team": "Portland Trail Blazers",
+        "away_team": "Memphis Grizzlies",
+        "run_date": "2026-02-06",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.8125
+      },
+      {
+        "event_id": "e3d5928f680f116697bc4e6bb16f5862",
+        "market": "moneyline",
+        "tier": "strong_lean",
+        "confidence": 0.92,
+        "side": "SAC ML",
+        "home_team": "Sacramento Kings",
+        "away_team": "Los Angeles Clippers",
+        "run_date": "2026-02-06",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.7325
+      },
+      {
+        "event_id": "69d971ab3826cab2feb87672c81b99cc",
+        "market": "moneyline",
+        "tier": "strong_lean",
+        "confidence": 0.88,
+        "side": "NYK ML",
+        "home_team": "Detroit Pistons",
+        "away_team": "New York Knicks",
+        "run_date": "2026-02-06",
+        "clv": 0.0,
+        "category": "calibration_gap",
+        "bucket_gap": 0.6925
+      }
+    ]
+  },
+  "feature_discovery": {
+    "generated_at": "2026-02-18T19:15:46.621410+00:00",
+    "lookback_days": 180,
+    "n_results": 18,
+    "n_graded": 18,
+    "overall_win_pct": 16.7,
+    "patterns": [
+      {
+        "segment": "tier:watchlist",
+        "n": 5,
+        "n_graded": 5,
+        "wins": 0,
+        "losses": 5,
+        "win_pct": 0.0,
+        "units": -5.0,
+        "mean_clv": 0.0,
+        "n_clv": 5,
+        "deviation_from_overall": -16.7
+      },
+      {
+        "segment": "tier_market:watchlist_moneyline",
+        "n": 5,
+        "n_graded": 5,
+        "wins": 0,
+        "losses": 5,
+        "win_pct": 0.0,
+        "units": -5.0,
+        "mean_clv": 0.0,
+        "n_clv": 5,
+        "deviation_from_overall": -16.7
+      },
+      {
+        "segment": "slot:early",
+        "n": 5,
+        "n_graded": 5,
+        "wins": 0,
+        "losses": 5,
+        "win_pct": 0.0,
+        "units": -5.0,
+        "mean_clv": 0.0,
+        "n_clv": 5,
+        "deviation_from_overall": -16.7
+      },
+      {
+        "segment": "score:65-74",
+        "n": 5,
+        "n_graded": 5,
+        "wins": 0,
+        "losses": 5,
+        "win_pct": 0.0,
+        "units": -5.0,
+        "mean_clv": 0.0,
+        "n_clv": 5,
+        "deviation_from_overall": -16.7
+      },
+      {
+        "segment": "tier:strong_lean",
+        "n": 11,
+        "n_graded": 11,
+        "wins": 3,
+        "losses": 8,
+        "win_pct": 27.3,
+        "units": -3.116,
+        "mean_clv": 0.0,
+        "n_clv": 11,
+        "deviation_from_overall": 10.6
+      },
+      {
+        "segment": "tier_market:strong_lean_moneyline",
+        "n": 11,
+        "n_graded": 11,
+        "wins": 3,
+        "losses": 8,
+        "win_pct": 27.3,
+        "units": -3.116,
+        "mean_clv": 0.0,
+        "n_clv": 11,
+        "deviation_from_overall": 10.6
+      },
+      {
+        "segment": "score:75+",
+        "n": 11,
+        "n_graded": 11,
+        "wins": 3,
+        "losses": 8,
+        "win_pct": 27.3,
+        "units": -3.116,
+        "mean_clv": 0.0,
+        "n_clv": 11,
+        "deviation_from_overall": 10.6
+      },
+      {
+        "segment": "slot:late",
+        "n": 13,
+        "n_graded": 13,
+        "wins": 3,
+        "losses": 10,
+        "win_pct": 23.1,
+        "units": -5.116,
+        "mean_clv": 0.0,
+        "n_clv": 13,
+        "deviation_from_overall": 6.4
+      },
+      {
+        "segment": "side:away",
+        "n": 8,
+        "n_graded": 8,
+        "wins": 1,
+        "losses": 7,
+        "win_pct": 12.5,
+        "units": -3.6,
+        "mean_clv": 0.0,
+        "n_clv": 8,
+        "deviation_from_overall": -4.2
+      },
+      {
+        "segment": "side:home",
+        "n": 10,
+        "n_graded": 10,
+        "wins": 2,
+        "losses": 8,
+        "win_pct": 20.0,
+        "units": -6.516,
+        "mean_clv": 0.0,
+        "n_clv": 10,
+        "deviation_from_overall": 3.3
+      },
+      {
+        "segment": "conf:high",
+        "n": 16,
+        "n_graded": 16,
+        "wins": 3,
+        "losses": 13,
+        "win_pct": 18.8,
+        "units": -8.116,
+        "mean_clv": 0.0,
+        "n_clv": 16,
+        "deviation_from_overall": 2.1
+      },
+      {
+        "segment": "market:moneyline",
+        "n": 18,
+        "n_graded": 18,
+        "wins": 3,
+        "losses": 15,
+        "win_pct": 16.7,
+        "units": -10.116,
+        "mean_clv": 0.0,
+        "n_clv": 18,
+        "deviation_from_overall": 0.0
+      }
+    ],
+    "n_proposed_tests": 5
+  },
+  "calibration_agent": {
+    "generated_at": "2026-02-18T19:15:47.138598+00:00",
+    "lookback_days": 180,
+    "n_usable": 18,
+    "metrics": {
+      "n": 18,
+      "logloss": 4.02626,
+      "brier": 0.57408,
+      "avg_confidence": 0.8133,
+      "avg_win_rate": 0.1667
+    },
+    "reliability_bins": [
+      {
+        "bin_lo": 0.61,
+        "bin_hi": 0.7,
+        "n": 6,
+        "predicted_avg": 0.6467,
+        "actual_win_rate": 0.0
+      },
+      {
+        "bin_lo": 0.74,
+        "bin_hi": 0.88,
+        "n": 6,
+        "predicted_avg": 0.82,
+        "actual_win_rate": 0.5
+      },
+      {
+        "bin_lo": 0.92,
+        "bin_hi": 1.0,
+        "n": 6,
+        "predicted_avg": 0.9733,
+        "actual_win_rate": 0.0
+      }
+    ],
+    "candidate_curve": null
+  },
+  "strategy_tournament": {
+    "generated_at": "2026-02-18T19:15:49.082750+00:00",
+    "lookback_days": 180,
+    "n_variants": 12,
+    "n_pick_results": 18,
+    "champion": {
+      "C": 1.0,
+      "MIN_EDGE": 0.03,
+      "n_bets": 14,
+      "n_wins": 2,
+      "n_losses": 12,
+      "win_pct": 14.3,
+      "units": -8.156,
+      "roi_pct": -58.25,
+      "logloss": 0.50705,
+      "mean_clv": 0.0,
+      "pct_positive_clv": 0.0
+    },
+    "top_5": [
+      {
+        "C": 1.0,
+        "MIN_EDGE": 0.04,
+        "n_bets": 13,
+        "n_wins": 2,
+        "n_losses": 11,
+        "win_pct": 15.4,
+        "units": -7.156,
+        "roi_pct": -55.04,
+        "logloss": 0.50685,
+        "mean_clv": 0.0,
+        "pct_positive_clv": 0.0
+      },
+      {
+        "C": 1.0,
+        "MIN_EDGE": 0.03,
+        "n_bets": 14,
+        "n_wins": 2,
+        "n_losses": 12,
+        "win_pct": 14.3,
+        "units": -8.156,
+        "roi_pct": -58.25,
+        "logloss": 0.50705,
+        "mean_clv": 0.0,
+        "pct_positive_clv": 0.0
+      },
+      {
+        "C": 1.0,
+        "MIN_EDGE": 0.02,
+        "n_bets": 15,
+        "n_wins": 2,
+        "n_losses": 13,
+        "win_pct": 13.3,
+        "units": -9.156,
+        "roi_pct": -61.04,
+        "logloss": 0.51142,
+        "mean_clv": 0.0,
+        "pct_positive_clv": 0.0
+      },
+      {
+        "C": 10.0,
+        "MIN_EDGE": 0.02,
+        "n_bets": 9,
+        "n_wins": 2,
+        "n_losses": 7,
+        "win_pct": 22.2,
+        "units": -3.156,
+        "roi_pct": -35.06,
+        "logloss": 0.54279,
+        "mean_clv": 0.0,
+        "pct_positive_clv": 0.0
+      },
+      {
+        "C": 10.0,
+        "MIN_EDGE": 0.03,
+        "n_bets": 4,
+        "n_wins": 1,
+        "n_losses": 3,
+        "win_pct": 25.0,
+        "units": -2.556,
+        "roi_pct": -63.89,
+        "logloss": 0.5745,
+        "mean_clv": 0.0,
+        "pct_positive_clv": 0.0
+      }
+    ]
+  },
+  "gating": {
+    "passed": false,
+    "checks": [
+      {
+        "gate": "sample_size",
+        "passed": false,
+        "value": 13,
+        "threshold": 200
+      },
+      {
+        "gate": "logloss_improvement",
+        "passed": false,
+        "champion_ll": 0.50705,
+        "challenger_ll": 0.50685,
+        "improvement_pct": 0.04,
+        "threshold_pct": 2.0
+      },
+      {
+        "gate": "clv",
+        "passed": false,
+        "mean_clv": 0.0,
+        "pct_positive_clv": 0.0,
+        "rule": "mean_clv > 0 OR pct_positive_clv >= 52%"
+      },
+      {
+        "gate": "roi_regression",
+        "passed": true,
+        "champion_roi": -58.25,
+        "challenger_roi": -55.04,
+        "regression": -3.21,
+        "max_allowed": 2.0
+      },
+      {
+        "gate": "overconfidence",
+        "passed": false,
+        "avg_confidence": 0.8133,
+        "threshold": 0.62,
+        "win_pct": 15.4
+      }
+    ]
+  }
+}

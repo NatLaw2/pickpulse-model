@@ -1,0 +1,401 @@
+deal_id,close_date,won,amount,industry,lead_source,rep,product_line,stage,days_in_pipeline,num_activities,num_contacts,competitor_involved,deal_size_bucket,pipeline_speed,probability,tier,rank,value_at_risk
+DEAL-11739,2025-03-18,1,341081,Technology,Partner,Rep_J,Platform,Verbal Commit,39,2,3,1,large,normal,0.5891425340900655,Moderate,13,200945.3246699736
+DEAL-11790,2025-04-12,1,379106,Technology,Event,Rep_F,Platform,Demo Given,50,10,4,0,large,slow,0.5088382455387574,Moderate,151,192903.63191321617
+DEAL-11679,2025-03-11,0,320797,Consulting,Inbound,Rep_F,Platform,Verbal Commit,60,9,4,1,large,slow,0.5031249245293514,Moderate,165,161400.96641424234
+DEAL-10767,2025-04-08,0,278181,Media,Website,Rep_F,Platform,Verbal Commit,1,9,4,0,large,fast,0.5636754630952053,Moderate,29,156803.8039992873
+DEAL-10920,2025-04-19,1,320522,Healthcare,Partner,Rep_J,Platform,Verbal Commit,108,8,4,1,large,stalled,0.48634503389189776,Moderate,211,155884.28295309885
+DEAL-10494,2025-05-27,1,339588,Energy,Outbound,Rep_I,Platform,Proposal Sent,3,11,2,0,large,fast,0.45680368558125356,Moderate,288,155125.04997916674
+DEAL-10539,2025-04-13,0,292896,Education,Website,Rep_G,Platform,Demo Given,20,14,3,0,large,normal,0.5083798152725486,Moderate,152,148902.4143740684
+DEAL-10223,2025-05-28,1,296198,Technology,Website,Rep_C,Platform,Demo Given,3,11,5,0,large,fast,0.4736433198745174,Moderate,246,140292.2040601923
+DEAL-11244,2025-03-25,1,242932,Finance,Inbound,Rep_K,Platform,Negotiation,38,4,5,0,large,normal,0.5728506017446178,Moderate,22,139163.7423830235
+DEAL-10675,2025-06-13,0,261093,Real Estate,Partner,Rep_D,Platform,Demo Given,20,4,1,0,large,normal,0.5270020068948438,Moderate,108,137596.53498619545
+DEAL-11416,2025-03-21,0,280550,Media,Event,Rep_C,Platform,Verbal Commit,21,4,1,0,large,normal,0.4878979552895023,Moderate,205,136879.77135646986
+DEAL-10538,2025-04-13,1,263260,Energy,Inbound,Rep_F,Platform,Verbal Commit,33,8,3,0,large,normal,0.5102349787215918,Moderate,147,134324.46049824628
+DEAL-10537,2025-05-03,1,231073,Consulting,Website,Rep_C,Platform,Verbal Commit,39,6,3,0,large,normal,0.5799176152657695,Moderate,18,134003.30311230716
+DEAL-11280,2025-03-28,0,246969,Retail,Event,Rep_F,Platform,Verbal Commit,26,9,3,0,large,normal,0.5406548971037122,Moderate,62,133524.9992828067
+DEAL-11665,2025-05-13,1,244606,Media,Outbound,Rep_E,Platform,Negotiation,7,7,3,1,large,fast,0.5399108358540176,Moderate,67,132065.4299149078
+DEAL-10659,2025-05-20,1,262537,Energy,Event,Rep_D,Platform,Qualified,12,11,4,0,large,fast,0.49172603288191113,Moderate,193,129096.2774947183
+DEAL-10765,2025-04-24,0,291532,Retail,Partner,Rep_C,Platform,Demo Given,4,11,1,1,large,fast,0.4408867758498184,Moderate,321,128532.60353704926
+DEAL-11160,2025-06-15,0,253647,Energy,Referral,Rep_F,Platform,Proposal Sent,25,6,1,0,large,normal,0.49674353458723425,Moderate,176,125997.50731744821
+DEAL-10747,2025-03-27,0,272542,Manufacturing,Partner,Rep_E,Platform,Proposal Sent,3,14,3,0,large,fast,0.45970491343668873,Moderate,281,125288.89651786203
+DEAL-11048,2025-05-15,1,238126,Healthcare,Partner,Rep_K,Platform,Negotiation,55,11,6,0,large,slow,0.5169380954373433,Moderate,132,123096.4009141128
+DEAL-10197,2025-03-12,0,244524,Healthcare,Partner,Rep_F,Platform,Proposal Sent,13,10,3,0,large,fast,0.4966647833964967,Moderate,177,121446.45949524497
+DEAL-10447,2025-06-21,1,257492,Energy,Event,Rep_K,Platform,Proposal Sent,7,10,3,1,large,fast,0.46792897293206615,Moderate,261,120487.96709822357
+DEAL-11440,2025-04-01,0,220045,Media,Outbound,Rep_K,Platform,Demo Given,25,7,4,0,large,normal,0.5338488777950083,Moderate,93,117470.77631440261
+DEAL-11725,2025-04-23,1,206078,Media,Referral,Rep_L,Platform,Qualified,13,2,3,1,large,fast,0.5363992173364526,Moderate,79,110540.07791026148
+DEAL-11668,2025-05-16,0,256552,Finance,Event,Rep_A,Platform,Proposal Sent,12,6,5,0,large,fast,0.4292848787889819,Moderate,348,110133.89422307089
+DEAL-10521,2025-06-16,0,223938,Media,Outbound,Rep_C,Platform,Proposal Sent,19,7,3,0,large,normal,0.49012912913461415,Moderate,199,109758.53692014722
+DEAL-10439,2025-06-21,1,249834,Healthcare,Referral,Rep_D,Platform,Qualified,88,7,6,0,large,slow,0.43619398613474497,Moderate,332,108976.08833198788
+DEAL-11294,2025-05-11,1,240759,Manufacturing,Outbound,Rep_A,Platform,Qualified,10,10,5,0,large,fast,0.44828628057564457,Moderate,300,107928.9566251116
+DEAL-11478,2025-03-13,0,234465,Manufacturing,Referral,Rep_L,Platform,Qualified,20,8,1,1,large,normal,0.4552667037210651,Moderate,293,106744.10768795952
+DEAL-10628,2025-06-09,1,236136,Education,Referral,Rep_F,Platform,Demo Given,15,7,5,0,large,normal,0.4435840698240274,Moderate,316,104746.16791196654
+DEAL-10614,2025-03-15,1,205240,Retail,Website,Rep_B,Platform,Negotiation,4,4,4,0,large,fast,0.5095157417447883,Moderate,149,104573.01083570035
+DEAL-10158,2025-05-28,0,192652,Technology,Event,Rep_D,Enterprise,Demo Given,54,7,3,1,large,slow,0.5405382231791122,Moderate,63,104135.76977190231
+DEAL-10584,2025-05-01,1,170782,Media,Website,Rep_C,Enterprise,Verbal Commit,27,7,4,0,large,normal,0.6085012495698755,Moderate,5,103921.06040404248
+DEAL-11891,2025-05-17,1,215668,Consulting,Partner,Rep_F,Platform,Negotiation,16,6,2,0,large,normal,0.4794061498179759,Moderate,226,103392.56551894323
+DEAL-10149,2025-04-06,1,217112,Media,Partner,Rep_B,Platform,Proposal Sent,14,14,2,1,large,fast,0.47060055701561093,Moderate,255,102173.02813477333
+DEAL-11694,2025-05-02,1,209672,Consulting,Partner,Rep_D,Platform,Proposal Sent,16,4,6,1,large,normal,0.48353385693499307,Moderate,217,101383.51085127387
+DEAL-10346,2025-03-20,0,222159,Retail,Website,Rep_L,Platform,Demo Given,60,13,1,0,large,slow,0.43568442745977076,Moderate,336,96791.21672003521
+DEAL-10358,2025-04-13,0,191875,Real Estate,Outbound,Rep_E,Platform,Demo Given,47,7,3,0,large,slow,0.5043050624040569,Moderate,163,96763.53384877842
+DEAL-11465,2025-04-25,0,228683,Consulting,Partner,Rep_C,Platform,Qualified,81,9,3,1,large,slow,0.4216687504535523,Moderate,358,96428.4748599697
+DEAL-10794,2025-05-17,0,200593,Education,Referral,Rep_C,Enterprise,Proposal Sent,60,16,2,0,large,slow,0.4772762784682305,Moderate,230,95738.28052677776
+DEAL-11958,2025-06-07,1,191652,Education,Referral,Rep_B,Enterprise,Qualified,16,8,3,0,large,normal,0.49584714292921256,Moderate,178,95030.09663666945
+DEAL-10804,2025-04-07,0,266635,Energy,Website,Rep_A,Platform,Demo Given,86,7,2,1,large,slow,0.3560279225705928,Watchlist,393,94929.50513461001
+DEAL-11645,2025-06-17,0,184179,Technology,Website,Rep_H,Enterprise,Negotiation,1,8,2,0,large,fast,0.5131889615757658,Moderate,140,94518.62975406296
+DEAL-10827,2025-04-24,1,180026,Consulting,Referral,Rep_F,Enterprise,Qualified,67,6,3,1,large,slow,0.5170690091680806,Moderate,130,93085.86544449288
+DEAL-11962,2025-05-20,1,207653,Healthcare,Event,Rep_J,Platform,Qualified,16,9,3,1,large,normal,0.4459414158763608,Moderate,308,92601.07283097395
+DEAL-11317,2025-05-07,1,210804,Retail,Referral,Rep_L,Platform,Proposal Sent,123,7,4,1,large,stalled,0.43865590554843703,Moderate,326,92470.41951323271
+DEAL-11372,2025-05-03,0,193561,Consulting,Event,Rep_I,Enterprise,Demo Given,67,8,1,0,large,slow,0.4765384083940464,Moderate,232,92239.25086716001
+DEAL-11116,2025-03-29,0,171784,Manufacturing,Event,Rep_C,Enterprise,Verbal Commit,15,5,3,1,large,normal,0.5361190465640113,Moderate,81,92096.67429495213
+DEAL-11816,2025-06-02,1,162215,Technology,Referral,Rep_A,Enterprise,Negotiation,4,11,4,0,large,fast,0.5669100767854325,Moderate,28,91961.31810574893
+DEAL-11867,2025-06-13,0,169306,Technology,Website,Rep_B,Platform,Proposal Sent,56,7,1,0,large,slow,0.5372535372801105,Moderate,74,90960.24738274638
+DEAL-10140,2025-03-11,1,157391,Manufacturing,Outbound,Rep_H,Enterprise,Verbal Commit,40,7,3,0,large,normal,0.5708153529436274,Moderate,23,89841.19921515045
+DEAL-10266,2025-05-05,0,191652,Retail,Outbound,Rep_B,Platform,Qualified,41,11,1,1,large,normal,0.4685127569791197,Moderate,259,89791.40690056224
+DEAL-11396,2025-04-06,1,179024,Energy,Referral,Rep_I,Enterprise,Negotiation,32,5,6,0,large,normal,0.5008135877843906,Moderate,170,89657.65173951273
+DEAL-11713,2025-03-31,0,170496,Finance,Outbound,Rep_E,Platform,Negotiation,9,7,4,1,large,fast,0.5238443744025685,Moderate,114,89313.37045814031
+DEAL-10251,2025-05-10,0,169374,Healthcare,Outbound,Rep_D,Platform,Verbal Commit,8,9,1,0,large,fast,0.5233475621425877,Moderate,116,88641.46999033865
+DEAL-11539,2025-04-04,1,197358,Energy,Partner,Rep_C,Platform,Demo Given,44,2,2,1,large,normal,0.44822136419607617,Moderate,301,88460.0719950092
+DEAL-10904,2025-05-19,1,165818,Retail,Inbound,Rep_B,Platform,Demo Given,33,5,3,0,large,normal,0.5330888360793542,Moderate,95,88395.72462100636
+DEAL-11938,2025-03-21,0,203022,Media,Event,Rep_F,Platform,Demo Given,69,7,1,0,large,slow,0.4318065799525243,Moderate,342,87666.23547512139
+DEAL-10485,2025-04-18,1,173050,Manufacturing,Inbound,Rep_B,Platform,Proposal Sent,56,10,5,1,large,slow,0.5049228850139488,Moderate,162,87376.90525166383
+DEAL-10089,2025-03-22,0,170622,Energy,Outbound,Rep_D,Platform,Proposal Sent,4,10,3,0,large,fast,0.5081569260929581,Moderate,153,86702.7510438327
+DEAL-11472,2025-06-08,1,157156,Energy,Partner,Rep_G,Platform,Qualified,1,9,3,0,large,fast,0.5489303905256351,Moderate,48,86267.70445344671
+DEAL-10991,2025-06-22,1,179789,Education,Event,Rep_B,Enterprise,Demo Given,23,5,1,0,large,normal,0.4784029891827998,Moderate,228,86011.59502218639
+DEAL-11235,2025-03-30,1,143631,Manufacturing,Referral,Rep_E,Enterprise,Verbal Commit,32,11,2,0,large,normal,0.5910938339406233,Moderate,11,84899.39846272567
+DEAL-10836,2025-05-17,0,173341,Consulting,Website,Rep_L,Platform,Qualified,11,11,5,0,large,fast,0.4882529117434302,Moderate,204,84634.24797451794
+DEAL-10736,2025-04-17,1,190227,Manufacturing,Event,Rep_D,Platform,Negotiation,19,8,1,1,large,normal,0.4425391679991731,Moderate,319,84182.8983109787
+DEAL-11520,2025-04-09,0,274976,Finance,Outbound,Rep_J,Platform,Demo Given,215,5,2,0,large,stalled,0.30508434856444344,Watchlist,400,83890.8738308564
+DEAL-11812,2025-05-26,0,189131,Retail,Partner,Rep_C,Platform,Negotiation,80,3,5,0,large,slow,0.4376669871302554,Moderate,328,82776.39494293234
+DEAL-11707,2025-06-20,0,150727,Media,Referral,Rep_K,Enterprise,Negotiation,19,6,7,0,large,normal,0.5359922756289277,Moderate,82,80788.5077287214
+DEAL-11487,2025-03-18,1,155391,Technology,Partner,Rep_J,Enterprise,Demo Given,6,7,2,0,large,fast,0.5177912522962457,Moderate,127,80460.10048556591
+DEAL-11680,2025-04-20,1,143499,Media,Referral,Rep_J,Enterprise,Negotiation,4,9,6,0,large,fast,0.557323559652348,Moderate,38,79975.37348655229
+DEAL-10397,2025-05-21,1,150464,Retail,Referral,Rep_H,Custom,Negotiation,1,13,3,1,large,fast,0.5290353930187689,Moderate,101,79600.78137517604
+DEAL-10033,2025-06-16,0,148274,Technology,Event,Rep_F,Platform,Qualified,5,10,3,0,large,fast,0.5367983437109116,Moderate,75,79593.23761539171
+DEAL-10938,2025-03-18,1,146109,Real Estate,Event,Rep_D,Platform,Proposal Sent,5,7,7,0,large,fast,0.5434671575183871,Moderate,55,79405.44291785403
+DEAL-10193,2025-04-28,0,177887,Consulting,Referral,Rep_A,Enterprise,Demo Given,63,5,3,0,large,slow,0.4440693278564165,Moderate,313,78994.16052439436
+DEAL-11560,2025-03-20,1,149570,Education,Partner,Rep_H,Enterprise,Proposal Sent,66,11,4,1,large,slow,0.5220520885880713,Moderate,122,78083.33089011782
+DEAL-11161,2025-03-20,1,160946,Finance,Referral,Rep_A,Enterprise,Verbal Commit,85,10,4,1,large,slow,0.48445140798992636,Moderate,216,77970.51631034669
+DEAL-10370,2025-04-23,1,174440,Energy,Website,Rep_C,Platform,Negotiation,77,9,3,0,large,slow,0.4439543275683814,Moderate,314,77443.39290102845
+DEAL-11476,2025-06-12,1,175667,Real Estate,Referral,Rep_B,Platform,Proposal Sent,81,14,4,1,large,slow,0.4400512068228594,Moderate,322,77302.47534895125
+DEAL-10079,2025-05-28,0,151734,Retail,Outbound,Rep_L,Platform,Verbal Commit,5,7,4,0,large,fast,0.5078661768452419,Moderate,154,77060.56647743595
+DEAL-11747,2025-05-26,0,211211,Retail,Outbound,Rep_J,Platform,Demo Given,222,9,4,0,large,stalled,0.3642684883451459,Watchlist,389,76937.51169186662
+DEAL-11781,2025-05-13,1,145414,Consulting,Partner,Rep_B,Platform,Proposal Sent,30,8,2,0,large,normal,0.527264166413756,Moderate,105,76671.59149488992
+DEAL-11661,2025-06-15,0,182298,Real Estate,Event,Rep_A,Enterprise,Negotiation,70,5,3,0,large,slow,0.417954734606683,Moderate,360,76192.31220932909
+DEAL-11207,2025-05-09,1,152446,Consulting,Referral,Rep_F,Platform,Proposal Sent,35,9,2,0,large,normal,0.49828241902990367,Moderate,173,75961.16165143269
+DEAL-11397,2025-05-11,0,133908,Finance,Referral,Rep_G,Enterprise,Verbal Commit,138,10,1,1,large,stalled,0.5632461278887189,Moderate,31,75423.16249332257
+DEAL-11151,2025-06-05,1,147816,Finance,Inbound,Rep_K,Platform,Proposal Sent,53,15,1,0,large,slow,0.48888173070573593,Moderate,201,72264.54190599907
+DEAL-11033,2025-05-18,0,150145,Finance,Event,Rep_C,Platform,Demo Given,44,8,4,0,large,normal,0.47934024801144703,Moderate,227,71970.54153767871
+DEAL-11415,2025-05-19,0,146657,Finance,Website,Rep_G,Platform,Verbal Commit,2,6,1,1,large,fast,0.4869188029824153,Moderate,210,71410.05088899207
+DEAL-10275,2025-06-23,1,138998,Media,Event,Rep_B,Enterprise,Negotiation,25,13,2,0,large,normal,0.5129783698693613,Moderate,141,71302.96745510148
+DEAL-11672,2025-03-31,0,143819,Technology,Website,Rep_F,Platform,Qualified,29,10,2,0,large,normal,0.49524876251313293,Moderate,184,71226.18177587626
+DEAL-11065,2025-03-19,1,123324,Real Estate,Inbound,Rep_K,Platform,Verbal Commit,23,12,3,0,medium,normal,0.572917405190583,Moderate,21,70654.46607772345
+DEAL-11766,2025-05-13,0,127672,Media,Inbound,Rep_H,Enterprise,Negotiation,17,9,4,1,medium,normal,0.5531089529478842,Moderate,41,70616.52624076226
+DEAL-10605,2025-05-03,1,219781,Finance,Referral,Rep_A,Platform,Proposal Sent,135,12,1,1,large,stalled,0.31764734616161466,Watchlist,399,69812.85138674584
+DEAL-10222,2025-05-22,0,149281,Healthcare,Partner,Rep_B,Custom,Negotiation,92,9,2,1,large,stalled,0.46673317349648824,Moderate,267,69674.39487272926
+DEAL-11312,2025-06-11,1,130251,Healthcare,Inbound,Rep_L,Platform,Proposal Sent,29,8,1,0,medium,normal,0.5337580317185535,Moderate,94,69522.51738937332
+DEAL-10549,2025-04-28,0,112316,Technology,Outbound,Rep_D,Enterprise,Negotiation,2,15,4,1,medium,fast,0.6136899896871106,Moderate,3,68927.20488169751
+DEAL-10919,2025-04-30,0,182103,Finance,Website,Rep_L,Enterprise,Demo Given,3,4,2,1,large,fast,0.3774835084835931,Watchlist,382,68740.87934538774
+DEAL-11076,2025-05-08,1,119996,Manufacturing,Partner,Rep_I,Custom,Negotiation,29,10,3,0,medium,normal,0.5705896178765167,Moderate,24,68468.4717867105
+DEAL-10502,2025-03-18,0,114333,Education,Referral,Rep_J,Custom,Qualified,2,10,3,1,medium,fast,0.5941978109488609,Moderate,8,67936.41831921611
+DEAL-10160,2025-06-11,1,146470,Energy,Partner,Rep_A,Enterprise,Proposal Sent,10,6,4,0,large,fast,0.461415632533363,Moderate,277,67583.54769716167
+DEAL-10912,2025-06-09,0,129976,Technology,Inbound,Rep_C,Enterprise,Proposal Sent,19,7,3,0,medium,normal,0.5192533950863139,Moderate,124,67490.47927973873
+DEAL-11598,2025-04-19,1,125154,Consulting,Referral,Rep_H,Custom,Negotiation,42,9,4,0,medium,normal,0.5313926880938001,Moderate,99,66505.92048569146
+DEAL-10339,2025-05-11,1,120636,Manufacturing,Website,Rep_H,Platform,Verbal Commit,38,7,2,0,medium,normal,0.5379118082241845,Moderate,72,64891.52889693272
+DEAL-10764,2025-04-28,1,121157,Media,Event,Rep_H,Enterprise,Qualified,38,7,3,0,medium,normal,0.5315847705855532,Moderate,98,64405.21604983387
+DEAL-11956,2025-05-15,1,127779,Education,Inbound,Rep_J,Enterprise,Demo Given,50,4,3,0,medium,slow,0.49544040607108986,Moderate,182,63306.87964735779
+DEAL-10404,2025-06-16,0,140550,Media,Event,Rep_A,Custom,Demo Given,58,2,2,1,large,slow,0.4456504194390886,Moderate,311,62636.1664521639
+DEAL-10669,2025-06-12,0,147109,Education,Outbound,Rep_K,Platform,Negotiation,143,10,5,1,large,stalled,0.42450934029081633,Moderate,352,62449.1445408417
+DEAL-10546,2025-04-16,1,112865,Retail,Partner,Rep_K,Custom,Verbal Commit,25,8,5,0,medium,normal,0.5493636108321142,Moderate,47,62003.92393656656
+DEAL-11601,2025-03-19,0,131483,Retail,Partner,Rep_C,Platform,Demo Given,40,7,1,0,large,normal,0.46554734583203833,Moderate,269,61211.561672033895
+DEAL-10200,2025-05-19,0,112054,Real Estate,Inbound,Rep_H,Enterprise,Proposal Sent,9,6,4,0,medium,fast,0.5413745414904261,Moderate,58,60663.1828721682
+DEAL-11481,2025-06-05,0,106990,Manufacturing,Partner,Rep_G,Enterprise,Verbal Commit,62,8,3,0,medium,slow,0.563593546459027,Moderate,30,60298.873535651306
+DEAL-11571,2025-05-08,0,150860,Finance,Outbound,Rep_I,Enterprise,Proposal Sent,65,13,2,0,large,slow,0.39924417355332975,Watchlist,373,60229.97602225532
+DEAL-10371,2025-03-14,1,101235,Consulting,Inbound,Rep_B,Enterprise,Proposal Sent,29,11,4,1,medium,normal,0.5902044440653424,Moderate,12,59749.34689495494
+DEAL-11307,2025-06-22,1,123809,Energy,Inbound,Rep_L,Custom,Qualified,41,4,1,0,medium,normal,0.47784728638043117,Moderate,229,59161.794679474806
+DEAL-11404,2025-03-21,0,111752,Education,Inbound,Rep_J,Enterprise,Verbal Commit,84,11,1,1,medium,slow,0.5272567317139355,Moderate,106,58921.99428249572
+DEAL-11141,2025-05-18,1,98779,Media,Website,Rep_J,Custom,Negotiation,39,6,3,0,medium,normal,0.5916129612862284,Moderate,10,58438.93670289236
+DEAL-10380,2025-06-15,0,94634,Education,Inbound,Rep_I,Custom,Verbal Commit,129,10,2,0,medium,stalled,0.6156973459851584,Moderate,2,58265.90263995947
+DEAL-10874,2025-05-20,0,123875,Education,Referral,Rep_E,Custom,Proposal Sent,61,9,3,0,medium,slow,0.46711083396069786,Moderate,263,57863.354556881444
+DEAL-11846,2025-03-28,1,126300,Retail,Event,Rep_C,Enterprise,Proposal Sent,33,14,5,1,medium,normal,0.4576282876098402,Moderate,284,57798.45272512282
+DEAL-11910,2025-04-11,0,126505,Consulting,Referral,Rep_C,Enterprise,Qualified,28,8,2,1,medium,normal,0.4568396258768562,Moderate,287,57792.496871551695
+DEAL-10685,2025-04-03,1,114868,Energy,Inbound,Rep_C,Custom,Demo Given,11,6,1,0,medium,fast,0.5024429440553261,Moderate,167,57714.616097747195
+DEAL-10015,2025-03-20,1,131150,Retail,Website,Rep_K,Enterprise,Verbal Commit,18,5,2,1,medium,normal,0.43872133540767544,Moderate,325,57538.303138716634
+DEAL-11314,2025-04-28,1,106271,Consulting,Outbound,Rep_G,Custom,Negotiation,1,9,1,0,medium,fast,0.5399463694768445,Moderate,66,57380.64063067374
+DEAL-11421,2025-03-15,0,105264,Technology,Inbound,Rep_J,Platform,Proposal Sent,35,8,3,1,medium,normal,0.5349072333228906,Moderate,88,56306.475008500754
+DEAL-11471,2025-06-20,0,119930,Education,Partner,Rep_J,Enterprise,Verbal Commit,70,5,1,0,medium,slow,0.4679041616340959,Moderate,262,56115.74610477712
+DEAL-11950,2025-05-17,0,113430,Real Estate,Event,Rep_E,Custom,Negotiation,11,10,1,1,medium,fast,0.4929210552346526,Moderate,190,55912.03529526665
+DEAL-11288,2025-03-11,0,136497,Finance,Inbound,Rep_J,Custom,Proposal Sent,83,12,2,1,large,slow,0.4076408719863257,Moderate,368,55641.7561035175
+DEAL-11433,2025-03-15,0,135656,Energy,Inbound,Rep_C,Custom,Qualified,137,13,3,0,large,stalled,0.39756019124804587,Watchlist,374,53931.42530394491
+DEAL-10891,2025-03-18,0,104564,Retail,Partner,Rep_L,Custom,Verbal Commit,49,7,2,0,medium,slow,0.5155724396056928,Moderate,137,53910.31657492966
+DEAL-11264,2025-06-08,0,101870,Technology,Partner,Rep_J,Custom,Qualified,1,7,2,0,medium,fast,0.5289430493674985,Moderate,103,53883.42843906707
+DEAL-10910,2025-04-16,0,113703,Healthcare,Event,Rep_B,Enterprise,Proposal Sent,63,7,6,0,medium,slow,0.47340013183141744,Moderate,247,53827.01518962766
+DEAL-11564,2025-05-10,1,115345,Energy,Partner,Rep_E,Custom,Demo Given,15,9,4,0,medium,normal,0.46666043145713115,Moderate,268,53826.9474664228
+DEAL-10279,2025-04-28,0,123450,Energy,Partner,Rep_G,Enterprise,Negotiation,89,8,4,1,medium,slow,0.43482653944526933,Moderate,338,53679.3362945185
+DEAL-11618,2025-04-29,1,115893,Healthcare,Partner,Rep_H,Enterprise,Qualified,28,10,2,0,medium,normal,0.4559531930541003,Moderate,291,52841.78340261885
+DEAL-10840,2025-06-13,0,141648,Manufacturing,Outbound,Rep_E,Platform,Proposal Sent,166,8,3,0,large,stalled,0.37131318870465757,Watchlist,384,52595.77055363733
+DEAL-10932,2025-04-14,0,95376,Technology,Event,Rep_D,Custom,Negotiation,55,10,5,0,medium,slow,0.5467420096276825,Moderate,50,52146.06591024985
+DEAL-10850,2025-05-01,1,109995,Energy,Outbound,Rep_H,Custom,Verbal Commit,8,10,2,0,medium,fast,0.4630098016599944,Moderate,275,50928.763133591085
+DEAL-11387,2025-05-15,1,90780,Finance,Referral,Rep_F,Custom,Verbal Commit,125,14,7,1,medium,stalled,0.5494576898074557,Moderate,46,49879.76908072083
+DEAL-11133,2025-03-14,0,106690,Manufacturing,Referral,Rep_H,Enterprise,Negotiation,57,5,7,0,medium,slow,0.4667483762367276,Moderate,266,49797.38426069647
+DEAL-11060,2025-03-14,1,111066,Media,Outbound,Rep_B,Enterprise,Demo Given,81,2,4,0,medium,slow,0.4459188143278333,Moderate,309,49526.419032135134
+DEAL-11391,2025-06-05,1,103118,Manufacturing,Event,Rep_D,Custom,Demo Given,5,4,4,0,medium,fast,0.4738073440383353,Moderate,245,48858.06570254506
+DEAL-11168,2025-05-04,1,82698,Media,Website,Rep_D,Custom,Verbal Commit,31,6,3,0,medium,normal,0.5841922439293067,Moderate,16,48311.530188465804
+DEAL-11550,2025-04-09,0,97659,Education,Referral,Rep_E,Custom,Negotiation,31,3,3,0,medium,normal,0.4938274666409262,Moderate,187,48226.69656468621
+DEAL-10505,2025-04-05,0,108772,Real Estate,Website,Rep_E,Enterprise,Proposal Sent,6,8,1,1,medium,fast,0.44321903258113815,Moderate,318,48209.82061191556
+DEAL-10520,2025-06-15,0,106817,Technology,Inbound,Rep_H,Enterprise,Proposal Sent,8,2,5,1,medium,fast,0.45120364392234097,Moderate,295,48196.2196328527
+DEAL-11232,2025-06-18,1,96657,Real Estate,Event,Rep_J,Custom,Demo Given,15,9,2,0,medium,normal,0.49838061557193286,Moderate,172,48171.97515933632
+DEAL-10207,2025-04-23,0,90887,Finance,Referral,Rep_I,Enterprise,Verbal Commit,7,5,3,1,medium,fast,0.5289720961554286,Moderate,102,48076.68690327844
+DEAL-10646,2025-06-18,0,103367,Education,Website,Rep_C,Custom,Negotiation,68,4,3,0,medium,slow,0.4647691016813168,Moderate,272,48041.787733492674
+DEAL-10750,2025-04-29,1,90976,Manufacturing,Referral,Rep_G,Custom,Qualified,9,7,1,0,medium,fast,0.514895193502547,Moderate,138,46843.10512408771
+DEAL-11795,2025-03-19,0,86448,Real Estate,Inbound,Rep_A,Custom,Qualified,2,8,2,0,medium,fast,0.5386665896471488,Moderate,70,46566.649341816716
+DEAL-10452,2025-04-01,1,82945,Media,Event,Rep_H,Custom,Proposal Sent,28,9,4,0,medium,normal,0.5606360797543257,Moderate,35,46501.95963522255
+DEAL-11238,2025-03-19,0,98898,Consulting,Website,Rep_E,Enterprise,Verbal Commit,146,10,5,0,medium,stalled,0.46831660943079745,Moderate,260,46315.57603948701
+DEAL-11334,2025-04-26,0,82406,Media,Event,Rep_D,Professional,Verbal Commit,47,14,3,1,medium,slow,0.5598295915941851,Moderate,36,46133.317324910415
+DEAL-10813,2025-05-09,1,81655,Healthcare,Referral,Rep_G,Platform,Negotiation,5,7,6,0,medium,fast,0.5398986812479942,Moderate,68,44085.42681730497
+DEAL-10929,2025-04-04,0,92910,Real Estate,Event,Rep_A,Enterprise,Demo Given,59,7,3,0,medium,slow,0.4740680669456389,Moderate,243,44045.66409991931
+DEAL-10518,2025-04-08,0,77154,Technology,Website,Rep_D,Custom,Qualified,9,12,4,1,medium,fast,0.5676248018985679,Moderate,27,43794.52396568211
+DEAL-11961,2025-06-13,1,86084,Education,Inbound,Rep_F,Custom,Demo Given,19,9,6,0,medium,normal,0.49370700633639875,Moderate,188,42500.27393346255
+DEAL-10715,2025-06-21,1,75211,Finance,Partner,Rep_F,Custom,Verbal Commit,1,8,8,0,medium,fast,0.5628790740009977,Moderate,33,42334.698034689034
+DEAL-11126,2025-05-08,0,97756,Finance,Event,Rep_C,Custom,Demo Given,19,1,8,1,medium,normal,0.4329063663293862,Moderate,340,42319.19474689548
+DEAL-10268,2025-05-21,1,75216,Technology,Referral,Rep_D,Professional,Verbal Commit,1,7,5,0,medium,fast,0.5516680211671174,Moderate,43,41494.26188010591
+DEAL-11692,2025-05-09,0,88181,Real Estate,Partner,Rep_K,Custom,Demo Given,24,7,4,0,medium,normal,0.4697339014203045,Moderate,257,41421.605161143874
+DEAL-11011,2025-04-13,0,94809,Finance,Outbound,Rep_D,Custom,Proposal Sent,3,4,1,0,medium,fast,0.4364161857171496,Moderate,331,41376.18215165723
+DEAL-10540,2025-06-09,1,83446,Retail,Partner,Rep_C,Custom,Negotiation,46,7,1,1,medium,slow,0.492434011696418,Moderate,191,41091.6485400193
+DEAL-11051,2025-04-01,1,95766,Finance,Outbound,Rep_K,Custom,Qualified,29,4,4,1,medium,normal,0.4279641159301962,Moderate,349,40984.41152617117
+DEAL-10208,2025-06-11,0,71893,Media,Inbound,Rep_D,Enterprise,Negotiation,23,10,2,0,medium,normal,0.5690228738604831,Moderate,26,40908.76147045171
+DEAL-10412,2025-05-01,1,79067,Finance,Website,Rep_H,Enterprise,Proposal Sent,3,11,4,0,medium,fast,0.5164855268877073,Moderate,134,40836.961154430355
+DEAL-10132,2025-03-12,0,93484,Technology,Partner,Rep_J,Custom,Qualified,65,8,1,1,medium,slow,0.4358352050898285,Moderate,335,40743.618312617524
+DEAL-10290,2025-03-19,0,83279,Finance,Event,Rep_A,Custom,Verbal Commit,91,10,2,0,medium,stalled,0.487351984429237,Moderate,208,40586.18591128243
+DEAL-10623,2025-04-06,0,76041,Manufacturing,Event,Rep_L,Custom,Verbal Commit,91,10,1,0,medium,stalled,0.5324311661466841,Moderate,97,40486.59830496
+DEAL-10800,2025-04-11,1,73085,Finance,Partner,Rep_B,Enterprise,Proposal Sent,16,10,5,1,medium,normal,0.5408217376575208,Moderate,60,39525.95669669991
+DEAL-10831,2025-03-12,1,75219,Finance,Outbound,Rep_J,Custom,Verbal Commit,2,6,7,0,medium,fast,0.5227871148762046,Moderate,118,39323.52399387323
+DEAL-11246,2025-03-11,1,82530,Media,Referral,Rep_G,Professional,Demo Given,63,10,2,0,medium,slow,0.4727892423968704,Moderate,248,39019.29617501372
+DEAL-11019,2025-06-18,1,80549,Consulting,Outbound,Rep_J,Custom,Proposal Sent,28,10,2,0,medium,normal,0.4800342162538526,Moderate,224,38666.276085031575
+DEAL-10943,2025-03-23,1,77149,Real Estate,Referral,Rep_L,Enterprise,Qualified,19,5,2,0,medium,normal,0.4948721247005376,Moderate,185,38178.88954852177
+DEAL-10989,2025-06-19,0,78686,Technology,Event,Rep_F,Custom,Verbal Commit,135,5,3,1,medium,stalled,0.4814642959792558,Moderate,222,37884.49959342372
+DEAL-10625,2025-04-11,1,73238,Education,Partner,Rep_H,Custom,Verbal Commit,183,10,7,0,medium,stalled,0.5170659890986513,Moderate,131,37868.878909607025
+DEAL-11145,2025-04-28,0,70544,Education,Website,Rep_J,Custom,Negotiation,22,4,3,0,medium,normal,0.5365432569057313,Moderate,78,37849.90751515791
+DEAL-10300,2025-03-19,1,71138,Education,Inbound,Rep_C,Professional,Verbal Commit,6,8,4,0,medium,fast,0.5222909756913546,Moderate,121,37154.73542873158
+DEAL-11557,2025-05-04,0,88561,Healthcare,Website,Rep_C,Platform,Demo Given,43,5,6,1,medium,normal,0.41439409742917527,Moderate,363,36699.15566242519
+DEAL-11370,2025-06-01,1,74254,Real Estate,Referral,Rep_H,Enterprise,Proposal Sent,16,7,5,0,medium,normal,0.4922979015184028,Moderate,192,36555.08837934748
+DEAL-11271,2025-06-14,1,81396,Manufacturing,Event,Rep_H,Custom,Qualified,36,6,4,0,medium,normal,0.44590624393971384,Moderate,310,36294.98463171695
+DEAL-10565,2025-03-18,1,71490,Finance,Inbound,Rep_D,Custom,Negotiation,26,7,1,1,medium,normal,0.5063188427906947,Moderate,160,36196.734071106766
+DEAL-10828,2025-05-27,1,66647,Media,Event,Rep_G,Custom,Proposal Sent,20,7,3,0,medium,normal,0.5421192447527569,Moderate,57,36130.621305036984
+DEAL-11580,2025-05-21,1,89387,Retail,Inbound,Rep_G,Custom,Demo Given,109,5,1,0,medium,stalled,0.3909923205830644,Watchlist,375,34949.63055995837
+DEAL-11825,2025-04-16,1,64990,Energy,Referral,Rep_H,Professional,Verbal Commit,135,7,1,0,medium,stalled,0.5325505254370662,Moderate,96,34610.45864815493
+DEAL-11494,2025-06-13,0,92058,Education,Outbound,Rep_A,Custom,Demo Given,83,6,1,0,medium,slow,0.3711338361089189,Watchlist,385,34165.838684514856
+DEAL-11676,2025-06-22,1,53330,Healthcare,Referral,Rep_C,Enterprise,Verbal Commit,22,11,3,0,medium,normal,0.6320630788818794,Moderate,1,33707.92399677063
+DEAL-10644,2025-03-25,1,59808,Consulting,Event,Rep_B,Professional,Proposal Sent,10,6,3,0,medium,fast,0.5567944907186543,Moderate,39,33300.764900901275
+DEAL-11262,2025-06-23,0,65189,Real Estate,Outbound,Rep_D,Custom,Verbal Commit,9,9,4,0,medium,fast,0.495536864281308,Moderate,180,32303.552645634187
+DEAL-11631,2025-06-01,1,60243,Consulting,Referral,Rep_F,Professional,Verbal Commit,8,8,2,0,medium,fast,0.5226735773925697,Moderate,119,31487.424322860577
+DEAL-11103,2025-03-24,1,65056,Healthcare,Partner,Rep_K,Professional,Demo Given,58,10,5,1,medium,slow,0.48218819953563746,Moderate,220,31369.23550899043
+DEAL-11097,2025-03-28,0,84099,Retail,Outbound,Rep_G,Custom,Qualified,36,4,1,0,medium,normal,0.3706571303934991,Watchlist,386,31171.89400896288
+DEAL-11538,2025-03-13,0,67266,Energy,Event,Rep_L,Custom,Qualified,81,8,1,0,medium,slow,0.4550742064962465,Moderate,294,30611.02157417652
+DEAL-10436,2025-06-13,1,61524,Media,Partner,Rep_H,Professional,Proposal Sent,54,10,2,0,medium,slow,0.4954432472530762,Moderate,181,30481.65034399826
+DEAL-10578,2025-03-27,1,67522,Healthcare,Event,Rep_A,Professional,Demo Given,10,9,2,0,medium,fast,0.45093511989053126,Moderate,296,30448.04116524845
+DEAL-11502,2025-04-11,1,77949,Finance,Website,Rep_E,Custom,Negotiation,69,4,5,1,medium,slow,0.39051003683451946,Watchlist,376,30439.86686121396
+DEAL-10061,2025-05-24,1,62233,Real Estate,Outbound,Rep_A,Custom,Qualified,14,7,4,0,medium,fast,0.4875535881165122,Moderate,207,30341.922449254904
+DEAL-10062,2025-04-01,0,61091,Finance,Inbound,Rep_J,Enterprise,Demo Given,14,7,5,0,medium,fast,0.49581274000111825,Moderate,179,30289.696099408317
+DEAL-11928,2025-05-19,0,59610,Media,Website,Rep_B,Professional,Verbal Commit,96,7,4,1,medium,stalled,0.5076015079497354,Moderate,156,30258.125888883726
+DEAL-11458,2025-04-16,1,85710,Finance,Partner,Rep_K,Custom,Demo Given,151,14,2,0,medium,stalled,0.35247680791144687,Watchlist,395,30210.78720609011
+DEAL-10131,2025-03-26,1,55267,Finance,Partner,Rep_C,Custom,Verbal Commit,16,5,4,0,medium,normal,0.5441167516493037,Moderate,53,30071.70051340207
+DEAL-11131,2025-04-09,1,74058,Energy,Referral,Rep_E,Custom,Verbal Commit,111,8,6,1,medium,stalled,0.4011511049838294,Moderate,371,29708.44853289244
+DEAL-11218,2025-03-25,1,57047,Healthcare,Website,Rep_D,Custom,Negotiation,27,8,4,0,medium,normal,0.5115618502329906,Moderate,144,29183.068870241415
+DEAL-10250,2025-05-31,0,61570,Retail,Website,Rep_F,Enterprise,Negotiation,52,8,2,1,medium,slow,0.4715465673652008,Moderate,253,29033.122152675413
+DEAL-11349,2025-04-03,1,54115,Energy,Inbound,Rep_K,Professional,Negotiation,8,4,3,0,medium,fast,0.5355159878783736,Moderate,85,28979.44768403819
+DEAL-11343,2025-06-07,0,58580,Education,Referral,Rep_I,Professional,Qualified,1,5,1,0,medium,fast,0.4944464598281204,Moderate,186,28964.673616731292
+DEAL-10159,2025-05-26,1,48551,Media,Partner,Rep_I,Professional,Negotiation,43,6,3,0,medium,normal,0.5950793498674279,Moderate,7,28891.697515413493
+DEAL-10718,2025-06-20,1,53285,Real Estate,Inbound,Rep_E,Custom,Qualified,8,7,2,0,medium,fast,0.5367002758426936,Moderate,76,28598.07419827793
+DEAL-10679,2025-06-07,0,65392,Energy,Inbound,Rep_B,Professional,Negotiation,110,12,3,1,medium,stalled,0.4367012670558575,Moderate,329,28556.769255316634
+DEAL-11194,2025-05-31,1,57744,Healthcare,Outbound,Rep_H,Professional,Proposal Sent,15,8,4,0,medium,normal,0.48894338031609336,Moderate,200,28233.546552972493
+DEAL-11875,2025-05-29,1,47832,Media,Outbound,Rep_H,Professional,Negotiation,1,11,5,1,medium,fast,0.5883133508146275,Moderate,14,28140.204196165265
+DEAL-11517,2025-03-17,1,62224,Healthcare,Referral,Rep_D,Enterprise,Demo Given,16,11,2,1,medium,normal,0.4484666986502478,Moderate,299,27905.391856813018
+DEAL-11549,2025-03-29,1,54489,Energy,Website,Rep_J,Professional,Demo Given,14,12,1,1,medium,fast,0.5113325223496924,Moderate,145,27861.99781031239
+DEAL-10180,2025-06-10,0,65730,Retail,Event,Rep_J,Enterprise,Verbal Commit,89,10,2,1,medium,slow,0.4237521885937136,Moderate,356,27853.231356264794
+DEAL-10641,2025-03-30,1,53947,Real Estate,Website,Rep_F,Custom,Negotiation,34,8,3,1,medium,normal,0.5162287354348212,Moderate,136,27848.991590502297
+DEAL-10276,2025-05-27,1,54598,Energy,Referral,Rep_I,Custom,Qualified,7,8,2,0,medium,fast,0.5076589171710706,Moderate,155,27717.161559706114
+DEAL-10344,2025-04-08,0,66800,Retail,Website,Rep_K,Custom,Demo Given,38,9,2,1,medium,normal,0.4146332171110269,Moderate,362,27697.498903016596
+DEAL-11626,2025-04-22,1,61915,Technology,Website,Rep_I,Custom,Qualified,1,7,2,1,medium,fast,0.4469989031647229,Moderate,307,27675.937089443818
+DEAL-11741,2025-06-16,1,67299,Consulting,Inbound,Rep_A,Custom,Negotiation,107,8,7,1,medium,stalled,0.4111062433850785,Moderate,366,27667.0390735724
+DEAL-10499,2025-04-15,1,50217,Education,Inbound,Rep_G,Enterprise,Demo Given,60,11,3,0,medium,slow,0.5461329321926182,Moderate,51,27425.157455916706
+DEAL-10550,2025-04-15,0,51774,Manufacturing,Website,Rep_J,Professional,Negotiation,44,8,4,0,medium,normal,0.5286055212626193,Moderate,104,27368.02225785085
+DEAL-10440,2025-05-31,1,60556,Retail,Partner,Rep_D,Professional,Qualified,15,4,3,0,medium,normal,0.45073787646279345,Moderate,297,27294.88284708092
+DEAL-10754,2025-04-23,1,51841,Technology,Inbound,Rep_D,Professional,Demo Given,11,9,1,0,medium,fast,0.5256798406971326,Moderate,112,27251.76862158005
+DEAL-10946,2025-04-25,0,50564,Media,Outbound,Rep_H,Professional,Proposal Sent,67,10,7,1,medium,slow,0.5383324664559211,Moderate,71,27220.242833877197
+DEAL-11025,2025-05-02,1,51412,Retail,Outbound,Rep_I,Professional,Proposal Sent,77,10,6,0,medium,slow,0.527039957260252,Moderate,107,27096.178282664074
+DEAL-11526,2025-03-11,0,56573,Finance,Website,Rep_J,Professional,Verbal Commit,90,5,1,0,medium,slow,0.4720168165513032,Moderate,252,26703.407362756876
+DEAL-11920,2025-03-23,0,60504,Media,Partner,Rep_B,Custom,Demo Given,120,15,1,0,medium,stalled,0.4366532153675692,Moderate,330,26419.266142599405
+DEAL-11616,2025-03-13,1,54237,Finance,Event,Rep_D,Professional,Verbal Commit,44,10,1,1,medium,normal,0.47984303385474164,Moderate,225,26025.246627179622
+DEAL-10918,2025-06-08,0,58315,Energy,Partner,Rep_K,Professional,Qualified,5,7,5,1,medium,fast,0.44444344154471294,Moderate,312,25917.719293679937
+DEAL-10484,2025-03-13,0,53690,Manufacturing,Inbound,Rep_K,Custom,Demo Given,55,9,4,1,medium,slow,0.48233338071673215,Moderate,219,25896.479210681347
+DEAL-10286,2025-04-13,0,60622,Education,Partner,Rep_G,Platform,Qualified,35,5,3,0,medium,normal,0.41004477154089747,Moderate,367,24857.734140352288
+DEAL-11952,2025-06-11,0,45485,Media,Partner,Rep_E,Enterprise,Verbal Commit,48,12,4,0,medium,slow,0.5432918114784469,Moderate,56,24711.628045097154
+DEAL-11281,2025-05-29,1,55995,Finance,Outbound,Rep_K,Professional,Verbal Commit,1,3,4,1,medium,fast,0.43904232408465116,Moderate,323,24584.174937120042
+DEAL-11731,2025-05-27,1,47360,Healthcare,Inbound,Rep_C,Professional,Verbal Commit,41,2,3,0,medium,normal,0.5172146285447196,Moderate,129,24495.284807877917
+DEAL-11605,2025-05-29,1,54010,Education,Event,Rep_L,Custom,Qualified,34,4,3,0,medium,normal,0.44793199255212174,Moderate,305,24192.806917740094
+DEAL-11316,2025-06-09,1,50138,Finance,Outbound,Rep_C,Enterprise,Negotiation,36,8,3,0,medium,normal,0.4817365865054767,Moderate,221,24153.30897421159
+DEAL-11902,2025-03-16,1,47320,Technology,Referral,Rep_D,Professional,Verbal Commit,19,8,2,1,medium,normal,0.5088687645106658,Moderate,150,24079.669936644703
+DEAL-10576,2025-05-03,0,52436,Technology,Website,Rep_A,Professional,Qualified,20,5,5,0,medium,normal,0.45646595078376545,Moderate,290,23935.248595297526
+DEAL-10687,2025-03-22,1,44276,Education,Inbound,Rep_G,Professional,Negotiation,16,11,1,0,medium,normal,0.5403844978266403,Moderate,64,23926.064025772328
+DEAL-10054,2025-06-17,0,65454,Manufacturing,Outbound,Rep_G,Platform,Negotiation,60,5,1,1,medium,slow,0.36236131494425033,Watchlist,390,23717.99750836096
+DEAL-10677,2025-06-13,0,48045,Real Estate,Event,Rep_C,Custom,Negotiation,24,7,5,0,medium,normal,0.49167846169263313,Moderate,194,23622.69169202256
+DEAL-10985,2025-05-13,0,56505,Energy,Event,Rep_K,Enterprise,Qualified,44,10,2,1,medium,normal,0.416036360330883,Moderate,361,23508.134540496543
+DEAL-11024,2025-03-14,0,43558,Real Estate,Inbound,Rep_C,Custom,Qualified,92,11,4,0,medium,stalled,0.5361555761530784,Moderate,80,23353.86458607579
+DEAL-10328,2025-05-12,0,48604,Consulting,Website,Rep_K,Custom,Proposal Sent,46,8,1,0,medium,slow,0.48006474781575176,Moderate,223,23333.067002836797
+DEAL-10642,2025-05-22,0,41126,Consulting,Partner,Rep_J,Enterprise,Proposal Sent,15,10,4,0,medium,normal,0.5577697607712603,Moderate,37,22938.839181478852
+DEAL-10632,2025-04-25,0,51028,Education,Website,Rep_B,Professional,Demo Given,20,6,2,1,medium,normal,0.44789470395952363,Moderate,306,22855.17095364657
+DEAL-11577,2025-05-28,0,48403,Retail,Event,Rep_K,Professional,Verbal Commit,85,10,4,0,medium,slow,0.47216499653543337,Moderate,251,22854.20232730458
+DEAL-11972,2025-05-13,0,47787,Healthcare,Inbound,Rep_A,Custom,Qualified,75,9,7,0,medium,slow,0.4765383460063549,Moderate,233,22772.33794060568
+DEAL-11204,2025-06-14,1,47803,Consulting,Referral,Rep_J,Professional,Proposal Sent,5,3,7,0,medium,fast,0.4754760985634191,Moderate,236,22729.183939627124
+DEAL-11393,2025-06-23,1,49026,Consulting,Partner,Rep_G,Custom,Proposal Sent,126,3,3,0,medium,stalled,0.46272571008194313,Moderate,276,22685.590662477345
+DEAL-10870,2025-03-17,1,46674,Finance,Website,Rep_I,Professional,Proposal Sent,54,13,1,0,medium,slow,0.48338828886315277,Moderate,218,22561.664994398794
+DEAL-10151,2025-03-17,1,45208,Real Estate,Website,Rep_E,Custom,Verbal Commit,11,3,5,0,medium,fast,0.4970381432782177,Moderate,175,22470.100381321667
+DEAL-10514,2025-05-05,1,47489,Consulting,Partner,Rep_B,Custom,Negotiation,36,3,1,1,medium,normal,0.4690505594997071,Moderate,258,22274.74202008159
+DEAL-10647,2025-04-05,1,47398,Media,Event,Rep_C,Custom,Negotiation,11,9,2,0,medium,fast,0.4645425329957911,Moderate,273,22018.386978934508
+DEAL-10643,2025-06-08,0,47372,Education,Partner,Rep_J,Professional,Proposal Sent,20,9,1,1,medium,normal,0.4570160281388615,Moderate,286,21649.763284994147
+DEAL-11811,2025-06-20,1,50505,Media,Website,Rep_I,Professional,Qualified,70,5,3,1,medium,slow,0.4238415156079659,Moderate,355,21406.115745780317
+DEAL-11637,2025-05-23,1,35335,Education,Partner,Rep_G,Professional,Verbal Commit,17,10,5,1,medium,normal,0.6050079764300152,Moderate,6,21377.95684715459
+DEAL-11110,2025-04-20,1,49245,Retail,Outbound,Rep_D,Professional,Demo Given,45,10,1,1,medium,normal,0.41883094422221145,Moderate,359,20625.329848222802
+DEAL-10506,2025-06-19,0,61053,Education,Event,Rep_D,Professional,Demo Given,70,5,2,1,medium,slow,0.336800864648125,Watchlist,397,20562.703189361975
+DEAL-10594,2025-06-16,1,44471,Healthcare,Outbound,Rep_B,Professional,Negotiation,76,13,3,0,medium,slow,0.46012672449704517,Moderate,280,20462.295565108096
+DEAL-10980,2025-05-24,0,47870,Healthcare,Website,Rep_F,Custom,Demo Given,32,6,1,0,medium,normal,0.4263758839749106,Moderate,351,20410.61356587897
+DEAL-11068,2025-05-14,1,41272,Consulting,Inbound,Rep_G,Professional,Proposal Sent,36,2,3,1,medium,normal,0.48870179795822166,Moderate,203,20169.700605331724
+DEAL-11326,2025-04-03,0,43569,Technology,Website,Rep_J,Custom,Proposal Sent,35,9,2,0,medium,normal,0.4603082869784438,Moderate,279,20055.171755363815
+DEAL-11712,2025-04-24,1,48516,Manufacturing,Partner,Rep_D,Professional,Qualified,36,6,4,0,medium,normal,0.4132417857675442,Moderate,364,20048.838478298174
+DEAL-11324,2025-04-02,1,49765,Real Estate,Outbound,Rep_A,Professional,Demo Given,61,4,1,1,medium,slow,0.40165325314207323,Moderate,370,19988.274142615275
+DEAL-10527,2025-03-26,1,41897,Manufacturing,Partner,Rep_F,Professional,Proposal Sent,44,9,2,0,medium,normal,0.47456676216196036,Moderate,241,19882.923634299652
+DEAL-11072,2025-04-09,0,40676,Technology,Partner,Rep_K,Professional,Proposal Sent,80,7,3,0,medium,slow,0.48870189900463057,Moderate,202,19878.438443912353
+DEAL-10903,2025-04-26,0,37389,Healthcare,Event,Rep_L,Custom,Qualified,1,7,3,0,medium,fast,0.5239324026461298,Moderate,113,19589.308602536148
+DEAL-10459,2025-04-05,1,38379,Education,Event,Rep_F,Professional,Negotiation,47,8,3,0,medium,slow,0.5100379698041522,Moderate,148,19574.747243113557
+DEAL-10949,2025-03-30,1,47892,Finance,Partner,Rep_A,Custom,Qualified,41,7,1,0,medium,normal,0.4027668183253329,Moderate,369,19289.308463236845
+DEAL-11282,2025-05-30,1,41966,Real Estate,Website,Rep_D,Professional,Proposal Sent,32,6,4,1,medium,normal,0.45883392126985656,Moderate,283,19255.4243400108
+DEAL-11080,2025-06-02,1,33740,Finance,Inbound,Rep_D,Custom,Negotiation,64,11,3,0,medium,slow,0.5615823995501216,Moderate,34,18947.790160821103
+DEAL-10338,2025-05-30,0,44293,Healthcare,Event,Rep_K,Professional,Qualified,4,7,3,0,medium,fast,0.42358621942660113,Moderate,357,18761.904417062444
+DEAL-10900,2025-06-10,0,43333,Real Estate,Referral,Rep_H,Professional,Demo Given,5,5,6,1,medium,fast,0.42948164286869106,Moderate,347,18610.72803042899
+DEAL-10034,2025-06-14,1,38494,Healthcare,Referral,Rep_E,Professional,Qualified,7,5,1,0,medium,fast,0.47726840410750304,Moderate,231,18371.96994771422
+DEAL-10422,2025-05-12,1,38417,Real Estate,Website,Rep_J,Professional,Demo Given,67,9,4,1,medium,slow,0.47512502634872156,Moderate,239,18252.878137238837
+DEAL-11105,2025-04-02,0,36958,Technology,Website,Rep_E,Professional,Proposal Sent,7,5,5,0,medium,fast,0.4850915191834761,Moderate,213,17928.012365982908
+DEAL-10727,2025-03-24,0,39674,Technology,Outbound,Rep_D,Custom,Qualified,20,7,6,0,medium,normal,0.4480320702407318,Moderate,302,17775.22435473079
+DEAL-11193,2025-05-16,0,36212,Technology,Inbound,Rep_F,Professional,Verbal Commit,14,8,2,1,medium,fast,0.490348896747825,Moderate,198,17756.51424903224
+DEAL-10227,2025-03-30,1,47820,Technology,Event,Rep_B,Professional,Proposal Sent,144,2,3,0,medium,stalled,0.3690778751217749,Watchlist,387,17649.303988323278
+DEAL-10855,2025-04-20,1,33585,Technology,Partner,Rep_C,Professional,Verbal Commit,25,8,3,1,medium,normal,0.518058751097072,Moderate,126,17399.003155595165
+DEAL-10023,2025-05-04,1,37200,Consulting,Partner,Rep_F,Professional,Demo Given,77,10,2,0,medium,slow,0.467061206799164,Moderate,264,17374.676892928903
+DEAL-10354,2025-05-05,0,37417,Education,Event,Rep_C,Custom,Negotiation,41,5,4,1,medium,normal,0.461324828118309,Moderate,278,17261.39109370277
+DEAL-10865,2025-06-09,1,34483,Media,Website,Rep_F,Professional,Qualified,56,10,3,0,medium,slow,0.5001365673982725,Moderate,171,17246.209253594632
+DEAL-11070,2025-06-02,1,34830,Real Estate,Partner,Rep_E,Professional,Qualified,34,7,4,0,medium,normal,0.47547097247358455,Moderate,237,16560.65397125495
+DEAL-11813,2025-05-14,0,45121,Technology,Inbound,Rep_C,Professional,Negotiation,115,5,5,1,medium,stalled,0.3602711234942209,Watchlist,391,16255.793363182742
+DEAL-10270,2025-04-22,1,34413,Manufacturing,Outbound,Rep_F,Professional,Verbal Commit,42,6,2,0,medium,normal,0.4721807679495318,Moderate,250,16249.156767447237
+DEAL-10997,2025-04-28,0,30079,Real Estate,Inbound,Rep_J,Professional,Proposal Sent,57,7,6,0,medium,slow,0.5355137119049045,Moderate,86,16107.716940387621
+DEAL-11456,2025-03-12,0,47064,Technology,Event,Rep_K,Professional,Verbal Commit,222,5,3,1,medium,stalled,0.3407946345027194,Watchlist,396,16039.158678235986
+DEAL-11744,2025-03-15,1,29097,Media,Outbound,Rep_G,Professional,Verbal Commit,20,13,6,0,medium,normal,0.5403208578354477,Moderate,65,15721.716000438022
+DEAL-11509,2025-06-12,0,31019,Technology,Outbound,Rep_B,Professional,Negotiation,17,6,1,0,medium,normal,0.4870487400433248,Moderate,209,15107.764867403892
+DEAL-10802,2025-03-23,0,34211,Education,Outbound,Rep_G,Professional,Qualified,20,7,4,1,medium,normal,0.4354145919792516,Moderate,337,14895.968606202176
+DEAL-11745,2025-04-19,0,29583,Manufacturing,Referral,Rep_L,Professional,Negotiation,4,11,2,1,medium,fast,0.501742703419273,Moderate,168,14843.054395252351
+DEAL-11156,2025-06-15,1,27455,Finance,Website,Rep_I,Professional,Verbal Commit,27,7,1,1,medium,normal,0.5352747271117949,Moderate,87,14695.96763285433
+DEAL-11120,2025-04-06,1,26457,Technology,Inbound,Rep_K,Professional,Negotiation,33,12,3,0,medium,normal,0.5452296047777914,Moderate,52,14425.139653606026
+DEAL-11855,2025-06-15,0,30685,Media,Partner,Rep_K,Custom,Proposal Sent,32,9,2,0,medium,normal,0.4699508524388031,Moderate,256,14420.441907084672
+DEAL-11864,2025-04-29,1,27475,Real Estate,Event,Rep_E,Professional,Proposal Sent,8,10,3,1,medium,fast,0.47595591434505036,Moderate,235,13076.888746630259
+DEAL-10552,2025-03-22,0,24737,Energy,Event,Rep_K,Starter,Proposal Sent,61,12,4,0,small,slow,0.5148551390290906,Moderate,139,12735.971574162615
+DEAL-11853,2025-05-20,0,29101,Technology,Website,Rep_K,Professional,Verbal Commit,196,6,4,0,medium,stalled,0.43586829056430654,Moderate,334,12684.203123711884
+DEAL-11848,2025-05-07,0,25848,Finance,Event,Rep_G,Professional,Demo Given,35,4,3,0,medium,normal,0.46478633925058466,Moderate,271,12013.797296949113
+DEAL-11108,2025-03-28,1,25706,Manufacturing,Event,Rep_E,Professional,Demo Given,1,8,8,1,medium,fast,0.44395229063142716,Moderate,315,11412.237582971467
+DEAL-10772,2025-04-25,1,21416,Finance,Inbound,Rep_D,Professional,Proposal Sent,24,7,3,0,small,normal,0.5232750208219924,Moderate,117,11206.45784592379
+DEAL-11786,2025-03-21,0,31193,Healthcare,Referral,Rep_I,Professional,Negotiation,235,15,3,0,medium,stalled,0.3562565492925459,Watchlist,392,11112.710542082385
+DEAL-11505,2025-04-06,0,22392,Healthcare,Website,Rep_E,Starter,Negotiation,64,10,3,0,small,slow,0.49526261240572567,Moderate,183,11089.920416989009
+DEAL-11949,2025-04-30,1,24250,Real Estate,Website,Rep_E,Professional,Qualified,31,8,4,0,small,normal,0.4558061115547053,Moderate,292,11053.298205201603
+DEAL-10863,2025-05-01,0,25444,Retail,Website,Rep_L,Starter,Demo Given,1,5,1,0,small,fast,0.4338883615841741,Moderate,339,11039.855472147725
+DEAL-10331,2025-04-07,1,20424,Technology,Referral,Rep_I,Enterprise,Proposal Sent,26,9,1,0,small,normal,0.5374480250149822,Moderate,73,10976.838462905996
+DEAL-10311,2025-04-05,0,25486,Manufacturing,Referral,Rep_D,Professional,Proposal Sent,147,10,2,0,small,stalled,0.42993878856704476,Moderate,345,10957.419965419704
+DEAL-11876,2025-05-18,1,21061,Healthcare,Referral,Rep_K,Custom,Negotiation,25,9,4,0,small,normal,0.5187405552477073,Moderate,125,10925.194834071965
+DEAL-10216,2025-04-16,0,18808,Real Estate,Partner,Rep_F,Starter,Verbal Commit,93,10,3,0,small,stalled,0.5749240081211267,Moderate,19,10813.17074474215
+DEAL-10475,2025-05-05,1,20350,Real Estate,Referral,Rep_D,Starter,Proposal Sent,23,8,3,0,small,normal,0.5257696687943029,Moderate,111,10699.412759964063
+DEAL-10504,2025-03-19,1,21045,Healthcare,Partner,Rep_E,Professional,Negotiation,88,6,5,0,small,slow,0.5042332643049287,Moderate,164,10611.589047297224
+DEAL-11537,2025-05-14,0,20810,Technology,Partner,Rep_K,Starter,Demo Given,18,9,4,0,small,normal,0.5074175898740906,Moderate,158,10559.360045279825
+DEAL-11154,2025-05-23,0,17582,Technology,Website,Rep_F,Starter,Negotiation,11,6,4,0,small,fast,0.5802857269784554,Moderate,17,10202.583651735202
+DEAL-11363,2025-03-21,1,19010,Energy,Website,Rep_I,Starter,Proposal Sent,128,5,4,0,small,stalled,0.5269241659332515,Moderate,109,10016.828394391112
+DEAL-11333,2025-06-12,1,19458,Healthcare,Website,Rep_E,Starter,Verbal Commit,34,6,2,1,small,normal,0.5115953480425388,Moderate,143,9954.62228221172
+DEAL-11671,2025-04-24,0,23090,Technology,Outbound,Rep_F,Starter,Verbal Commit,66,9,2,1,small,slow,0.4306520498342133,Moderate,343,9943.755830671986
+DEAL-11930,2025-03-27,0,17905,Education,Website,Rep_F,Starter,Negotiation,5,12,3,1,small,fast,0.5302708225060234,Moderate,100,9494.499076970349
+DEAL-10157,2025-06-08,1,18658,Retail,Event,Rep_L,Starter,Verbal Commit,45,6,2,1,small,normal,0.497377575263096,Moderate,174,9280.070799258845
+DEAL-10153,2025-05-26,1,16657,Education,Outbound,Rep_B,Starter,Negotiation,4,14,5,0,small,fast,0.5522915253074607,Moderate,42,9199.519937046374
+DEAL-11856,2025-04-21,1,15974,Education,Referral,Rep_A,Starter,Verbal Commit,12,16,1,1,small,fast,0.5738155217635342,Moderate,20,9166.129144650697
+DEAL-11134,2025-05-11,1,15385,Education,Referral,Rep_F,Starter,Verbal Commit,3,8,2,0,small,fast,0.5940749048082863,Moderate,9,9139.842410475485
+DEAL-11179,2025-06-05,1,16582,Healthcare,Outbound,Rep_A,Starter,Negotiation,1,5,3,0,small,fast,0.55047095029736,Moderate,45,9127.909297830824
+DEAL-10851,2025-03-11,1,18310,Education,Referral,Rep_C,Starter,Qualified,67,12,3,0,small,slow,0.4878645692627789,Moderate,206,8932.800263201481
+DEAL-11252,2025-05-31,0,18796,Manufacturing,Outbound,Rep_B,Starter,Negotiation,11,11,2,0,small,fast,0.47235779682735346,Moderate,249,8878.437149166935
+DEAL-11570,2025-03-15,0,18474,Consulting,Outbound,Rep_H,Starter,Proposal Sent,16,8,2,1,small,normal,0.4763754376682437,Moderate,234,8800.559835483135
+DEAL-11586,2025-04-09,0,15317,Consulting,Event,Rep_A,Starter,Negotiation,17,9,6,0,small,normal,0.5630227446839843,Moderate,32,8623.819380324587
+DEAL-10807,2025-05-11,0,15917,Real Estate,Referral,Rep_K,Starter,Proposal Sent,46,5,1,0,small,slow,0.541335207069835,Moderate,59,8616.432490930563
+DEAL-10882,2025-05-18,0,15946,Technology,Inbound,Rep_H,Starter,Demo Given,33,4,1,0,small,normal,0.5342420670764368,Moderate,91,8519.024001600861
+DEAL-10817,2025-03-27,0,18746,Retail,Outbound,Rep_E,Custom,Qualified,56,7,3,0,small,slow,0.4433664146703874,Moderate,317,8311.346809411081
+DEAL-10067,2025-04-15,1,16296,Retail,Partner,Rep_C,Starter,Negotiation,18,9,1,1,small,normal,0.507464847275455,Moderate,157,8269.647151200816
+DEAL-11226,2025-04-20,1,17958,Consulting,Outbound,Rep_J,Custom,Demo Given,11,10,2,0,small,fast,0.45003853877901445,Moderate,298,8081.792079393542
+DEAL-10924,2025-05-23,0,16645,Healthcare,Referral,Rep_K,Starter,Qualified,38,8,5,0,small,normal,0.48506087226844097,Moderate,214,8073.8382189082
+DEAL-10329,2025-05-20,0,18972,Education,Outbound,Rep_H,Enterprise,Negotiation,130,7,3,1,small,stalled,0.4242397676951136,Moderate,353,8048.676872711696
+DEAL-11893,2025-06-07,0,18193,Energy,Website,Rep_H,Professional,Proposal Sent,99,12,3,1,small,stalled,0.4388164078047058,Moderate,324,7983.386907191013
+DEAL-10695,2025-04-25,1,18187,Media,Referral,Rep_G,Starter,Demo Given,3,8,1,1,small,fast,0.430330015930827,Moderate,344,7826.41199973395
+DEAL-11643,2025-04-28,0,15213,Manufacturing,Event,Rep_G,Starter,Negotiation,135,9,2,0,small,stalled,0.49356433014242623,Moderate,189,7508.59415445673
+DEAL-10000,2025-03-25,1,14384,Healthcare,Inbound,Rep_L,Starter,Demo Given,59,6,1,0,small,slow,0.5008439485950102,Moderate,169,7204.139356590627
+DEAL-10352,2025-05-18,0,18543,Finance,Outbound,Rep_B,Starter,Qualified,60,5,2,1,small,slow,0.35358298815321165,Watchlist,394,6556.489349325004
+DEAL-11980,2025-05-25,1,14890,Real Estate,Event,Rep_K,Professional,Qualified,2,6,4,1,small,fast,0.43200673946484197,Moderate,341,6432.580350631497
+DEAL-11463,2025-04-07,0,12268,Media,Referral,Rep_A,Starter,Proposal Sent,17,10,3,1,small,normal,0.5225054186671062,Moderate,120,6410.096476208058
+DEAL-10664,2025-05-30,1,11454,Manufacturing,Inbound,Rep_J,Starter,Verbal Commit,51,7,2,0,small,slow,0.5540042223753522,Moderate,40,6345.564363087284
+DEAL-11373,2025-03-20,0,11826,Real Estate,Referral,Rep_I,Starter,Proposal Sent,15,10,1,0,small,normal,0.5348329444809877,Moderate,89,6324.9344014321605
+DEAL-10969,2025-04-14,0,10459,Media,Partner,Rep_G,Starter,Verbal Commit,5,16,6,0,small,fast,0.5843647390946398,Moderate,15,6111.870806190838
+DEAL-10477,2025-03-13,0,11435,Energy,Referral,Rep_I,Starter,Proposal Sent,25,6,3,0,small,normal,0.5339494818721435,Moderate,92,6105.712325207961
+DEAL-10205,2025-05-17,1,11571,Retail,Event,Rep_C,Starter,Negotiation,39,9,4,0,small,normal,0.5265580629038772,Moderate,110,6092.803345860763
+DEAL-11759,2025-03-21,1,15867,Finance,Referral,Rep_B,Starter,Qualified,5,13,1,0,small,fast,0.379208932661489,Watchlist,381,6016.908134539845
+DEAL-10133,2025-05-04,1,10914,Healthcare,Website,Rep_G,Professional,Negotiation,3,6,3,0,small,fast,0.5407253552578887,Moderate,61,5901.476527284597
+DEAL-11614,2025-04-28,1,11000,Finance,Event,Rep_E,Starter,Negotiation,22,9,3,1,small,normal,0.5343808790872941,Moderate,90,5878.189669960236
+DEAL-11824,2025-05-11,1,13424,Media,Inbound,Rep_C,Starter,Demo Given,70,7,3,0,small,slow,0.4359760688286278,Moderate,333,5852.5427479555
+DEAL-10124,2025-06-17,1,10521,Healthcare,Partner,Rep_G,Starter,Verbal Commit,7,4,4,1,small,fast,0.5508606917310093,Moderate,44,5795.605337701949
+DEAL-10084,2025-03-22,0,12812,Manufacturing,Website,Rep_B,Starter,Verbal Commit,4,13,2,1,small,fast,0.4479737005585747,Moderate,303,5739.439051556459
+DEAL-10070,2025-06-07,1,13927,Real Estate,Referral,Rep_C,Starter,Qualified,107,8,3,0,small,stalled,0.4120448826521197,Moderate,365,5738.549080696071
+DEAL-10798,2025-03-31,0,11280,Media,Partner,Rep_G,Starter,Verbal Commit,1,8,3,1,small,fast,0.5067529210954869,Moderate,159,5716.172949957092
+DEAL-11405,2025-06-12,1,14270,Real Estate,Partner,Rep_C,Starter,Qualified,31,8,3,0,small,normal,0.3998649713428736,Watchlist,372,5706.073141062806
+DEAL-11028,2025-04-30,1,10895,Manufacturing,Inbound,Rep_I,Starter,Verbal Commit,60,5,1,1,small,slow,0.5220189557126196,Moderate,123,5687.396522488991
+DEAL-10224,2025-03-22,1,9168,Healthcare,Partner,Rep_E,Starter,Verbal Commit,6,7,1,0,small,fast,0.612191944387733,Moderate,4,5612.575746146736
+DEAL-10602,2025-05-02,1,10608,Media,Referral,Rep_G,Starter,Negotiation,15,12,1,0,small,normal,0.52374221182812,Moderate,115,5555.857383072696
+DEAL-10382,2025-04-28,0,11320,Technology,Website,Rep_G,Starter,Proposal Sent,8,9,3,1,small,fast,0.4741797152912458,Moderate,242,5367.714377096902
+DEAL-10101,2025-03-25,1,11603,Retail,Website,Rep_G,Starter,Negotiation,41,13,2,1,small,normal,0.4567755923232223,Moderate,289,5299.967197726348
+DEAL-11884,2025-04-20,1,10796,Healthcare,Referral,Rep_J,Starter,Qualified,16,8,4,1,small,normal,0.49077729100074574,Moderate,196,5298.431633644051
+DEAL-10350,2025-04-17,0,10333,Education,Inbound,Rep_F,Starter,Demo Given,5,8,3,0,small,fast,0.5052033469621718,Moderate,161,5220.266184160122
+DEAL-10964,2025-04-02,0,13198,Retail,Outbound,Rep_E,Starter,Demo Given,117,5,1,0,small,stalled,0.3842981782380548,Watchlist,380,5071.967356385847
+DEAL-11851,2025-05-31,1,9722,Real Estate,Inbound,Rep_B,Starter,Proposal Sent,1,6,1,1,small,fast,0.5177134191137597,Moderate,128,5033.2098606239715
+DEAL-10597,2025-04-06,1,8872,Healthcare,Event,Rep_J,Starter,Negotiation,22,11,1,0,small,normal,0.5477616917325361,Moderate,49,4859.74172905106
+DEAL-10620,2025-04-18,1,9569,Healthcare,Inbound,Rep_D,Starter,Demo Given,14,13,2,0,small,fast,0.49080641305997413,Moderate,195,4696.526566570892
+DEAL-11401,2025-05-24,1,10187,Finance,Partner,Rep_I,Starter,Negotiation,80,8,5,1,small,slow,0.4590794786550165,Moderate,282,4676.642649058654
+DEAL-10164,2025-04-21,0,8686,Education,Website,Rep_H,Starter,Proposal Sent,30,7,1,0,small,normal,0.5357018111004689,Moderate,84,4653.105931218673
+DEAL-10416,2025-04-27,1,9041,Manufacturing,Partner,Rep_A,Starter,Verbal Commit,115,8,4,0,small,stalled,0.5118706084816698,Moderate,142,4627.822171282776
+DEAL-10299,2025-06-05,0,9419,Finance,Referral,Rep_L,Starter,Proposal Sent,47,5,3,0,small,slow,0.484848886697009,Moderate,215,4566.7916637991275
+DEAL-11516,2025-06-13,0,10080,Manufacturing,Website,Rep_K,Starter,Demo Given,84,10,5,0,small,slow,0.447939821478085,Moderate,304,4515.233400499096
+DEAL-10525,2025-04-25,0,9490,Manufacturing,Inbound,Rep_A,Starter,Negotiation,1,6,1,1,small,fast,0.47380913610310194,Moderate,244,4496.448701618438
+DEAL-10672,2025-03-20,1,8077,Real Estate,Website,Rep_E,Starter,Negotiation,16,8,5,1,small,normal,0.5436559536501673,Moderate,54,4391.109137632401
+DEAL-11773,2025-05-04,1,8343,Energy,Website,Rep_B,Starter,Qualified,17,14,6,0,small,normal,0.5167122243684612,Moderate,133,4310.930087906072
+DEAL-11144,2025-05-28,0,11309,Consulting,Website,Rep_G,Starter,Negotiation,176,6,4,0,small,stalled,0.37298830643090436,Watchlist,383,4218.124757427097
+DEAL-10093,2025-06-06,1,8148,Education,Inbound,Rep_B,Starter,Demo Given,15,7,1,1,small,normal,0.502569505995049,Moderate,166,4094.9363348476595
+DEAL-11125,2025-04-02,1,7307,Education,Referral,Rep_G,Starter,Negotiation,2,5,4,0,small,fast,0.5390999386991469,Moderate,69,3939.203252074666
+DEAL-11382,2025-03-15,1,7337,Energy,Inbound,Rep_H,Starter,Negotiation,16,11,1,0,small,normal,0.5365916165925154,Moderate,77,3936.9726909392857
+DEAL-10384,2025-04-29,1,7647,Healthcare,Event,Rep_L,Starter,Demo Given,24,7,1,1,small,normal,0.5108130475495585,Moderate,146,3906.187374611474
+DEAL-10731,2025-05-31,1,7364,Consulting,Outbound,Rep_H,Starter,Verbal Commit,17,8,1,0,small,normal,0.5164170119474832,Moderate,135,3802.8948759812665
+DEAL-11629,2025-06-07,1,9810,Consulting,Outbound,Rep_J,Professional,Demo Given,136,10,2,0,small,stalled,0.386855384379036,Watchlist,378,3795.051320758343
+DEAL-11915,2025-05-26,1,7505,Healthcare,Referral,Rep_A,Starter,Negotiation,50,10,4,1,small,slow,0.4906153682205955,Moderate,197,3682.068338495569
+DEAL-11215,2025-03-27,0,8324,Real Estate,Website,Rep_G,Starter,Qualified,52,9,4,1,small,slow,0.4409207086621212,Moderate,320,3670.2239789034966
+DEAL-11687,2025-06-12,0,7880,Healthcare,Event,Rep_F,Starter,Qualified,5,9,3,1,small,fast,0.4653778816012001,Moderate,270,3667.1777070174567
+DEAL-10886,2025-06-22,0,9911,Real Estate,Outbound,Rep_L,Starter,Qualified,23,18,2,0,small,normal,0.3684330343196058,Watchlist,388,3651.539803141613
+DEAL-11703,2025-05-06,1,8435,Technology,Outbound,Rep_C,Starter,Demo Given,62,3,3,0,small,slow,0.42395569790837434,Moderate,354,3576.0663118571374
+DEAL-10008,2025-05-05,1,7473,Media,Inbound,Rep_F,Starter,Verbal Commit,160,6,1,1,small,stalled,0.47528806067333307,Moderate,238,3551.827677411818
+DEAL-11368,2025-04-19,1,10750,Retail,Inbound,Rep_J,Starter,Demo Given,184,7,5,0,small,stalled,0.32992657931466696,Watchlist,398,3546.7107276326697
+DEAL-11199,2025-03-22,0,7313,Consulting,Outbound,Rep_I,Starter,Proposal Sent,10,7,1,0,small,fast,0.4634810779828856,Moderate,274,3389.4371232888425
+DEAL-11943,2025-04-20,1,7458,Retail,Partner,Rep_L,Custom,Demo Given,60,5,3,0,small,slow,0.43839605131943526,Moderate,327,3269.557750740348
+DEAL-10689,2025-06-01,0,7428,Healthcare,Referral,Rep_F,Starter,Demo Given,13,3,6,0,small,fast,0.429626210544024,Moderate,346,3191.2634919210104
+DEAL-10437,2025-06-16,1,6766,Consulting,Outbound,Rep_F,Starter,Proposal Sent,2,7,1,1,small,fast,0.4668377065705954,Moderate,265,3158.6239226566486
+DEAL-11885,2025-05-29,1,7483,Real Estate,Outbound,Rep_B,Starter,Proposal Sent,67,5,2,1,small,slow,0.38936569300438356,Watchlist,377,2913.623480751802
+DEAL-10871,2025-03-28,0,5106,Healthcare,Partner,Rep_C,Starter,Verbal Commit,5,4,2,0,small,fast,0.5704925200425564,Moderate,25,2912.9348073372926
+DEAL-11862,2025-03-21,1,5426,Healthcare,Event,Rep_I,Starter,Verbal Commit,11,8,4,0,small,fast,0.5357309030183256,Moderate,83,2906.875879777435
+DEAL-10462,2025-06-13,0,6594,Retail,Partner,Rep_A,Starter,Proposal Sent,10,8,1,0,small,fast,0.4276488232162038,Moderate,350,2819.916340287648
+DEAL-11265,2025-05-07,1,7298,Retail,Outbound,Rep_A,Starter,Demo Given,6,10,3,1,small,fast,0.3843829220143573,Watchlist,379,2805.2265648607795
+DEAL-11305,2025-05-11,0,6043,Energy,Outbound,Rep_G,Starter,Verbal Commit,41,11,1,1,small,normal,0.45746635856880574,Moderate,285,2764.469204831293
+DEAL-11738,2025-04-25,1,3667,Healthcare,Partner,Rep_D,Starter,Demo Given,68,6,3,0,small,slow,0.48624359378612925,Moderate,212,1783.055258413736
+DEAL-10911,2025-06-01,0,1000,Manufacturing,Partner,Rep_E,Starter,Negotiation,45,4,3,1,small,normal,0.4750695054593132,Moderate,240,475.0695054593132
+DEAL-11767,2025-04-16,1,1000,Education,Website,Rep_I,Platform,Negotiation,75,6,5,0,small,slow,0.4711454661175942,Moderate,254,471.1454661175942

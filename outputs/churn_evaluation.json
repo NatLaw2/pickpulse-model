@@ -1,0 +1,200 @@
+{
+  "module": "churn",
+  "evaluated_at": "2026-02-23T22:33:12.279513+00:00",
+  "n": 400,
+  "base_rate": 0.1875,
+  "auc": 0.7776,
+  "pr_auc": 0.40561,
+  "brier": 0.13226,
+  "logloss": 0.41842,
+  "threshold": 0.2134,
+  "confusion_matrix": [
+    [
+      213,
+      112
+    ],
+    [
+      13,
+      62
+    ]
+  ],
+  "accuracy": 0.6875,
+  "precision": 0.3563,
+  "recall": 0.8267,
+  "f1": 0.498,
+  "calibration_bins": [
+    {
+      "bin_lo": 0.05,
+      "bin_hi": 0.0807,
+      "n": 50,
+      "predicted_avg": 0.0649,
+      "actual_rate": 0.02,
+      "delta": 0.0449
+    },
+    {
+      "bin_lo": 0.0807,
+      "bin_hi": 0.1151,
+      "n": 50,
+      "predicted_avg": 0.0988,
+      "actual_rate": 0.06,
+      "delta": 0.0388
+    },
+    {
+      "bin_lo": 0.1167,
+      "bin_hi": 0.1469,
+      "n": 50,
+      "predicted_avg": 0.1312,
+      "actual_rate": 0.08,
+      "delta": 0.0512
+    },
+    {
+      "bin_lo": 0.1474,
+      "bin_hi": 0.1907,
+      "n": 50,
+      "predicted_avg": 0.1661,
+      "actual_rate": 0.02,
+      "delta": 0.1461
+    },
+    {
+      "bin_lo": 0.192,
+      "bin_hi": 0.2411,
+      "n": 50,
+      "predicted_avg": 0.2123,
+      "actual_rate": 0.24,
+      "delta": -0.0277
+    },
+    {
+      "bin_lo": 0.2413,
+      "bin_hi": 0.2813,
+      "n": 50,
+      "predicted_avg": 0.2612,
+      "actual_rate": 0.3,
+      "delta": -0.0388
+    },
+    {
+      "bin_lo": 0.2857,
+      "bin_hi": 0.3495,
+      "n": 50,
+      "predicted_avg": 0.3169,
+      "actual_rate": 0.3,
+      "delta": 0.0169
+    },
+    {
+      "bin_lo": 0.3528,
+      "bin_hi": 0.5998,
+      "n": 50,
+      "predicted_avg": 0.4294,
+      "actual_rate": 0.48,
+      "delta": -0.0506
+    }
+  ],
+  "calibration_error": 0.0519,
+  "lift_table": [
+    {
+      "decile": 1,
+      "n": 40,
+      "avg_prob": 0.4469,
+      "actual_rate": 0.475,
+      "lift": 2.53,
+      "cumulative_capture": 0.2533
+    },
+    {
+      "decile": 2,
+      "n": 40,
+      "avg_prob": 0.3366,
+      "actual_rate": 0.375,
+      "lift": 2.0,
+      "cumulative_capture": 0.4533
+    },
+    {
+      "decile": 3,
+      "n": 40,
+      "avg_prob": 0.2855,
+      "actual_rate": 0.3,
+      "lift": 1.6,
+      "cumulative_capture": 0.6133
+    },
+    {
+      "decile": 4,
+      "n": 40,
+      "avg_prob": 0.2488,
+      "actual_rate": 0.25,
+      "lift": 1.33,
+      "cumulative_capture": 0.7467
+    },
+    {
+      "decile": 5,
+      "n": 40,
+      "avg_prob": 0.207,
+      "actual_rate": 0.25,
+      "lift": 1.33,
+      "cumulative_capture": 0.88
+    },
+    {
+      "decile": 6,
+      "n": 40,
+      "avg_prob": 0.17,
+      "actual_rate": 0.025,
+      "lift": 0.13,
+      "cumulative_capture": 0.8933
+    },
+    {
+      "decile": 7,
+      "n": 40,
+      "avg_prob": 0.14,
+      "actual_rate": 0.1,
+      "lift": 0.53,
+      "cumulative_capture": 0.9467
+    },
+    {
+      "decile": 8,
+      "n": 40,
+      "avg_prob": 0.1163,
+      "actual_rate": 0.025,
+      "lift": 0.13,
+      "cumulative_capture": 0.96
+    },
+    {
+      "decile": 9,
+      "n": 40,
+      "avg_prob": 0.0884,
+      "actual_rate": 0.05,
+      "lift": 0.27,
+      "cumulative_capture": 0.9867
+    },
+    {
+      "decile": 10,
+      "n": 40,
+      "avg_prob": 0.0615,
+      "actual_rate": 0.025,
+      "lift": 0.13,
+      "cumulative_capture": 1.0
+    }
+  ],
+  "lift_at_top10": 2.53,
+  "capture_at_top10": 0.2533,
+  "tier_breakdown": {
+    "Medium Risk": {
+      "count": 26,
+      "actual_rate": 0.5,
+      "avg_probability": 0.4818,
+      "total_value": 292629.0,
+      "value_at_risk": 127332.63
+    },
+    "Low Risk": {
+      "count": 374,
+      "actual_rate": 0.1658,
+      "avg_probability": 0.1912,
+      "total_value": 16473435.0,
+      "value_at_risk": 2544941.96
+    }
+  },
+  "business_impact": {
+    "total_value": 16766064.0,
+    "value_in_top_decile": 545700.0,
+    "arr_at_risk_top_decile": 225932.39,
+    "total_arr_at_risk": 2672274.58,
+    "positives_in_top_decile": 19,
+    "total_positives": 75
+  }
+}

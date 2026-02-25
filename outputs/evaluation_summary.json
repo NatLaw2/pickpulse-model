@@ -1,0 +1,204 @@
+{
+  "generated_at": "2026-02-23T16:13:24.895267+00:00",
+  "parameters": {
+    "min_prob": 0.5,
+    "default_odds": -110,
+    "test_split": 0.3
+  },
+  "total_games_evaluated": 19,
+  "all_data": {
+    "overall": {
+      "label": "all",
+      "bets": 19,
+      "wins": 4,
+      "losses": 15,
+      "pushes": 0,
+      "win_rate": 21.05,
+      "units_won": -7.66,
+      "roi": -40.32,
+      "max_drawdown": -13.0,
+      "longest_losing_streak": 13
+    },
+    "tiers": {
+      "70%+": {
+        "label": "70%+",
+        "bets": 4,
+        "wins": 1,
+        "losses": 3,
+        "pushes": 0,
+        "win_rate": 25.0,
+        "units_won": -2.75,
+        "roi": -68.75,
+        "max_drawdown": -3.0,
+        "longest_losing_streak": 3
+      },
+      "65-70%": {
+        "label": "65-70%",
+        "bets": 2,
+        "wins": 0,
+        "losses": 2,
+        "pushes": 0,
+        "win_rate": 0.0,
+        "units_won": -2.0,
+        "roi": -100.0,
+        "max_drawdown": -2.0,
+        "longest_losing_streak": 2
+      },
+      "60-65%": {
+        "label": "60-65%",
+        "bets": 1,
+        "wins": 0,
+        "losses": 1,
+        "pushes": 0,
+        "win_rate": 0.0,
+        "units_won": -1.0,
+        "roi": -100.0,
+        "max_drawdown": -1.0,
+        "longest_losing_streak": 1
+      },
+      "Strong Lean": {
+        "label": "Strong Lean",
+        "bets": 12,
+        "wins": 3,
+        "losses": 9,
+        "pushes": 0,
+        "win_rate": 25.0,
+        "units_won": -1.91,
+        "roi": -15.92,
+        "max_drawdown": -7.0,
+        "longest_losing_streak": 7
+      }
+    }
+  },
+  "test_period": {
+    "start": "2026-02-22",
+    "end": "2026-02-22",
+    "overall": {
+      "label": "test",
+      "bets": 2,
+      "wins": 1,
+      "losses": 1,
+      "pushes": 0,
+      "win_rate": 50.0,
+      "units_won": -0.75,
+      "roi": -37.5,
+      "max_drawdown": -1.0,
+      "longest_losing_streak": 1
+    },
+    "tiers": {
+      "70%+": {
+        "label": "70%+",
+        "bets": 1,
+        "wins": 1,
+        "losses": 0,
+        "pushes": 0,
+        "win_rate": 100.0,
+        "units_won": 0.25,
+        "roi": 25.0,
+        "max_drawdown": 0.0,
+        "longest_losing_streak": 0
+      },
+      "65-70%": {
+        "label": "65-70%",
+        "bets": 0,
+        "wins": 0,
+        "losses": 0,
+        "pushes": 0,
+        "win_rate": null,
+        "units_won": 0.0,
+        "roi": null,
+        "max_drawdown": 0.0,
+        "longest_losing_streak": 0
+      },
+      "60-65%": {
+        "label": "60-65%",
+        "bets": 0,
+        "wins": 0,
+        "losses": 0,
+        "pushes": 0,
+        "win_rate": null,
+        "units_won": 0.0,
+        "roi": null,
+        "max_drawdown": 0.0,
+        "longest_losing_streak": 0
+      },
+      "Strong Lean": {
+        "label": "Strong Lean",
+        "bets": 1,
+        "wins": 0,
+        "losses": 1,
+        "pushes": 0,
+        "win_rate": 0.0,
+        "units_won": -1.0,
+        "roi": -100.0,
+        "max_drawdown": -1.0,
+        "longest_losing_streak": 1
+      }
+    }
+  },
+  "calibration": [
+    {
+      "prob_bucket": "0.60-0.65",
+      "bets": 1,
+      "avg_pred_prob": 0.62,
+      "actual_win_rate": 0.0,
+      "delta": -0.62
+    },
+    {
+      "prob_bucket": "0.65-0.70",
+      "bets": 2,
+      "avg_pred_prob": 0.65,
+      "actual_win_rate": 0.0,
+      "delta": -0.65
+    },
+    {
+      "prob_bucket": "0.70-0.75",
+      "bets": 2,
+      "avg_pred_prob": 0.72,
+      "actual_win_rate": 0.0,
+      "delta": -0.72
+    },
+    {
+      "prob_bucket": "0.75-0.80",
+      "bets": 1,
+      "avg_pred_prob": 0.75,
+      "actual_win_rate": 1.0,
+      "delta": 0.25
+    },
+    {
+      "prob_bucket": "0.80-0.85",
+      "bets": 4,
+      "avg_pred_prob": 0.82,
+      "actual_win_rate": 0.5,
+      "delta": -0.32
+    },
+    {
+      "prob_bucket": "0.85-0.90",
+      "bets": 2,
+      "avg_pred_prob": 0.865,
+      "actual_win_rate": 0.5,
+      "delta": -0.365
+    },
+    {
+      "prob_bucket": "0.90-0.95",
+      "bets": 3,
+      "avg_pred_prob": 0.9267,
+      "actual_win_rate": 0.0,
+      "delta": -0.9267
+    },
+    {
+      "prob_bucket": "0.95-1.01",
+      "bets": 4,
+      "avg_pred_prob": 1.0,
+      "actual_win_rate": 0.0,
+      "delta": -1.0
+    }
+  ],
+  "tier_definitions": {
+    "70%+": "confidence >= 0.70",
+    "65-70%": "0.65 <= confidence < 0.70",
+    "60-65%": "0.60 <= confidence < 0.65",
+    "Strong Lean": "tier='strong_lean' (repo-canonical, score 66-73)"
+  },
+  "leakage_policy": "Only picks with locked_at < game_start_time are included."
+}

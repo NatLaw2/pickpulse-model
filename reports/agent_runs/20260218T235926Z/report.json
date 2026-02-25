@@ -1,0 +1,187 @@
+{
+  "generated_at": "2026-02-18T23:59:26.302807+00:00",
+  "lookback_days": 90,
+  "mode": "shadow",
+  "timestamp": "20260218T235926Z",
+  "clv_auditor": {
+    "generated_at": "2026-02-18T23:59:27.540704+00:00",
+    "lookback_days": 90,
+    "n_picks": 20,
+    "n_skipped": 0,
+    "overall": {
+      "n": 20,
+      "mean": 0.0,
+      "median": 0.0,
+      "pct_positive": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "by_market": {
+      "moneyline": {
+        "n": 20,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "by_tier": {
+      "strong_lean": {
+        "n": 12,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "top_pick": {
+        "n": 3,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "watchlist": {
+        "n": 5,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "by_confidence_bucket": {
+      "mid": {
+        "n": 2,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "high": {
+        "n": 18,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "leakage_flags": [
+      "Only 0.0% of picks have positive CLV"
+    ],
+    "debug_sample": [
+      {
+        "event_id": "8864122f2c28fd6b7621c0ee000c41fc",
+        "market": "moneyline",
+        "side": "away",
+        "locked_at": "2026-02-08T14:10:01.664+00:00",
+        "game_start_time": "2026-02-08T20:10:00+00:00",
+        "lock_snap_ts": "2026-02-08T11:55:37+00:00",
+        "close_snap_ts": "2026-02-08T11:55:37+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": -330,
+          "ml_away": 265
+        },
+        "closing_odds": {
+          "ml_home": -330,
+          "ml_away": 265
+        }
+      },
+      {
+        "event_id": "c2aacc97e9c2f14777db6a947e5b0772",
+        "market": "moneyline",
+        "side": "home",
+        "locked_at": "2026-02-08T16:10:01.19+00:00",
+        "game_start_time": "2026-02-08T17:40:00+00:00",
+        "lock_snap_ts": "2026-02-08T11:55:37+00:00",
+        "close_snap_ts": "2026-02-08T11:55:37+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": -164,
+          "ml_away": 138
+        },
+        "closing_odds": {
+          "ml_home": -164,
+          "ml_away": 138
+        }
+      },
+      {
+        "event_id": "9a4bb2e3bc9fd308b6e40f29e43ab2f1",
+        "market": "moneyline",
+        "side": "away",
+        "locked_at": "2026-02-08T14:10:01.664+00:00",
+        "game_start_time": "2026-02-08T20:10:00+00:00",
+        "lock_snap_ts": "2026-02-08T11:55:37+00:00",
+        "close_snap_ts": "2026-02-08T11:55:37+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": -360,
+          "ml_away": 290
+        },
+        "closing_odds": {
+          "ml_home": -360,
+          "ml_away": 290
+        }
+      },
+      {
+        "event_id": "c7739a581c938fedf4dd128cb53f31dc",
+        "market": "moneyline",
+        "side": "home",
+        "locked_at": "2026-02-08T13:10:01.313+00:00",
+        "game_start_time": "2026-02-08T19:10:00+00:00",
+        "lock_snap_ts": "2026-02-08T11:55:37+00:00",
+        "close_snap_ts": "2026-02-08T11:55:37+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": 385,
+          "ml_away": -500
+        },
+        "closing_odds": {
+          "ml_home": 385,
+          "ml_away": -500
+        }
+      },
+      {
+        "event_id": "05cf7fd60949a0c52340284b261ae851",
+        "market": "moneyline",
+        "side": "home",
+        "locked_at": "2026-02-07T18:40:00.985+00:00",
+        "game_start_time": "2026-02-08T00:40:00+00:00",
+        "lock_snap_ts": "2026-02-07T11:55:37+00:00",
+        "close_snap_ts": "2026-02-07T11:55:37+00:00",
+        "clv": 0.0,
+        "locked_odds": {
+          "ml_home": 110,
+          "ml_away": -130
+        },
+        "closing_odds": {
+          "ml_home": 110,
+          "ml_away": -130
+        }
+      }
+    ],
+    "timing": {
+      "coverage": {
+        "total": 20,
+        "has_lock_snap": 20,
+        "has_close_snap": 20,
+        "has_both": 20,
+        "has_clv": 20,
+        "has_steam": 0,
+        "skipped": 0
+      },
+      "clv_prob_stats": {
+        "n": 20,
+        "mean": 0.0,
+        "median": 0.0,
+        "pct_positive": 0.0
+      },
+      "markdown": "# CLV Timing Features Summary\n\n## Snapshot Coverage\n\n| Metric | Count | % |\n|--------|-------|---|\n| Lock Snap | 20 | 100.0% |\n| Close Snap | 20 | 100.0% |\n| Both | 20 | 100.0% |\n| Clv | 20 | 100.0% |\n| Steam | 0 | 0.0% |\n| **Total Picks** | **20** | |\n\n## Feature Distributions\n\n| Feature | N | Mean | Median | Std | Min | Max |\n|---------|---|------|--------|-----|-----|-----|\n| CLV (prob) | 20 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 0.00000 |\n| P(lock) | 20 | 0.37522 | 0.36570 | 0.14505 | 0.16303 | 0.66598 |\n| P(close) | 20 | 0.37522 | 0.36570 | 0.14505 | 0.16303 | 0.66598 |\n| Steam 5m | 0 | \u2014 | \u2014 | \u2014 | \u2014 | \u2014 |\n| Steam 15m | 0 | \u2014 | \u2014 | \u2014 | \u2014 | \u2014 |\n| Velocity 30m | 0 | \u2014 | \u2014 | \u2014 | \u2014 | \u2014 |\n| Range 30m | 0 | \u2014 | \u2014 | \u2014 | \u2014 | \u2014 |\n| Std 30m | 0 | \u2014 | \u2014 | \u2014 | \u2014 | \u2014 |\n| Snap Gap Lock (s) | 20 | 25973.61000 | 25913.40000 | 12999.48819 | 4464.30000 | 51564.20000 |\n| Snap Gap Close (s) | 20 | 42604.70000 | 45922.50000 | 10507.82801 | 20663.00000 | 54863.00000 |\n\n**CLV Summary:** mean=0.00000, pct_positive=0.0% (n=20)\n"
+    }
+  }
+}

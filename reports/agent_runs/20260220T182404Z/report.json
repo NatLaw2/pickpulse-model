@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-02-20T18:24:04.752767+00:00",
+  "lookback_days": 7,
+  "mode": "shadow",
+  "timestamp": "20260220T182404Z",
+  "clv_auditor": {
+    "generated_at": "2026-02-20T18:24:07.520750+00:00",
+    "lookback_days": 7,
+    "n_picks": 0,
+    "n_skipped": 0,
+    "overall": {
+      "n": 0
+    },
+    "by_market": {},
+    "by_tier": {},
+    "by_confidence_bucket": {},
+    "leakage_flags": [],
+    "debug_sample": [],
+    "timing": {
+      "coverage": {
+        "total": 0,
+        "has_lock_snap": 0,
+        "has_close_snap": 0,
+        "has_both": 0,
+        "has_clv": 0,
+        "has_steam": 0,
+        "skipped": 0
+      },
+      "clv_prob_stats": {},
+      "markdown": "# CLV Timing Features Summary\n\nNo picks to analyze."
+    }
+  }
+}
