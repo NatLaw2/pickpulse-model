@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Database, Brain, BarChart3,
-  Crosshair, Code2, ListChecks, FileText, ShieldAlert
+  Crosshair, Code2, ListChecks, FileText, ShieldAlert, Plug
 } from 'lucide-react';
 import { useDataset } from '../lib/DatasetContext';
 
@@ -13,6 +13,7 @@ const links = [
   { to: '/predict', icon: Crosshair, label: 'Predict' },
   { to: '/api-docs', icon: Code2, label: 'API' },
   { to: '/onboarding', icon: ListChecks, label: 'Onboarding' },
+  { to: '/integrations', icon: Plug, label: 'Integrations' },
   { to: '/reports', icon: FileText, label: 'Reports' },
 ];
 

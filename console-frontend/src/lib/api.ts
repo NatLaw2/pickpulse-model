@@ -77,6 +77,26 @@ export const api = {
   resetStep: (id: string) =>
     request<{ step_id: string; status: string }>(`/onboarding/${id}/reset`, { method: 'POST' }),
   downloadTemplate: () => `${BASE}/onboarding/template/${MOD}`,
+
+  // Integrations
+  integrations: () => request<IntegrationsListResponse>('/integrations'),
+  configureIntegration: (name: string, apiKey: string) =>
+    request<{ status: string; connector: string }>(
+      `/integrations/${name}/configure?api_key=${encodeURIComponent(apiKey)}`,
+      { method: 'POST' },
+    ),
+  integrationStatus: (name: string) => request<IntegrationStatusResponse>(`/integrations/${name}/status`),
+  syncIntegration: (name: string) => request<SyncResponse>(`/integrations/${name}/sync`, { method: 'POST' }),
+  integrationAccounts: (source?: string, limit = 200) =>
+    request<IntegrationAccountsResponse>(
+      `/integrations/accounts?limit=${limit}${source ? `&source=${source}` : ''}`,
+    ),
+  triggerScoring: () => request<ScoringResponse>('/integrations/score', { method: 'POST' }),
+  latestScores: (limit = 200) => request<LatestScoresResponse>(`/integrations/scores/latest?limit=${limit}`),
+
+  // Run demo: sync + score a connector in one call
+  runDemo: (connectorName: string) =>
+    request<RunDemoResponse>(`/integrations/${connectorName}/run-demo`, { method: 'POST' }),
 };
 
 // Types
@@ -279,4 +299,90 @@ export interface OnboardingStep {
   label: string;
   description: string;
   status: 'pending' | 'complete';
+}
+
+// Integration types
+
+export interface ConnectorInfo {
+  name: string;
+  display_name: string;
+  status: 'not_configured' | 'configured' | 'syncing' | 'healthy' | 'error';
+  enabled: boolean;
+  last_synced_at: string | null;
+  account_count: number;
+  error_message: string | null;
+}
+
+export interface IntegrationsListResponse {
+  connectors: ConnectorInfo[];
+}
+
+export interface IntegrationStatusResponse {
+  name: string;
+  status: string;
+  enabled: boolean;
+  account_count: number;
+  last_sync?: any;
+}
+
+export interface SyncResponse {
+  status: string;
+  accounts_synced: number;
+  signals_synced: number;
+  errors: string[];
+  duration_seconds: number;
+}
+
+export interface IntegrationAccount {
+  id: number;
+  external_id: string;
+  source: string;
+  name: string;
+  email: string | null;
+  plan: string | null;
+  arr: number | null;
+  seats: number | null;
+  industry: string | null;
+  company_size: string | null;
+  synced_at: string;
+}
+
+export interface IntegrationAccountsResponse {
+  accounts: IntegrationAccount[];
+  total: number;
+  showing: number;
+}
+
+export interface ScoringResponse {
+  status: string;
+  accounts_scored: number;
+  tier_counts: Record<string, number>;
+  total_arr_at_risk: number;
+}
+
+export interface IntegrationScore {
+  external_id: string;
+  scored_at: string;
+  churn_probability: number;
+  tier: string;
+  arr_at_risk: number | null;
+  urgency_score: number | null;
+  recommended_action: string | null;
+  name?: string;
+  email?: string;
+  plan?: string;
+  arr?: number;
+  source?: string;
+}
+
+export interface LatestScoresResponse {
+  scores: IntegrationScore[];
+  count: number;
+}
+
+export interface RunDemoResponse {
+  status: string;
+  connector: string;
+  sync: SyncResponse;
+  scoring: ScoringResponse;
 }

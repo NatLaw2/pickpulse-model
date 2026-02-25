@@ -21,6 +21,13 @@ from .engine.train import train_model
 from .engine.evaluate import evaluate_model, generate_pdf_report
 from .engine.predict import predict, load_model
 
+# Integration layer
+from .integrations.models import ConnectorConfig, ConnectorStatus
+from .integrations import registry as connector_registry
+from .integrations.sync import sync_connector, sync_all
+from .integrations.scoring import score_accounts
+from .storage import repo as storage_repo
+
 app = FastAPI(title="Churn Risk Engine", version="1.0.0")
 
 app.add_middleware(
@@ -700,6 +707,251 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95)):
             "high_risk_in_window": high_risk_in_window,
         },
         "top_at_risk": top_10,
+    }
+
+
+# -----------------------------------------------------------------------
+# Integrations
+# -----------------------------------------------------------------------
+
+@app.get("/api/integrations")
+def list_integrations():
+    """List all available connectors and their status."""
+    connectors = connector_registry.list_connectors()
+    # Enrich with account counts from DB
+    for c in connectors:
+        if c.enabled:
+            c.account_count = storage_repo.account_count(source=c.name)
+            cfg = connector_registry.get_config(c.name)
+            if cfg and cfg.extra.get("last_sync_result"):
+                sync_info = cfg.extra["last_sync_result"]
+                c.error_message = "; ".join(sync_info.get("errors", [])) or None
+    return {"connectors": [c.model_dump() for c in connectors]}
+
+
+@app.post("/api/integrations/{connector_name}/configure")
+def configure_integration(connector_name: str, api_key: str = Query(...)):
+    """Configure a connector with API credentials."""
+    available = connector_registry.available_connectors()
+    if connector_name not in available:
+        raise HTTPException(status_code=404, detail=f"Unknown connector: {connector_name}")
+
+    config = ConnectorConfig(
+        name=connector_name,
+        display_name=available[connector_name].__name__,
+        api_key=api_key,
+        enabled=True,
+    )
+
+    # Test connection before saving
+    cls = available[connector_name]
+    instance = cls(config)
+    if not instance.test_connection():
+        raise HTTPException(status_code=400, detail="Connection test failed. Check your API key.")
+
+    connector_registry.configure(connector_name, config)
+    return {"status": "configured", "connector": connector_name}
+
+
+@app.get("/api/integrations/{connector_name}/status")
+def integration_status(connector_name: str):
+    """Get detailed status for a specific connector."""
+    cfg = connector_registry.get_config(connector_name)
+    if not cfg:
+        return {
+            "name": connector_name,
+            "status": "not_configured",
+            "enabled": False,
+            "account_count": 0,
+        }
+
+    connector = connector_registry.get_connector(connector_name)
+    connected = connector.test_connection() if connector else False
+
+    return {
+        "name": connector_name,
+        "status": "healthy" if connected else "error",
+        "enabled": cfg.enabled,
+        "account_count": storage_repo.account_count(source=connector_name),
+        "last_sync": cfg.extra.get("last_sync_result"),
+    }
+
+
+@app.post("/api/integrations/{connector_name}/sync")
+def trigger_sync(connector_name: str):
+    """Trigger a sync for a specific connector."""
+    cfg = connector_registry.get_config(connector_name)
+    if not cfg or not cfg.enabled:
+        raise HTTPException(status_code=400, detail=f"Connector '{connector_name}' not configured or not enabled.")
+
+    result = sync_connector(connector_name)
+
+    return {
+        "status": "synced" if not result.errors else "partial",
+        "accounts_synced": result.accounts_synced,
+        "signals_synced": result.signals_synced,
+        "errors": result.errors,
+        "duration_seconds": result.duration_seconds,
+    }
+
+
+@app.get("/api/integrations/accounts")
+def list_integration_accounts(
+    source: Optional[str] = Query(None),
+    limit: int = Query(200),
+    offset: int = Query(0),
+):
+    """List accounts from the integration database."""
+    accounts = storage_repo.list_accounts(source=source, limit=limit, offset=offset)
+    total = storage_repo.account_count(source=source)
+    return {"accounts": accounts, "total": total, "showing": len(accounts)}
+
+
+@app.post("/api/integrations/score")
+def trigger_live_scoring():
+    """Score all integrated accounts using the trained churn model."""
+    mod = get_module("churn")
+    model_path = os.path.join(mod.artifact_dir, "model.joblib")
+
+    if not os.path.exists(model_path):
+        raise HTTPException(status_code=400, detail="No trained model. Train a model first.")
+
+    acct_count = storage_repo.account_count()
+    if acct_count == 0:
+        raise HTTPException(status_code=400, detail="No accounts in database. Sync an integration first.")
+
+    try:
+        scores = score_accounts()
+        high = sum(1 for s in scores if s.tier == "High Risk")
+        med = sum(1 for s in scores if s.tier == "Medium Risk")
+        low = sum(1 for s in scores if s.tier == "Low Risk")
+        total_arr = sum(s.arr_at_risk or 0 for s in scores)
+
+        return {
+            "status": "scored",
+            "accounts_scored": len(scores),
+            "tier_counts": {"High Risk": high, "Medium Risk": med, "Low Risk": low},
+            "total_arr_at_risk": round(total_arr, 2),
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/integrations/scores/latest")
+def get_latest_scores(limit: int = Query(200)):
+    """Get the most recent churn scores for all accounts."""
+    scores = storage_repo.latest_scores(limit=limit)
+    return {"scores": scores, "count": len(scores)}
+
+
+@app.post("/api/integrations/{connector_name}/run-demo")
+def run_demo(connector_name: str):
+    """One-click: validate connector → sync → score. Returns combined result."""
+    # Validate configured
+    cfg = connector_registry.get_config(connector_name)
+    if not cfg or not cfg.enabled:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Connector '{connector_name}' is not configured. Call /configure first.",
+        )
+
+    # Sync
+    sync_result = sync_connector(connector_name)
+
+    # Score (only if we have accounts + a trained model)
+    scored = 0
+    tier_counts: Dict[str, int] = {}
+    total_arr = 0.0
+    score_error = None
+
+    mod = get_module("churn")
+    model_exists = os.path.exists(os.path.join(mod.artifact_dir, "model.joblib"))
+    acct_count = storage_repo.account_count()
+
+    if model_exists and acct_count > 0:
+        try:
+            scores = score_accounts()
+            scored = len(scores)
+            tier_counts = {
+                "High Risk": sum(1 for s in scores if s.tier == "High Risk"),
+                "Medium Risk": sum(1 for s in scores if s.tier == "Medium Risk"),
+                "Low Risk": sum(1 for s in scores if s.tier == "Low Risk"),
+            }
+            total_arr = round(sum(s.arr_at_risk or 0 for s in scores), 2)
+        except Exception as e:
+            score_error = str(e)
+    elif not model_exists:
+        score_error = "No trained model — sync succeeded but scoring was skipped."
+
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "status": "ok" if not sync_result.errors and not score_error else "partial",
+        "connector": connector_name,
+        "synced_accounts": sync_result.accounts_synced,
+        "synced_signals": sync_result.signals_synced,
+        "scored_accounts": scored,
+        "tier_counts": tier_counts,
+        "total_arr_at_risk": total_arr,
+        "score_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "model_version": "churn_v1" if model_exists else None,
+        "last_sync_at": now,
+        "last_scored_at": now if scored > 0 else None,
+        "sync_errors": sync_result.errors,
+        "score_error": score_error,
+    }
+
+
+# -----------------------------------------------------------------------
+# Cron / automation auth
+# -----------------------------------------------------------------------
+CRON_API_KEY = os.environ.get("CRON_API_KEY", "")
+
+
+def _verify_cron_key(key: str) -> None:
+    """Raise 401 if the key doesn't match CRON_API_KEY."""
+    if not CRON_API_KEY:
+        raise HTTPException(status_code=500, detail="CRON_API_KEY not configured on server.")
+    if key != CRON_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid cron API key.")
+
+
+@app.post("/api/cron/sync-all")
+def cron_sync_all(x_cron_key: str = Query(..., alias="key")):
+    """Scheduled endpoint: sync all enabled connectors. Requires CRON_API_KEY."""
+    _verify_cron_key(x_cron_key)
+    results = sync_all()
+    return {
+        "status": "ok",
+        "results": [
+            {
+                "connector": r.connector,
+                "accounts": r.accounts_synced,
+                "signals": r.signals_synced,
+                "errors": r.errors,
+            }
+            for r in results
+        ],
+    }
+
+
+@app.post("/api/cron/score")
+def cron_score(x_cron_key: str = Query(..., alias="key")):
+    """Scheduled endpoint: score all synced accounts. Requires CRON_API_KEY."""
+    _verify_cron_key(x_cron_key)
+
+    mod = get_module("churn")
+    if not os.path.exists(os.path.join(mod.artifact_dir, "model.joblib")):
+        return {"status": "skipped", "reason": "No trained model"}
+
+    if storage_repo.account_count() == 0:
+        return {"status": "skipped", "reason": "No accounts synced"}
+
+    scores = score_accounts()
+    return {
+        "status": "ok",
+        "scored": len(scores),
+        "total_arr_at_risk": round(sum(s.arr_at_risk or 0 for s in scores), 2),
     }
 
 

@@ -8,6 +8,7 @@ import { PredictPage } from './pages/PredictPage';
 import { ApiDocsPage } from './pages/ApiDocsPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { IntegrationsPage } from './pages/IntegrationsPage';
 import { DatasetProvider } from './lib/DatasetContext';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
             <Route path="/api-docs" element={<ApiDocsPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/integrations" element={<IntegrationsPage />} />
           </Routes>
         </main>
       </div>

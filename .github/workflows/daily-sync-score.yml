@@ -1,0 +1,27 @@
+name: Daily Integration Sync & Score
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC (sync all connectors, then score)
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync-and-score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Sync all connectors
+        run: |
+          curl -sf -X POST \
+            "${{ secrets.RENDER_API_URL }}/api/cron/sync-all" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_API_KEY }}"
+
+      - name: Score all accounts
+        run: |
+          curl -sf -X POST \
+            "${{ secrets.RENDER_API_URL }}/api/cron/score" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_API_KEY }}"

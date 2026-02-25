@@ -18,3 +18,6 @@ artifacts/*
 !artifacts/ml_metadata.json
 !artifacts/confidence_curve.json
 !artifacts/elo_params.json
+
+# Local Netlify folder
+.netlify
