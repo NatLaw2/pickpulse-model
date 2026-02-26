@@ -28,6 +28,8 @@ export function Footer() {
           <div>
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Company</h4>
             <ul className="space-y-2 text-sm">
+              <li><Link to="/about" className="text-slate-600 hover:text-indigo-600">About</Link></li>
+              <li><Link to="/onboarding" className="text-slate-600 hover:text-indigo-600">Onboarding</Link></li>
               <li><Link to="/demo" className="text-slate-600 hover:text-indigo-600">Request a Demo</Link></li>
               <li><Link to="/contact" className="text-slate-600 hover:text-indigo-600">Contact</Link></li>
             </ul>
