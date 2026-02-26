@@ -1,36 +1,8 @@
-import { useState } from 'react';
-import { Mail, Send, CheckCircle2, Loader2 } from 'lucide-react';
+import { Mail, Send, CheckCircle2 } from 'lucide-react';
 
 export function ContactPage() {
-  const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-
-    const form = e.currentTarget;
-    const data = new URLSearchParams(new FormData(form) as any);
-
-    try {
-      const res = await fetch('/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: data.toString(),
-      });
-      if (res.ok) {
-        setSubmitted(true);
-      } else {
-        setError('Something went wrong. Please try again or email us directly.');
-      }
-    } catch {
-      setError('Something went wrong. Please try again or email us directly.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const params = new URLSearchParams(window.location.search);
+  const submitted = params.get('success') === '1';
 
   return (
     <div>
@@ -63,7 +35,7 @@ export function ContactPage() {
                 method="POST"
                 data-netlify="true"
                 netlify-honeypot="bot-field"
-                onSubmit={handleSubmit}
+                action="/contact?success=1"
                 className="space-y-5"
               >
                 <input type="hidden" name="form-name" value="contact" />
@@ -112,23 +84,12 @@ export function ContactPage() {
                   />
                 </div>
 
-                {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                    {error}
-                  </div>
-                )}
-
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-lg shadow-indigo-600/20"
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20"
                 >
-                  {submitting ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Send size={16} />
-                  )}
-                  {submitting ? 'Sending...' : 'Send Message'}
+                  <Send size={16} />
+                  Send Message
                 </button>
               </form>
             </>
