@@ -3,7 +3,7 @@ export function LeaveBehind() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#0C1017',
+        background: '#0B0F14',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -13,21 +13,20 @@ export function LeaveBehind() {
         style={{
           width: 816,
           height: 1056,
-          background: '#0C1017',
+          background: '#0B0F14',
           fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-          color: '#D0D4DB',
           display: 'flex',
           flexDirection: 'column',
-          padding: '56px 64px 36px',
+          padding: '52px 64px 32px',
           overflow: 'hidden',
         }}
       >
-        {/* ── Brand mark ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 56 }}>
+        {/* Brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 72 }}>
           <div
             style={{
-              width: 34,
-              height: 34,
+              width: 32,
+              height: 32,
               borderRadius: '50%',
               background: 'linear-gradient(135deg, #5CF2C2, #4DA3FF)',
               display: 'flex',
@@ -35,24 +34,22 @@ export function LeaveBehind() {
               justifyContent: 'center',
             }}
           >
-            <span style={{ color: '#0C1017', fontSize: 10, fontWeight: 800, letterSpacing: '-0.03em' }}>PPI</span>
+            <span style={{ color: '#0B0F14', fontSize: 9, fontWeight: 800 }}>PPI</span>
           </div>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
             PickPulse Intelligence
           </span>
         </div>
 
-        {/* ═══════════════════════════════════════════════
-            SECTION 1 — COMMAND
-        ═══════════════════════════════════════════════ */}
-        <div style={{ textAlign: 'center', marginBottom: 64 }}>
+        {/* COMMAND */}
+        <div style={{ textAlign: 'center', marginBottom: 80 }}>
           <h1
             style={{
-              fontSize: 36,
+              fontSize: 44,
               fontWeight: 800,
               color: '#FFFFFF',
-              lineHeight: 1.15,
-              letterSpacing: '-0.025em',
+              lineHeight: 1.1,
+              letterSpacing: '-0.03em',
               margin: 0,
             }}
           >
@@ -60,165 +57,148 @@ export function LeaveBehind() {
             <br />
             Act before they churn.
           </h1>
-          <p style={{ fontSize: 15, color: '#7B8494', marginTop: 18, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 15, color: '#6B7280', marginTop: 24, lineHeight: 1.5 }}>
             PickPulse ranks every account by calibrated churn probability and ARR exposure.
           </p>
         </div>
 
-        {/* ═══════════════════════════════════════════════
-            SECTION 2 — THE OPERATING FLOW
-        ═══════════════════════════════════════════════ */}
-        <div style={{ marginBottom: 64 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'center',
-              gap: 0,
-            }}
-          >
-            <FlowStep title="Data" sub="CRM or billing export" />
+        {/* OPERATING FLOW */}
+        <div style={{ marginBottom: 80 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+            <FlowStep title="DATA" sub="CRM or billing export" />
             <FlowArrow />
-            <FlowStep title="Train" sub="Learns churn patterns" />
+            <FlowStep title="TRAIN" sub="Learns churn patterns" />
             <FlowArrow />
-            <FlowStep title="Score" sub="Calibrated probability per account" />
+            <FlowStep title="SCORE" sub="Calibrated probability" />
             <FlowArrow />
-            <FlowStep title="Prioritize" sub="Ranked by ARR + urgency" />
+            <FlowStep title="PRIORITIZE" sub="Ranked by ARR + urgency" />
             <FlowArrow />
-            <FlowStep title="Report" sub="ARR-at-risk + exec summary" />
+            <FlowStep title="REPORT" sub="ARR-at-risk + exec summary" />
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════
-            SECTION 3 — OUTPUT
-        ═══════════════════════════════════════════════ */}
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', gap: 48 }}>
-            {/* Left — Pilot Outputs */}
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: '#565E6C',
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase' as const,
-                  marginBottom: 18,
-                }}
-              >
-                Pilot Outputs
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <OutputItem text="Risk tiers per account" />
-                <OutputItem text="Prioritized save list" />
-                <OutputItem text="ARR-at-risk summary" />
-                <OutputItem text="Executive PDF" />
-              </div>
+        {/* OUTPUT */}
+        <div style={{ display: 'flex', gap: 48, flex: 1 }}>
+          <div style={{ flex: 1, paddingTop: 4 }}>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#4B5563',
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase' as const,
+                marginBottom: 22,
+              }}
+            >
+              Pilot Outputs
             </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <OutputItem text="Risk tiers per account" />
+              <OutputItem text="Prioritized save list" />
+              <OutputItem text="ARR-at-risk summary" />
+              <OutputItem text="Executive PDF" />
+            </div>
+          </div>
 
-            {/* Right — Outcome headline */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <h2
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  color: '#FFFFFF',
-                  lineHeight: 1.2,
-                  letterSpacing: '-0.02em',
-                  margin: 0,
-                }}
-              >
-                Lower churn. Higher NRR.
-                <br />
-                Clear ARR visibility.
-              </h2>
-            </div>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <h2
+              style={{
+                fontSize: 34,
+                fontWeight: 800,
+                color: '#FFFFFF',
+                lineHeight: 1.15,
+                letterSpacing: '-0.025em',
+                margin: 0,
+                textAlign: 'right',
+              }}
+            >
+              Lower churn.
+              <br />
+              Higher NRR.
+              <br />
+              <span style={{ color: '#5CF2C2' }}>Clear ARR visibility.</span>
+            </h2>
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════
-            SECTION 4 — ACTION
-        ═══════════════════════════════════════════════ */}
+        {/* ACTION */}
         <div
           style={{
             textAlign: 'center',
-            paddingTop: 24,
+            paddingTop: 28,
             borderTop: '1px solid rgba(255,255,255,0.06)',
-            marginTop: 24,
+            marginTop: 28,
           }}
         >
-          <p style={{ fontSize: 13, color: '#7B8494', margin: 0 }}>
-            <span style={{ color: '#5CF2C2', opacity: 0.6, marginRight: 8 }}>Next step</span>
-            <span style={{ color: '#565E6C', marginRight: 8 }}>&rarr;</span>
+          <p style={{ fontSize: 14, color: '#6B7280', margin: 0, fontWeight: 500 }}>
+            <span style={{ color: '#5CF2C2', marginRight: 10, fontWeight: 600 }}>Next step</span>
+            <span style={{ marginRight: 10, opacity: 0.4 }}>&rarr;</span>
             15-min working session to confirm data and deliver pilot plan.
           </p>
         </div>
 
-        {/* ── Footer ── */}
+        {/* Footer */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            marginTop: 20,
-            paddingTop: 12,
+            marginTop: 18,
+            paddingTop: 10,
           }}
         >
-          <span style={{ fontSize: 9, color: '#2D333B', letterSpacing: '0.04em' }}>
+          <span style={{ fontSize: 8, color: '#2D333B', letterSpacing: '0.05em' }}>
             Confidential &middot; For internal evaluation
           </span>
-          <span style={{ fontSize: 9, color: '#2D333B' }}>pickpulse.co</span>
+          <span style={{ fontSize: 8, color: '#2D333B' }}>pickpulse.co</span>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Flow step ── */
 function FlowStep({ title, sub }: { title: string; sub: string }) {
   return (
     <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
       <div
         style={{
-          fontSize: 20,
-          fontWeight: 700,
+          fontSize: 24,
+          fontWeight: 800,
           color: '#FFFFFF',
-          letterSpacing: '-0.01em',
-          marginBottom: 6,
+          letterSpacing: '0.04em',
+          marginBottom: 8,
         }}
       >
         {title}
       </div>
-      <div style={{ fontSize: 11, color: '#7B8494', lineHeight: 1.4 }}>{sub}</div>
+      <div style={{ fontSize: 11, color: '#6B7280', lineHeight: 1.4 }}>{sub}</div>
     </div>
   );
 }
 
-/* ── Flow arrow ── */
 function FlowArrow() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', paddingTop: 4, paddingLeft: 4, paddingRight: 4 }}>
-      <svg width="28" height="12" viewBox="0 0 28 12" fill="none">
+    <div style={{ display: 'flex', alignItems: 'center', paddingTop: 6, paddingLeft: 2, paddingRight: 2 }}>
+      <svg width="32" height="14" viewBox="0 0 32 14" fill="none">
         <path
-          d="M0 6h24M21 2l5 4-5 4"
+          d="M0 7h27M24 3l5 4-5 4"
           stroke="#5CF2C2"
-          strokeWidth="1.5"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          opacity="0.3"
+          opacity="0.45"
         />
       </svg>
     </div>
   );
 }
 
-/* ── Output check item ── */
 function OutputItem({ text }: { text: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5CF2C2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, flexShrink: 0 }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5CF2C2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45, flexShrink: 0 }}>
         <polyline points="20 6 9 17 4 12" />
       </svg>
-      <span style={{ fontSize: 14, color: '#A0A8B4' }}>{text}</span>
+      <span style={{ fontSize: 14, color: '#9CA3AF', fontWeight: 500 }}>{text}</span>
     </div>
   );
 }
