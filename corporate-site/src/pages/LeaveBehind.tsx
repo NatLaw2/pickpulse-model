@@ -37,29 +37,29 @@ function IconArrowRight() {
 
 export function LeaveBehind() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0B0F14] to-[#0E1623] text-[#E8ECF1] print:bg-[#0B0F14]">
+    <div className="min-h-screen bg-[#0C1017] text-[#E8ECF1] print:bg-[#0C1017]">
       <div className="max-w-[940px] mx-auto px-10 py-9 print:py-6 print:px-8">
 
         {/* Header */}
-        <header className="flex items-center justify-between mb-9 print:mb-7">
+        <header className="flex items-center justify-between mb-10 print:mb-8">
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#5CF2C2] to-[#4DA3FF] flex items-center justify-center shadow-lg shadow-[#5CF2C2]/10">
-              <span className="text-[#0B0F14] text-[11px] font-extrabold tracking-tight leading-none">PPI</span>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#5CF2C2] to-[#4DA3FF] flex items-center justify-center">
+              <span className="text-[#0C1017] text-[11px] font-extrabold tracking-tight leading-none">PPI</span>
             </div>
             <div>
               <div className="text-[15px] font-bold tracking-tight text-white">PickPulse Intelligence</div>
-              <div className="text-[10px] text-[#5CF2C2]/50 font-medium tracking-[0.2em] uppercase">Churn Risk Engine</div>
+              <div className="text-[10px] text-[#5CF2C2]/40 font-medium tracking-[0.2em] uppercase">Churn Risk Engine</div>
             </div>
           </div>
-          <div className="px-3.5 py-1 rounded-full border border-[#5CF2C2]/15 bg-[#5CF2C2]/[0.04] text-[9px] font-semibold text-[#5CF2C2]/70 uppercase tracking-widest">
+          <div className="px-3.5 py-1 rounded-full border border-white/[0.08] text-[9px] font-medium text-[#7B8494] uppercase tracking-widest">
             Workflow Overview
           </div>
         </header>
 
         {/* 01 — What You Get */}
-        <section className="mb-8 print:mb-6">
+        <section className="mb-10 print:mb-7">
           <Label n="01" t="What You Get" />
-          <div className="grid grid-cols-3 gap-4 mt-3">
+          <div className="grid grid-cols-3 gap-4 mt-3.5">
             {[
               {
                 icon: <IconShield />,
@@ -81,15 +81,15 @@ export function LeaveBehind() {
               },
             ].map((p, i) => (
               <div key={i} className="py-4 px-1">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#5CF2C2]/[0.08] text-[#5CF2C2] flex items-center justify-center">{p.icon}</div>
-                  <span className="text-[13px] font-semibold text-white">{p.title}</span>
+                <div className="flex items-center gap-2.5 mb-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#5CF2C2]/[0.07] text-[#5CF2C2] flex items-center justify-center">{p.icon}</div>
+                  <span className="text-[14px] font-semibold text-[#F1F3F5]">{p.title}</span>
                 </div>
-                <p className="text-[11px] text-[#9CA3AF] leading-relaxed mb-2">{p.line}</p>
+                <p className="text-[11px] text-[#7B8494] leading-relaxed mb-2.5">{p.line}</p>
                 <ul className="space-y-1">
                   {p.bullets.map((b, j) => (
-                    <li key={j} className="text-[11px] text-[#6B7280] flex gap-2 items-start">
-                      <span className="text-[#5CF2C2]/40 mt-px">›</span>{b}
+                    <li key={j} className="text-[11px] text-[#565E6C] flex gap-2 items-start">
+                      <span className="text-[#5CF2C2]/30 mt-px">›</span>{b}
                     </li>
                   ))}
                 </ul>
@@ -99,10 +99,10 @@ export function LeaveBehind() {
         </section>
 
         {/* 02 — How It Works */}
-        <section className="mb-8 print:mb-6">
+        <section className="mb-10 print:mb-7">
           <Label n="02" t="How It Works" />
-          <div className="relative mt-4">
-            <div className="absolute top-[19px] left-[40px] right-[40px] h-px bg-gradient-to-r from-[#5CF2C2]/20 via-[#5CF2C2]/10 to-[#4DA3FF]/15" />
+          <div className="relative mt-5">
+            <div className="absolute top-[19px] left-[40px] right-[40px] h-px bg-white/[0.06]" />
             <div className="relative grid grid-cols-5 gap-1">
               {[
                 { s: '1', title: 'Data Ingestion', line: 'CRM or billing export via template.', bullets: ['CSV, HubSpot, or Stripe'] },
@@ -114,18 +114,18 @@ export function LeaveBehind() {
                 <div key={i} className="flex flex-col items-center text-center px-1">
                   <div className={`relative z-10 w-[38px] h-[38px] rounded-full flex items-center justify-center text-[14px] font-bold mb-3 ${
                     step.opt
-                      ? 'bg-[#0E1623] border-[1.5px] border-dashed border-[#4DA3FF]/25 text-[#4DA3FF]/60'
-                      : 'bg-[#0E1623] border-[1.5px] border-[#5CF2C2]/25 text-[#5CF2C2]'
+                      ? 'bg-[#0C1017] border-[1.5px] border-dashed border-white/[0.1] text-[#7B8494]'
+                      : 'bg-[#0C1017] border-[1.5px] border-[#5CF2C2]/20 text-[#5CF2C2]'
                   }`}>
                     {step.s}
                   </div>
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <span className="text-[11px] font-semibold text-white">{step.title}</span>
-                    {step.opt && <span className="px-1 py-px rounded text-[7px] font-semibold uppercase tracking-wider text-[#4DA3FF]/60 bg-[#4DA3FF]/[0.06]">Opt</span>}
+                    <span className="text-[12px] font-semibold text-[#F1F3F5]">{step.title}</span>
+                    {step.opt && <span className="px-1 py-px rounded text-[7px] font-medium uppercase tracking-wider text-[#7B8494] bg-white/[0.04]">Opt</span>}
                   </div>
-                  <p className="text-[10px] text-[#8891A0] leading-snug mb-1">{step.line}</p>
+                  <p className="text-[10px] text-[#7B8494] leading-snug mb-1">{step.line}</p>
                   {step.bullets.map((b, j) => (
-                    <span key={j} className="text-[10px] text-[#6B7280]"><span className="text-[#5CF2C2]/30">› </span>{b}</span>
+                    <span key={j} className="text-[10px] text-[#565E6C]"><span className="text-[#5CF2C2]/25">› </span>{b}</span>
                   ))}
                 </div>
               ))}
@@ -134,13 +134,13 @@ export function LeaveBehind() {
         </section>
 
         {/* 03 — Onboarding */}
-        <section className="mb-8 print:mb-6">
+        <section className="mb-10 print:mb-7">
           <div className="flex items-center gap-2.5">
             <Label n="03" t="Onboarding" />
-            <span className="px-2.5 py-0.5 rounded-full bg-[#5CF2C2]/[0.05] border border-[#5CF2C2]/10 text-[8px] font-bold text-[#5CF2C2]/60 uppercase tracking-[0.15em]">30-Day Pilot</span>
+            <span className="px-2.5 py-0.5 rounded-full border border-white/[0.06] text-[8px] font-medium text-[#7B8494] uppercase tracking-[0.15em]">30-Day Pilot</span>
           </div>
-          <div className="relative mt-4">
-            <div className="absolute top-[14px] left-[calc(12.5%)] right-[calc(12.5%)] h-px bg-gradient-to-r from-[#5CF2C2]/25 to-[#4DA3FF]/15" />
+          <div className="relative mt-5">
+            <div className="absolute top-[14px] left-[calc(12.5%)] right-[calc(12.5%)] h-px bg-white/[0.06]" />
             <div className="relative grid grid-cols-4 gap-4">
               {[
                 { wk: 'Wk 1', title: 'Data Alignment', bullets: ['Template mapping', 'Field validation'] },
@@ -149,15 +149,15 @@ export function LeaveBehind() {
                 { wk: 'Wk 4', title: 'Impact Modeling', bullets: ['ARR-at-risk report', 'Executive summary'] },
               ].map((w, i) => (
                 <div key={i} className="flex flex-col items-center">
-                  <div className="relative z-10 w-7 h-7 rounded-full bg-[#0E1623] border-[1.5px] border-[#5CF2C2]/25 flex items-center justify-center mb-2.5">
-                    <span className="text-[8px] font-bold text-[#5CF2C2]/70">{w.wk}</span>
+                  <div className="relative z-10 w-7 h-7 rounded-full bg-[#0C1017] border-[1.5px] border-[#5CF2C2]/20 flex items-center justify-center mb-3">
+                    <span className="text-[8px] font-bold text-[#5CF2C2]/60">{w.wk}</span>
                   </div>
                   <div className="w-full px-1">
-                    <div className="text-[12px] font-semibold text-white mb-1.5 text-center">{w.title}</div>
+                    <div className="text-[12px] font-semibold text-[#F1F3F5] mb-1.5 text-center">{w.title}</div>
                     <ul className="space-y-1">
                       {w.bullets.map((b, j) => (
-                        <li key={j} className="text-[10px] text-[#8891A0] flex gap-1.5 items-start">
-                          <span className="text-[#5CF2C2]/30 mt-px shrink-0">›</span>{b}
+                        <li key={j} className="text-[10px] text-[#7B8494] flex gap-1.5 items-start">
+                          <span className="text-[#5CF2C2]/25 mt-px shrink-0">›</span>{b}
                         </li>
                       ))}
                     </ul>
@@ -169,33 +169,33 @@ export function LeaveBehind() {
         </section>
 
         {/* Bottom — Outputs + Outcome */}
-        <div className="grid grid-cols-2 gap-5 mb-6 print:mb-4">
-          <div>
-            <div className="text-[10px] font-bold text-[#5CF2C2]/40 uppercase tracking-wider mb-3">Pilot Outputs</div>
-            <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-6 mb-7 print:mb-5">
+          <div className="pt-1">
+            <div className="text-[10px] font-medium text-[#565E6C] uppercase tracking-wider mb-3.5">Pilot Outputs</div>
+            <div className="space-y-2.5">
               {['Risk tiers per account', 'Prioritized save list', 'ARR-at-risk quantification', 'Executive summary PDF'].map((item) => (
                 <div key={item} className="flex items-center gap-2.5">
-                  <span className="text-[#5CF2C2]/50"><IconCheck /></span>
-                  <span className="text-[12px] text-[#B0B8C5]">{item}</span>
+                  <span className="text-[#5CF2C2]/40"><IconCheck /></span>
+                  <span className="text-[12px] text-[#A0A8B4]">{item}</span>
                 </div>
               ))}
             </div>
           </div>
           <div className="flex flex-col justify-center">
-            <p className="text-[17px] font-semibold text-white leading-snug mb-3">
+            <p className="text-[22px] font-bold text-white leading-tight mb-4 tracking-tight">
               Lower churn. Higher NRR.<br />Clear ARR visibility.
             </p>
-            <div className="flex items-center gap-2 text-[#9CA3AF]">
-              <span className="text-[#5CF2C2]/50"><IconArrowRight /></span>
-              <span className="text-[11px]">Next step: 15-min working session to confirm data sources and deliver pilot plan.</span>
+            <div className="flex items-start gap-2.5">
+              <span className="text-[#5CF2C2]/40 mt-0.5"><IconArrowRight /></span>
+              <span className="text-[11px] text-[#7B8494] leading-relaxed">Next step: 15-min working session to confirm data sources and deliver pilot plan.</span>
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <footer className="pt-3 border-t border-white/[0.04] flex items-center justify-between">
-          <span className="text-[8px] text-[#4B5563] tracking-wide">Confidential &middot; For internal evaluation</span>
-          <span className="text-[8px] text-[#4B5563]">pickpulse.co</span>
+          <span className="text-[8px] text-[#3D4452] tracking-wide">Confidential &middot; For internal evaluation</span>
+          <span className="text-[8px] text-[#3D4452]">pickpulse.co</span>
         </footer>
       </div>
     </div>
@@ -205,8 +205,8 @@ export function LeaveBehind() {
 function Label({ n, t }: { n: string; t: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] font-bold text-[#5CF2C2]/30 font-mono">{n}</span>
-      <span className="text-[13px] font-semibold text-white tracking-tight">{t}</span>
+      <span className="text-[10px] font-medium text-[#3D4452] font-mono">{n}</span>
+      <span className="text-[14px] font-bold text-white tracking-tight">{t}</span>
     </div>
   );
 }
