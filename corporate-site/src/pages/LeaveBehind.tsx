@@ -1,15 +1,13 @@
-/* ─── Inline SVG icon components (consistent 16px, 1.5 stroke) ─── */
-
 function IconShield() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
   );
 }
 function IconList() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
       <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
     </svg>
@@ -17,128 +15,81 @@ function IconList() {
 }
 function IconBarChart() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   );
 }
 function IconCheck() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }
 function IconArrowRight() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
     </svg>
   );
 }
 
-/* ─── Data ─── */
-
-const workflow = [
-  {
-    step: '1',
-    title: 'Data Ingestion',
-    line: 'Export from your CRM or billing system.',
-    bullets: ['CSV, HubSpot, or Stripe', 'Mapped via standard template'],
-  },
-  {
-    step: '2',
-    title: 'Model Training',
-    line: 'Trains on your historical churn outcomes.',
-    bullets: ['Calibrated likelihood per account', 'Optional drivers and explanations'],
-  },
-  {
-    step: '3',
-    title: 'Account Prioritization',
-    line: 'Ranked by ARR exposure and renewal urgency.',
-    bullets: ['High / Medium / Low risk tiers', 'Actionable save list'],
-  },
-  {
-    step: '4',
-    title: 'Revenue Simulation',
-    line: 'Model recoverable ARR at varying save rates.',
-    bullets: ['Adjustable save assumptions', 'ARR-at-risk quantified per tier'],
-  },
-  {
-    step: '5',
-    title: 'Portfolio Roll-Up',
-    line: 'Aggregate risk view across the book.',
-    bullets: ['Executive summary + PDF', 'Renewal pipeline overlay'],
-    optional: true,
-  },
-];
-
-const timeline = [
-  { week: 'Wk 1', title: 'Data Alignment', bullets: ['Template mapping', 'Field validation', 'Outcome labeling'] },
-  { week: 'Wk 2', title: 'Model Training', bullets: ['Model fit + validation', 'Calibration check', 'Accuracy review'] },
-  { week: 'Wk 3', title: 'Live Scoring', bullets: ['Full account scoring', 'Risk tier assignment', 'Save list delivery'] },
-  { week: 'Wk 4', title: 'Impact Modeling', bullets: ['ARR-at-risk report', 'Save-rate simulation', 'Executive summary'] },
-];
-
-/* ─── Component ─── */
-
 export function LeaveBehind() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0B0F14] to-[#0E1623] text-[#E8ECF1] print:bg-[#0B0F14]">
-      <div className="max-w-[960px] mx-auto px-8 py-8 print:py-5 print:px-6">
+      <div className="max-w-[940px] mx-auto px-10 py-9 print:py-6 print:px-8">
 
-        {/* ─── Header ─── */}
-        <header className="flex items-center justify-between mb-7 print:mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#5CF2C2] to-[#4DA3FF] flex items-center justify-center shadow-lg shadow-[#5CF2C2]/10">
-              <span className="text-[#0B0F14] text-[10px] font-extrabold tracking-tight leading-none">PPI</span>
+        {/* Header */}
+        <header className="flex items-center justify-between mb-9 print:mb-7">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#5CF2C2] to-[#4DA3FF] flex items-center justify-center shadow-lg shadow-[#5CF2C2]/10">
+              <span className="text-[#0B0F14] text-[11px] font-extrabold tracking-tight leading-none">PPI</span>
             </div>
             <div>
-              <div className="text-sm font-bold tracking-tight text-white">PickPulse Intelligence</div>
-              <div className="text-[9px] text-[#5CF2C2]/60 font-medium tracking-[0.18em] uppercase">Churn Risk Engine</div>
+              <div className="text-[15px] font-bold tracking-tight text-white">PickPulse Intelligence</div>
+              <div className="text-[10px] text-[#5CF2C2]/50 font-medium tracking-[0.2em] uppercase">Churn Risk Engine</div>
             </div>
           </div>
-          <div className="px-3 py-1 rounded-full border border-[#5CF2C2]/20 bg-[#5CF2C2]/5 text-[9px] font-semibold text-[#5CF2C2] uppercase tracking-wider">
+          <div className="px-3.5 py-1 rounded-full border border-[#5CF2C2]/15 bg-[#5CF2C2]/[0.04] text-[9px] font-semibold text-[#5CF2C2]/70 uppercase tracking-widest">
             Workflow Overview
           </div>
         </header>
 
-        {/* ─── 1. Value Pillars ─── */}
-        <section className="mb-6 print:mb-4">
-          <SectionLabel number="01" title="What You Get" />
-          <div className="grid grid-cols-3 gap-3 mt-2.5">
+        {/* 01 — What You Get */}
+        <section className="mb-8 print:mb-6">
+          <Label n="01" t="What You Get" />
+          <div className="grid grid-cols-3 gap-4 mt-3">
             {[
               {
                 icon: <IconShield />,
                 title: 'Risk Tiers',
-                line: 'Calibrated churn likelihood with confidence for every account.',
-                bullets: ['Not an opaque score — a real probability', 'High / Medium / Low segmentation'],
+                line: 'Calibrated churn probability for every account.',
+                bullets: ['Real percentage, not an opaque score', 'High / Medium / Low segmentation'],
               },
               {
                 icon: <IconList />,
                 title: 'Prioritized Save List',
-                line: 'Accounts ranked by ARR exposure and renewal urgency.',
-                bullets: ['CS team knows exactly where to focus', 'Exportable to CRM or spreadsheet'],
+                line: 'Accounts ranked by revenue at risk.',
+                bullets: ['Sorted by ARR and renewal urgency', 'Exportable to CRM or spreadsheet'],
               },
               {
                 icon: <IconBarChart />,
                 title: 'Executive Visibility',
-                line: 'ARR-at-risk quantified with save-rate simulation.',
-                bullets: ['Board-ready PDF reporting', 'Adjustable recovery assumptions'],
+                line: 'ARR-at-risk with recovery simulation.',
+                bullets: ['Board-ready PDF reporting', 'Adjustable save-rate assumptions'],
               },
             ].map((p, i) => (
-              <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 flex flex-col">
+              <div key={i} className="py-4 px-1">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className="w-7 h-7 rounded-lg bg-[#5CF2C2]/10 text-[#5CF2C2] flex items-center justify-center shrink-0">
-                    {p.icon}
-                  </div>
-                  <span className="text-[12px] font-semibold text-white">{p.title}</span>
+                  <div className="w-8 h-8 rounded-lg bg-[#5CF2C2]/[0.08] text-[#5CF2C2] flex items-center justify-center">{p.icon}</div>
+                  <span className="text-[13px] font-semibold text-white">{p.title}</span>
                 </div>
-                <p className="text-[10px] text-[#9CA3AF] leading-snug mb-2">{p.line}</p>
-                <ul className="space-y-1 mt-auto">
+                <p className="text-[11px] text-[#9CA3AF] leading-relaxed mb-2">{p.line}</p>
+                <ul className="space-y-1">
                   {p.bullets.map((b, j) => (
-                    <li key={j} className="text-[10px] text-[#6B7280] leading-snug flex gap-1.5 items-start">
-                      <span className="text-[#5CF2C2]/50 mt-px shrink-0">›</span>{b}
+                    <li key={j} className="text-[11px] text-[#6B7280] flex gap-2 items-start">
+                      <span className="text-[#5CF2C2]/40 mt-px">›</span>{b}
                     </li>
                   ))}
                 </ul>
@@ -147,76 +98,66 @@ export function LeaveBehind() {
           </div>
         </section>
 
-        {/* ─── 2. How It Works — horizontal flow ─── */}
-        <section className="mb-6 print:mb-4">
-          <SectionLabel number="02" title="How It Works" />
-          <div className="relative mt-3">
-            {/* Progress line behind steps */}
-            <div className="absolute top-[18px] left-[20px] right-[20px] h-px bg-gradient-to-r from-[#5CF2C2]/25 via-[#5CF2C2]/15 to-[#4DA3FF]/20 print:bg-[#5CF2C2]/15" />
-
-            <div className="relative grid grid-cols-5 gap-0">
-              {workflow.map((s, i) => (
-                <div key={i} className="flex flex-col items-center px-1">
-                  {/* Step number node */}
-                  <div className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold mb-2.5 ${
-                    s.optional
-                      ? 'bg-[#0E1623] border-2 border-dashed border-[#4DA3FF]/30 text-[#4DA3FF]/70'
-                      : 'bg-[#5CF2C2]/10 border-2 border-[#5CF2C2]/30 text-[#5CF2C2]'
+        {/* 02 — How It Works */}
+        <section className="mb-8 print:mb-6">
+          <Label n="02" t="How It Works" />
+          <div className="relative mt-4">
+            <div className="absolute top-[19px] left-[40px] right-[40px] h-px bg-gradient-to-r from-[#5CF2C2]/20 via-[#5CF2C2]/10 to-[#4DA3FF]/15" />
+            <div className="relative grid grid-cols-5 gap-1">
+              {[
+                { s: '1', title: 'Data Ingestion', line: 'CRM or billing export via template.', bullets: ['CSV, HubSpot, or Stripe'] },
+                { s: '2', title: 'Model Training', line: 'Trains on your historical outcomes.', bullets: ['Calibrated likelihood per account'] },
+                { s: '3', title: 'Prioritization', line: 'Ranked by revenue and urgency.', bullets: ['Actionable save list by tier'] },
+                { s: '4', title: 'Impact Simulation', line: 'Recoverable ARR at varying save rates.', bullets: ['ARR-at-risk quantified per tier'] },
+                { s: '5', title: 'Portfolio View', line: 'Aggregate risk across the book.', bullets: ['Executive summary + PDF'], opt: true },
+              ].map((step, i) => (
+                <div key={i} className="flex flex-col items-center text-center px-1">
+                  <div className={`relative z-10 w-[38px] h-[38px] rounded-full flex items-center justify-center text-[14px] font-bold mb-3 ${
+                    step.opt
+                      ? 'bg-[#0E1623] border-[1.5px] border-dashed border-[#4DA3FF]/25 text-[#4DA3FF]/60'
+                      : 'bg-[#0E1623] border-[1.5px] border-[#5CF2C2]/25 text-[#5CF2C2]'
                   }`}>
-                    {s.step}
+                    {step.s}
                   </div>
-                  {/* Card */}
-                  <div className={`w-full rounded-lg px-2.5 py-2.5 text-center ${
-                    s.optional
-                      ? 'border border-dashed border-[#4DA3FF]/20 bg-[#4DA3FF]/[0.03]'
-                      : 'border border-white/[0.06] bg-white/[0.03]'
-                  }`}>
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <span className="text-[11px] font-semibold text-white leading-tight">{s.title}</span>
-                      {s.optional && (
-                        <span className="px-1 py-px rounded text-[7px] font-semibold uppercase tracking-wider bg-[#4DA3FF]/10 text-[#4DA3FF] border border-[#4DA3FF]/20">Opt</span>
-                      )}
-                    </div>
-                    <p className="text-[9px] text-[#8891A0] leading-snug mb-1.5">{s.line}</p>
-                    <ul className="space-y-0.5">
-                      {s.bullets.map((b, j) => (
-                        <li key={j} className="text-[9px] text-[#6B7280] leading-snug">
-                          <span className="text-[#5CF2C2]/40">› </span>{b}
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <span className="text-[11px] font-semibold text-white">{step.title}</span>
+                    {step.opt && <span className="px-1 py-px rounded text-[7px] font-semibold uppercase tracking-wider text-[#4DA3FF]/60 bg-[#4DA3FF]/[0.06]">Opt</span>}
                   </div>
+                  <p className="text-[10px] text-[#8891A0] leading-snug mb-1">{step.line}</p>
+                  {step.bullets.map((b, j) => (
+                    <span key={j} className="text-[10px] text-[#6B7280]"><span className="text-[#5CF2C2]/30">› </span>{b}</span>
+                  ))}
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ─── 3. Onboarding Timeline ─── */}
-        <section className="mb-5 print:mb-4">
-          <div className="flex items-center gap-2.5 mb-2.5">
-            <SectionLabel number="03" title="Onboarding" />
-            <span className="px-2 py-0.5 rounded-full bg-[#5CF2C2]/[0.07] border border-[#5CF2C2]/15 text-[8px] font-bold text-[#5CF2C2] uppercase tracking-widest">30-Day Pilot</span>
+        {/* 03 — Onboarding */}
+        <section className="mb-8 print:mb-6">
+          <div className="flex items-center gap-2.5">
+            <Label n="03" t="Onboarding" />
+            <span className="px-2.5 py-0.5 rounded-full bg-[#5CF2C2]/[0.05] border border-[#5CF2C2]/10 text-[8px] font-bold text-[#5CF2C2]/60 uppercase tracking-[0.15em]">30-Day Pilot</span>
           </div>
-
-          <div className="relative">
-            {/* Connecting line */}
-            <div className="absolute top-[14px] left-[calc(12.5%+4px)] right-[calc(12.5%+4px)] h-px bg-gradient-to-r from-[#5CF2C2]/30 to-[#4DA3FF]/20" />
-
-            <div className="relative grid grid-cols-4 gap-3">
-              {timeline.map((w, i) => (
+          <div className="relative mt-4">
+            <div className="absolute top-[14px] left-[calc(12.5%)] right-[calc(12.5%)] h-px bg-gradient-to-r from-[#5CF2C2]/25 to-[#4DA3FF]/15" />
+            <div className="relative grid grid-cols-4 gap-4">
+              {[
+                { wk: 'Wk 1', title: 'Data Alignment', bullets: ['Template mapping', 'Field validation'] },
+                { wk: 'Wk 2', title: 'Model Training', bullets: ['Model fit and calibration', 'Accuracy review'] },
+                { wk: 'Wk 3', title: 'Live Scoring', bullets: ['Full account scoring', 'Save list delivery'] },
+                { wk: 'Wk 4', title: 'Impact Modeling', bullets: ['ARR-at-risk report', 'Executive summary'] },
+              ].map((w, i) => (
                 <div key={i} className="flex flex-col items-center">
-                  {/* Node dot */}
-                  <div className="relative z-10 w-7 h-7 rounded-full bg-[#0E1623] border-2 border-[#5CF2C2]/30 flex items-center justify-center mb-2">
-                    <span className="text-[9px] font-bold text-[#5CF2C2]/80">{w.week}</span>
+                  <div className="relative z-10 w-7 h-7 rounded-full bg-[#0E1623] border-[1.5px] border-[#5CF2C2]/25 flex items-center justify-center mb-2.5">
+                    <span className="text-[8px] font-bold text-[#5CF2C2]/70">{w.wk}</span>
                   </div>
-                  {/* Card */}
-                  <div className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5">
-                    <div className="text-[11px] font-semibold text-white mb-1.5">{w.title}</div>
-                    <ul className="space-y-0.5">
+                  <div className="w-full px-1">
+                    <div className="text-[12px] font-semibold text-white mb-1.5 text-center">{w.title}</div>
+                    <ul className="space-y-1">
                       {w.bullets.map((b, j) => (
-                        <li key={j} className="text-[9px] text-[#8891A0] leading-snug flex gap-1 items-start">
-                          <span className="text-[#5CF2C2]/40 mt-px shrink-0">›</span>{b}
+                        <li key={j} className="text-[10px] text-[#8891A0] flex gap-1.5 items-start">
+                          <span className="text-[#5CF2C2]/30 mt-px shrink-0">›</span>{b}
                         </li>
                       ))}
                     </ul>
@@ -227,61 +168,33 @@ export function LeaveBehind() {
           </div>
         </section>
 
-        {/* ─── 4. Bottom: Pilot Outputs + ARR Impact ─── */}
-        <div className="grid grid-cols-2 gap-3 mb-4 print:mb-3">
-          {/* Pilot Outputs */}
-          <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] px-4 py-3">
-            <div className="text-[9px] font-bold text-[#5CF2C2]/50 uppercase tracking-wider mb-2">Pilot Outputs</div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              {['Risk tiers per account', 'Prioritized save list', 'ARR-at-risk quantification', 'Executive summary PDF'].map((item, i) => (
-                <div key={i} className="flex items-center gap-1.5">
-                  <span className="text-[#5CF2C2]/60 shrink-0"><IconCheck /></span>
-                  <span className="text-[10px] text-[#B0B8C5]">{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ARR Impact */}
-          <div className="rounded-xl border border-[#4DA3FF]/15 bg-gradient-to-br from-[#4DA3FF]/[0.04] to-[#5CF2C2]/[0.02] px-4 py-3">
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="text-[9px] font-bold text-[#4DA3FF]/70 uppercase tracking-wider">ARR Impact</span>
-              <span className="px-1.5 py-px rounded text-[7px] font-semibold uppercase tracking-wider bg-white/[0.04] text-[#6B7280] border border-white/[0.06]">Pilot Output</span>
-            </div>
-            <div className="space-y-1.5">
-              {([
-                { label: 'ARR at Risk', value: '$___', color: 'text-[#5CF2C2]/50' },
-                { label: 'Modeled Save Lift', value: '__%', color: 'text-[#5CF2C2]/50' },
-                { label: 'EBITDA Sensitivity', value: '__x', color: 'text-[#4DA3FF]/50' },
-              ]).map((row) => (
-                <div key={row.label} className="flex items-center justify-between">
-                  <span className="text-[10px] text-[#8891A0]">{row.label}</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-12 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                      <div className="w-3/4 h-full rounded-full bg-gradient-to-r from-[#5CF2C2]/20 to-[#4DA3FF]/20" />
-                    </div>
-                    <span className={`text-[11px] font-mono font-semibold ${row.color} bg-white/[0.03] px-2 py-0.5 rounded`}>{row.value}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ─── CTA ─── */}
-        <div className="rounded-xl bg-gradient-to-r from-[#5CF2C2]/[0.06] to-[#4DA3FF]/[0.04] border border-[#5CF2C2]/10 px-5 py-3 flex items-center justify-between mb-4 print:mb-3">
+        {/* Bottom — Outputs + Outcome */}
+        <div className="grid grid-cols-2 gap-5 mb-6 print:mb-4">
           <div>
-            <div className="text-[12px] font-semibold text-white">Next step</div>
-            <div className="text-[10px] text-[#9CA3AF] mt-0.5">15-min working session to confirm data sources and deliver a pilot plan.</div>
+            <div className="text-[10px] font-bold text-[#5CF2C2]/40 uppercase tracking-wider mb-3">Pilot Outputs</div>
+            <div className="space-y-2">
+              {['Risk tiers per account', 'Prioritized save list', 'ARR-at-risk quantification', 'Executive summary PDF'].map((item) => (
+                <div key={item} className="flex items-center gap-2.5">
+                  <span className="text-[#5CF2C2]/50"><IconCheck /></span>
+                  <span className="text-[12px] text-[#B0B8C5]">{item}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[#5CF2C2]/70 shrink-0">
-            <IconArrowRight />
+          <div className="flex flex-col justify-center">
+            <p className="text-[17px] font-semibold text-white leading-snug mb-3">
+              Lower churn. Higher NRR.<br />Clear ARR visibility.
+            </p>
+            <div className="flex items-center gap-2 text-[#9CA3AF]">
+              <span className="text-[#5CF2C2]/50"><IconArrowRight /></span>
+              <span className="text-[11px]">Next step: 15-min working session to confirm data sources and deliver pilot plan.</span>
+            </div>
           </div>
         </div>
 
-        {/* ─── Footer ─── */}
-        <footer className="pt-2.5 border-t border-white/[0.05] flex items-center justify-between">
-          <span className="text-[8px] text-[#4B5563] tracking-wide">Confidential &nbsp;&middot;&nbsp; For internal evaluation</span>
+        {/* Footer */}
+        <footer className="pt-3 border-t border-white/[0.04] flex items-center justify-between">
+          <span className="text-[8px] text-[#4B5563] tracking-wide">Confidential &middot; For internal evaluation</span>
           <span className="text-[8px] text-[#4B5563]">pickpulse.co</span>
         </footer>
       </div>
@@ -289,13 +202,11 @@ export function LeaveBehind() {
   );
 }
 
-/* ─── Shared ─── */
-
-function SectionLabel({ number, title }: { number: string; title: string }) {
+function Label({ n, t }: { n: string; t: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[9px] font-bold text-[#5CF2C2]/35 font-mono">{number}</span>
-      <span className="text-[12px] font-semibold text-white tracking-tight">{title}</span>
+      <span className="text-[10px] font-bold text-[#5CF2C2]/30 font-mono">{n}</span>
+      <span className="text-[13px] font-semibold text-white tracking-tight">{t}</span>
     </div>
   );
 }
