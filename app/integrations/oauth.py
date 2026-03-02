@@ -9,7 +9,7 @@ import os
 import secrets
 import time
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import requests
 
@@ -139,7 +139,7 @@ def generate_auth_url(
         "response_type": "code",
     }
 
-    auth_url = f"{cfg['authorize_url']}?{urlencode(params)}"
+    auth_url = f"{cfg['authorize_url']}?{urlencode(params, quote_via=quote)}"
     return auth_url, state
 
 
