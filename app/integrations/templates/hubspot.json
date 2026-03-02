@@ -6,7 +6,6 @@
   "icon": "hubspot",
   "description": "Sync companies, contacts, and deals from HubSpot",
   "oauth_scopes": [
-    "oauth",
     "crm.objects.appointments.read",
     "crm.objects.companies.read",
     "crm.objects.deals.read",

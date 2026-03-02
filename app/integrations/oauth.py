@@ -21,7 +21,7 @@ _OAUTH_PROVIDERS: Dict[str, Dict[str, Any]] = {
     "hubspot": {
         "authorize_url": "https://app.hubspot.com/oauth/authorize",
         "token_url": "https://api.hubapi.com/oauth/v1/token",
-        "scopes": "oauth crm.objects.appointments.read crm.objects.companies.read crm.objects.deals.read crm.objects.owners.read crm.schemas.companies.read",
+        "scopes": "crm.objects.appointments.read crm.objects.companies.read crm.objects.deals.read crm.objects.owners.read crm.schemas.companies.read",
         "client_id_env": "HUBSPOT_CLIENT_ID",
         "client_secret_env": "HUBSPOT_CLIENT_SECRET",
     },
