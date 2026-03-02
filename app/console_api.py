@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import traceback
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("pickpulse.api")
 from pydantic import BaseModel as PydanticBaseModel
 
 
@@ -821,6 +824,10 @@ def start_oauth_flow(
     _require_service()
     try:
         result = integration_service.start_oauth(TENANT_ID, provider, redirect_uri)
+        auth_url = result.get("auth_url", "")
+        logger.info("[oauth/start] provider=%s redirect_uri=%s", provider, redirect_uri)
+        logger.info("[oauth/start] auth_url=%s", auth_url)
+        logger.info("[oauth/start] state present in URL: %s", "&state=" in auth_url or "?state=" in auth_url)
         return result
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -832,25 +839,37 @@ def oauth_callback(
     code: str = Query(...),
     state: str = Query(...),
 ):
-    """OAuth callback — exchanges code for tokens, stores encrypted."""
+    """OAuth callback — exchanges code for tokens, redirects to frontend."""
+    from fastapi.responses import RedirectResponse
     _require_service()
+
+    logger.info("[oauth/callback] provider=%s code=%s... state=%s...", provider, code[:8], state[:20])
+
     try:
-        # Derive redirect_uri from the state payload
         from app.integrations.oauth import validate_state
         payload = validate_state(state)
-        redirect_uri = payload.get("redirect", "")
+        logger.info("[oauth/callback] state payload: tenant=%s provider=%s", payload.get("tenant_id"), payload.get("provider"))
+
+        # redirect_uri for token exchange must match what we sent to the provider
+        api_base = os.environ.get("API_BASE_URL", "").rstrip("/")
+        callback_url = f"{api_base}/api/integrations/{provider}/oauth/callback"
 
         integration = integration_service.complete_oauth(
-            provider, code, state, redirect_uri
+            provider, code, state, callback_url
         )
-        return {
-            "status": "connected",
-            "provider": provider,
-            "integration_id": integration["id"],
-        }
+
+        # Redirect browser to the frontend URL stored in state
+        frontend_redirect = payload.get("redirect", "/")
+        separator = "&" if "?" in frontend_redirect else "?"
+        return RedirectResponse(
+            url=f"{frontend_redirect}{separator}oauth=success&provider={provider}",
+            status_code=302,
+        )
     except ValueError as exc:
+        logger.error("[oauth/callback] ValueError: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
+        logger.error("[oauth/callback] Error: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

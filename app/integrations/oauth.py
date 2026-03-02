@@ -76,7 +76,7 @@ def generate_state(tenant_id: str, provider: str, redirect_uri: str) -> str:
     }
     payload_b64 = base64.urlsafe_b64encode(
         json.dumps(payload, separators=(",", ":")).encode()
-    ).decode()
+    ).decode().rstrip("=")  # strip padding — reconstructed on decode
 
     sig = hmac.new(_get_state_secret(), payload_b64.encode(), hashlib.sha256).hexdigest()
     return f"{payload_b64}.{sig}"
@@ -100,7 +100,9 @@ def validate_state(state_token: str, max_age_seconds: int = 600) -> Dict[str, An
         raise ValueError("Invalid state signature")
 
     try:
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        # Re-add base64 padding stripped during generation
+        padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded))
     except (json.JSONDecodeError, Exception) as exc:
         raise ValueError(f"Failed to decode state payload: {exc}")
 
@@ -122,6 +124,10 @@ def generate_auth_url(
 ) -> Tuple[str, str]:
     """Build the OAuth authorization URL for a provider.
 
+    redirect_uri is the *frontend* URL the user should land on after OAuth.
+    It is stored inside the signed state token. The actual OAuth callback URL
+    sent to the provider points to our backend callback endpoint.
+
     Returns (auth_url, state_token).
     """
     cfg = _get_provider_config(provider)
@@ -129,11 +135,19 @@ def generate_auth_url(
     if not client_id:
         raise RuntimeError(f"{cfg['client_id_env']} env var is required for {provider} OAuth")
 
+    # The backend callback URL that HubSpot redirects to (with ?code=&state=)
+    api_base = os.environ.get("API_BASE_URL", "").rstrip("/")
+    if not api_base:
+        raise RuntimeError("API_BASE_URL env var is required for OAuth flows")
+    callback_url = f"{api_base}/api/integrations/{provider}/oauth/callback"
+
+    # Store the frontend redirect_uri inside the state so the callback can
+    # redirect the user there after processing.
     state = generate_state(tenant_id, provider, redirect_uri)
 
     params = {
         "client_id": client_id,
-        "redirect_uri": redirect_uri,
+        "redirect_uri": callback_url,
         "scope": cfg["scopes"],
         "state": state,
         "response_type": "code",
