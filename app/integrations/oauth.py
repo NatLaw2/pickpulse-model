@@ -150,9 +150,12 @@ def generate_auth_url(
         "redirect_uri": callback_url,
         "scope": cfg["scopes"],
         "state": state,
-        "response_type": "code",
     }
 
+    # Build query string: use quote (not quote_plus) so spaces in scope
+    # are encoded as %20 (required by HubSpot), not +.
+    # Note: HubSpot does NOT accept response_type — it always uses
+    # authorization code flow implicitly.
     auth_url = f"{cfg['authorize_url']}?{urlencode(params, quote_via=quote)}"
     return auth_url, state
 

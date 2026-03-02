@@ -1177,6 +1177,38 @@ def _verify_cron_key(key: str) -> None:
         raise HTTPException(status_code=401, detail="Invalid cron API key.")
 
 
+@app.get("/api/debug/oauth-config")
+def debug_oauth_config(key: str = Query(...)):
+    """Temporary debug: show OAuth config (guarded by CRON_API_KEY)."""
+    _verify_cron_key(key)
+    api_base = os.environ.get("API_BASE_URL", "(not set)")
+    client_id = os.environ.get("HUBSPOT_CLIENT_ID", "(not set)")
+    callback_url = f"{api_base.rstrip('/')}/api/integrations/hubspot/oauth/callback"
+    has_secret = bool(os.environ.get("OAUTH_STATE_SECRET"))
+    has_client_secret = bool(os.environ.get("HUBSPOT_CLIENT_SECRET"))
+    # Generate a test auth URL if possible
+    test_url = ""
+    try:
+        _require_service()
+        result = integration_service.start_oauth(
+            TENANT_ID, "hubspot", "https://pickpulse-console.netlify.app/integrations"
+        )
+        test_url = result.get("auth_url", "")
+    except Exception as exc:
+        test_url = f"ERROR: {exc}"
+    return {
+        "api_base_url": api_base,
+        "hubspot_client_id": client_id[:8] + "..." if len(client_id) > 8 else client_id,
+        "hubspot_callback_url": callback_url,
+        "oauth_state_secret_set": has_secret,
+        "hubspot_client_secret_set": has_client_secret,
+        "test_auth_url_first_300": test_url[:300],
+        "test_auth_url_contains_scope": "scope=" in test_url,
+        "test_auth_url_contains_state": "state=" in test_url,
+        "test_auth_url_contains_response_type": "response_type=" in test_url,
+    }
+
+
 @app.post("/api/cron/sync-all")
 def cron_sync_all(x_cron_key: str = Query(..., alias="key")):
     """Scheduled endpoint: sync all enabled connectors. Requires CRON_API_KEY."""
