@@ -1,0 +1,36 @@
+{
+  "provider": "hubspot",
+  "display_name": "HubSpot CRM",
+  "category": "CRM",
+  "auth_method": "oauth",
+  "icon": "hubspot",
+  "description": "Sync companies, contacts, and deals from HubSpot",
+  "oauth_scopes": [
+    "crm.objects.companies.read",
+    "crm.objects.contacts.read",
+    "crm.objects.deals.read"
+  ],
+  "oauth_authorize_url": "https://app.hubspot.com/oauth/authorize",
+  "oauth_token_url": "https://api.hubapi.com/oauth/v1/token",
+  "default_field_map": {
+    "properties.name": {"target": "name", "transform": "direct"},
+    "properties.domain": {"target": "domain", "transform": "direct"},
+    "properties.annualrevenue": {"target": "arr", "transform": "to_float"},
+    "properties.industry": {"target": "industry", "transform": "direct"},
+    "properties.numberofemployees": {"target": "company_size", "transform": "employee_bucket"},
+    "properties.createdate": {"target": "created_at", "transform": "date_parse"}
+  },
+  "supported_resources": ["companies", "contacts", "deals"],
+  "sample_payload": {
+    "id": "12345",
+    "properties": {
+      "name": "Acme Corp",
+      "domain": "acme.com",
+      "annualrevenue": "120000",
+      "industry": "COMPUTER_SOFTWARE",
+      "numberofemployees": "50",
+      "createdate": "2024-01-15T00:00:00.000Z"
+    }
+  },
+  "status": "available"
+}

@@ -78,19 +78,66 @@ export const api = {
     request<{ step_id: string; status: string }>(`/onboarding/${id}/reset`, { method: 'POST' }),
   downloadTemplate: () => `${BASE}/onboarding/template/${MOD}`,
 
-  // Integrations
+  // -----------------------------------------------------------------------
+  // Integrations (new platform)
+  // -----------------------------------------------------------------------
   integrations: () => request<IntegrationsListResponse>('/integrations'),
+
+  integrationMetadata: (provider: string) =>
+    request<ProviderTemplate>(`/integrations/${provider}/metadata`),
+
+  connectIntegration: (provider: string, apiKey: string) =>
+    request<ConnectResponse>(
+      `/integrations/${provider}/connect?api_key=${encodeURIComponent(apiKey)}`,
+      { method: 'POST' },
+    ),
+
+  // Legacy alias
   configureIntegration: (name: string, apiKey: string) =>
-    request<{ status: string; connector: string }>(
+    request<ConnectResponse>(
       `/integrations/${name}/configure?api_key=${encodeURIComponent(apiKey)}`,
       { method: 'POST' },
     ),
+
+  startOAuth: (provider: string, redirectUri: string) =>
+    request<OAuthStartResponse>(
+      `/integrations/${provider}/oauth/start?redirect_uri=${encodeURIComponent(redirectUri)}`,
+    ),
+
+  disconnectIntegration: (provider: string) =>
+    request<{ status: string; provider: string }>(
+      `/integrations/${provider}/disconnect`, { method: 'POST' }
+    ),
+
   integrationStatus: (name: string) => request<IntegrationStatusResponse>(`/integrations/${name}/status`),
+
   syncIntegration: (name: string) => request<SyncResponse>(`/integrations/${name}/sync`, { method: 'POST' }),
+
+  syncStatus: (provider: string) => request<SyncStatusResponse>(`/integrations/${provider}/sync/status`),
+
+  getFieldMappings: (provider: string) =>
+    request<FieldMappingsResponse>(`/integrations/${provider}/mappings`),
+
+  updateFieldMappings: (provider: string, mappings: FieldMapping[]) =>
+    request<{ provider: string; updated: number }>(
+      `/integrations/${provider}/mappings`,
+      { method: 'PUT', body: JSON.stringify(mappings) },
+    ),
+
+  previewIntegration: (provider: string) =>
+    request<PreviewResponse>(`/integrations/${provider}/preview`, { method: 'POST' }),
+
+  integrationHealth: (provider: string) =>
+    request<HealthResponse>(`/integrations/${provider}/health`),
+
+  integrationEvents: (provider: string, limit = 50) =>
+    request<EventsResponse>(`/integrations/${provider}/events?limit=${limit}`),
+
   integrationAccounts: (source?: string, limit = 200) =>
     request<IntegrationAccountsResponse>(
       `/integrations/accounts?limit=${limit}${source ? `&source=${source}` : ''}`,
     ),
+
   triggerScoring: () => request<ScoringResponse>('/integrations/score', { method: 'POST' }),
   latestScores: (limit = 200) => request<LatestScoresResponse>(`/integrations/scores/latest?limit=${limit}`),
 
@@ -99,7 +146,10 @@ export const api = {
     request<RunDemoResponse>(`/integrations/${connectorName}/run-demo`, { method: 'POST' }),
 };
 
+// -----------------------------------------------------------------------
 // Types
+// -----------------------------------------------------------------------
+
 export interface DashboardResponse {
   module: DashboardModule;
   dataset: DatasetInfo | null;
@@ -301,8 +351,112 @@ export interface OnboardingStep {
   status: 'pending' | 'complete';
 }
 
-// Integration types
+// -----------------------------------------------------------------------
+// Integration types (new platform)
+// -----------------------------------------------------------------------
 
+export interface ProviderInfo {
+  provider: string;
+  display_name: string;
+  category: string;
+  auth_method: 'api_key' | 'oauth' | 'none';
+  icon: string;
+  description: string;
+  status: string;
+  enabled: boolean;
+  connected_at: string | null;
+  template_status: 'available' | 'coming_soon';
+  integration_id: string | null;
+  account_count: number;
+}
+
+export interface IntegrationsListResponse {
+  providers?: ProviderInfo[];
+  // Legacy fallback
+  connectors?: ConnectorInfo[];
+}
+
+export interface ProviderTemplate {
+  provider: string;
+  display_name: string;
+  category: string;
+  auth_method: string;
+  icon: string;
+  description: string;
+  default_field_map: Record<string, { target: string; transform: string }>;
+  supported_resources: string[];
+  sample_payload: any;
+  status: string;
+  oauth_scopes?: string[];
+  requires_config?: Record<string, { label: string; placeholder: string; default?: string }>;
+}
+
+export interface ConnectResponse {
+  status: string;
+  connector: string;
+  integration_id?: string;
+}
+
+export interface OAuthStartResponse {
+  auth_url: string;
+  state: string;
+}
+
+export interface SyncStatusResponse {
+  provider: string;
+  status: string;
+  sync_states: SyncState[];
+}
+
+export interface SyncState {
+  resource_type: string;
+  status: string;
+  last_synced_at: string | null;
+  records_synced: number;
+  error_message: string | null;
+}
+
+export interface FieldMapping {
+  source_field: string;
+  target_field: string;
+  transform: string;
+  is_default?: boolean;
+}
+
+export interface FieldMappingsResponse {
+  provider: string;
+  mappings: FieldMapping[];
+}
+
+export interface PreviewResponse {
+  provider: string;
+  preview: any[];
+  total_available: number;
+}
+
+export interface HealthResponse {
+  provider: string;
+  status: string;
+  connected: boolean;
+  enabled: boolean;
+  account_count: number;
+  connected_at: string | null;
+  sync_states: SyncState[];
+}
+
+export interface IntegrationEvent {
+  id: string;
+  event_type: string;
+  details: any;
+  created_at: string;
+}
+
+export interface EventsResponse {
+  provider: string;
+  events: IntegrationEvent[];
+}
+
+// Legacy types (kept for backward compat)
 export interface ConnectorInfo {
   name: string;
   display_name: string;
@@ -311,10 +465,6 @@ export interface ConnectorInfo {
   last_synced_at: string | null;
   account_count: number;
   error_message: string | null;
-}
-
-export interface IntegrationsListResponse {
-  connectors: ConnectorInfo[];
 }
 
 export interface IntegrationStatusResponse {
@@ -383,6 +533,11 @@ export interface LatestScoresResponse {
 export interface RunDemoResponse {
   status: string;
   connector: string;
-  sync: SyncResponse;
-  scoring: ScoringResponse;
+  synced_accounts: number;
+  synced_signals: number;
+  scored_accounts: number;
+  tier_counts: Record<string, number>;
+  total_arr_at_risk: number;
+  sync_errors: string[];
+  score_error: string | null;
 }

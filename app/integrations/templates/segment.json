@@ -1,0 +1,30 @@
+{
+  "provider": "segment",
+  "display_name": "Segment",
+  "category": "Analytics",
+  "auth_method": "api_key",
+  "icon": "segment",
+  "description": "Sync user traits and event data from Segment",
+  "api_key_prefix": "",
+  "default_field_map": {
+    "traits.company.name": {"target": "name", "transform": "direct"},
+    "traits.company.website": {"target": "domain", "transform": "direct"},
+    "traits.company.plan": {"target": "plan", "transform": "direct"},
+    "traits.company.monthly_spend": {"target": "arr", "transform": "monthly_to_annual"},
+    "traits.company.industry": {"target": "industry", "transform": "direct"}
+  },
+  "supported_resources": ["users", "groups", "events"],
+  "sample_payload": {
+    "userId": "user_123",
+    "traits": {
+      "company": {
+        "name": "Acme Corp",
+        "website": "acme.com",
+        "plan": "Enterprise",
+        "monthly_spend": 5000,
+        "industry": "Technology"
+      }
+    }
+  },
+  "status": "coming_soon"
+}

@@ -25,13 +25,17 @@ class HubSpotConnector(BaseConnector):
     def display_name(self) -> str:
         return "HubSpot CRM"
 
+    @property
+    def auth_method(self) -> str:
+        return "oauth"
+
     # ------------------------------------------------------------------
     # Auth helpers
     # ------------------------------------------------------------------
 
     def _headers(self) -> Dict[str, str]:
         return {
-            "Authorization": f"Bearer {self.config.api_key}",
+            "Authorization": f"Bearer {self._get_token()}",
             "Content-Type": "application/json",
         }
 

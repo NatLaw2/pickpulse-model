@@ -1,0 +1,30 @@
+{
+  "provider": "stripe",
+  "display_name": "Stripe Billing",
+  "category": "Billing",
+  "auth_method": "api_key",
+  "icon": "stripe",
+  "description": "Sync customers, subscriptions, and invoices from Stripe",
+  "api_key_prefix": "sk_",
+  "default_field_map": {
+    "name": {"target": "name", "transform": "direct"},
+    "email": {"target": "domain", "transform": "direct"},
+    "subscriptions.data[0].items.data[0].price.nickname": {"target": "plan", "transform": "direct"},
+    "created": {"target": "created_at", "transform": "unix_timestamp"},
+    "_computed.arr": {"target": "arr", "transform": "direct"}
+  },
+  "supported_resources": ["customers", "subscriptions", "invoices"],
+  "sample_payload": {
+    "id": "cus_ABC123",
+    "name": "Acme Corp",
+    "email": "billing@acme.com",
+    "created": 1705286400,
+    "subscriptions": {
+      "data": [{
+        "status": "active",
+        "items": {"data": [{"price": {"unit_amount": 10000, "nickname": "Pro"}}]}
+      }]
+    }
+  },
+  "status": "available"
+}

@@ -1,0 +1,26 @@
+{
+  "provider": "mixpanel",
+  "display_name": "Mixpanel",
+  "category": "Analytics",
+  "auth_method": "api_key",
+  "icon": "mixpanel",
+  "description": "Sync user profiles and engagement data from Mixpanel",
+  "api_key_prefix": "",
+  "default_field_map": {
+    "$name": {"target": "name", "transform": "direct"},
+    "$email": {"target": "domain", "transform": "direct"},
+    "plan": {"target": "plan", "transform": "direct"},
+    "company": {"target": "name", "transform": "direct"},
+    "monthly_logins": {"target": "monthly_logins", "transform": "to_int"}
+  },
+  "supported_resources": ["profiles", "events"],
+  "sample_payload": {
+    "$distinct_id": "user_123",
+    "$name": "Jane Smith",
+    "$email": "jane@acme.com",
+    "plan": "Business",
+    "company": "Acme Corp",
+    "monthly_logins": 30
+  },
+  "status": "coming_soon"
+}

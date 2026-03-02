@@ -1,0 +1,29 @@
+{
+  "provider": "chargebee",
+  "display_name": "Chargebee",
+  "category": "Billing",
+  "auth_method": "api_key",
+  "icon": "chargebee",
+  "description": "Sync subscriptions, customers, and invoices from Chargebee",
+  "api_key_prefix": "",
+  "default_field_map": {
+    "customer.first_name": {"target": "name", "transform": "direct"},
+    "customer.email": {"target": "domain", "transform": "direct"},
+    "subscription.plan_amount": {"target": "arr", "transform": "cents_to_annual"},
+    "customer.created_at": {"target": "created_at", "transform": "unix_timestamp"}
+  },
+  "supported_resources": ["customers", "subscriptions", "invoices"],
+  "sample_payload": {
+    "customer": {
+      "id": "cb_ABC123",
+      "first_name": "Acme Corp",
+      "email": "billing@acme.com",
+      "created_at": 1705286400
+    },
+    "subscription": {
+      "plan_amount": 10000,
+      "plan_id": "pro-monthly"
+    }
+  },
+  "status": "coming_soon"
+}

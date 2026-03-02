@@ -1,0 +1,29 @@
+{
+  "provider": "salesforce",
+  "display_name": "Salesforce CRM",
+  "category": "CRM",
+  "auth_method": "oauth",
+  "icon": "salesforce",
+  "description": "Sync accounts, opportunities, and contacts from Salesforce",
+  "oauth_scopes": ["api", "refresh_token"],
+  "oauth_authorize_url": "https://login.salesforce.com/services/oauth2/authorize",
+  "oauth_token_url": "https://login.salesforce.com/services/oauth2/token",
+  "default_field_map": {
+    "Name": {"target": "name", "transform": "direct"},
+    "Website": {"target": "domain", "transform": "direct"},
+    "AnnualRevenue": {"target": "arr", "transform": "to_float"},
+    "Industry": {"target": "industry", "transform": "direct"},
+    "NumberOfEmployees": {"target": "company_size", "transform": "employee_bucket"},
+    "CreatedDate": {"target": "created_at", "transform": "date_parse"}
+  },
+  "supported_resources": ["accounts", "opportunities", "contacts"],
+  "sample_payload": {
+    "Id": "001ABC123",
+    "Name": "Acme Corp",
+    "Website": "acme.com",
+    "AnnualRevenue": 120000,
+    "Industry": "Technology",
+    "NumberOfEmployees": 50
+  },
+  "status": "coming_soon"
+}

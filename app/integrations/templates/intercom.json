@@ -1,0 +1,28 @@
+{
+  "provider": "intercom",
+  "display_name": "Intercom",
+  "category": "Support",
+  "auth_method": "oauth",
+  "icon": "intercom",
+  "description": "Sync companies, conversations, and engagement data from Intercom",
+  "oauth_scopes": [],
+  "oauth_authorize_url": "https://app.intercom.com/oauth",
+  "oauth_token_url": "https://api.intercom.io/auth/eagle/token",
+  "default_field_map": {
+    "name": {"target": "name", "transform": "direct"},
+    "website": {"target": "domain", "transform": "direct"},
+    "monthly_spend": {"target": "arr", "transform": "monthly_to_annual"},
+    "industry": {"target": "industry", "transform": "direct"},
+    "size": {"target": "company_size", "transform": "employee_bucket"}
+  },
+  "supported_resources": ["companies", "contacts", "conversations"],
+  "sample_payload": {
+    "id": "5f1234",
+    "name": "Acme Corp",
+    "website": "acme.com",
+    "monthly_spend": 1000,
+    "industry": "Technology",
+    "size": 50
+  },
+  "status": "coming_soon"
+}

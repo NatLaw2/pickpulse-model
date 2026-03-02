@@ -1,153 +1,133 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import type { ConnectorInfo, IntegrationScore, RunDemoResponse } from '../lib/api';
+import type { ProviderInfo, IntegrationScore, RunDemoResponse } from '../lib/api';
 import { formatCurrency } from '../lib/format';
+import { IntegrationWizard } from '../components/IntegrationWizard';
 import {
   Plug, RefreshCw, Play, Key, CheckCircle2, XCircle,
-  AlertTriangle, Loader2, Users, Zap, ArrowRight,
+  AlertTriangle, Loader2, Users, Zap, ArrowRight, ExternalLink,
+  Unplug, Clock, Shield,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
-// Connector card
+// Provider card (new platform)
 // ---------------------------------------------------------------------------
 
-function ConnectorCard({
-  connector,
-  onConfigure,
+const CATEGORY_COLORS: Record<string, string> = {
+  CRM: 'bg-blue-500/10 text-blue-400',
+  Billing: 'bg-green-500/10 text-green-400',
+  Support: 'bg-orange-500/10 text-orange-400',
+  Analytics: 'bg-purple-500/10 text-purple-400',
+  Import: 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]',
+};
+
+function ProviderCard({
+  provider,
+  onSetup,
   onSync,
   onRunDemo,
+  onDisconnect,
   demoRunning,
 }: {
-  connector: ConnectorInfo;
-  onConfigure: (name: string) => void;
+  provider: ProviderInfo;
+  onSetup: (p: ProviderInfo) => void;
   onSync: (name: string) => void;
   onRunDemo: (name: string) => void;
+  onDisconnect: (name: string) => void;
   demoRunning: boolean;
 }) {
+  const isComingSoon = provider.template_status === 'coming_soon';
+  const isConnected = provider.enabled && provider.status !== 'not_configured';
+
   const statusColor: Record<string, string> = {
     not_configured: 'text-[var(--color-text-muted)]',
-    configured: 'text-[var(--color-accent)]',
+    pending: 'text-[var(--color-warning)]',
+    connected: 'text-[var(--color-accent)]',
     syncing: 'text-[var(--color-warning)]',
     healthy: 'text-green-400',
     error: 'text-red-400',
+    disconnected: 'text-[var(--color-text-muted)]',
   };
 
-  const StatusIcon = connector.status === 'healthy'
-    ? CheckCircle2
-    : connector.status === 'error'
-      ? XCircle
-      : connector.status === 'not_configured'
-        ? Key
-        : Plug;
+  const StatusIcon = isConnected
+    ? provider.status === 'healthy' ? CheckCircle2
+      : provider.status === 'error' ? XCircle
+      : provider.status === 'syncing' ? Loader2
+      : Plug
+    : Key;
 
   return (
-    <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-accent)]/30 transition-all">
-      <div className="flex items-center justify-between mb-3">
+    <div className={`
+      bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5
+      ${isComingSoon ? 'opacity-50' : 'hover:border-[var(--color-accent)]/30'} transition-all
+    `}>
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Plug size={16} className="text-[var(--color-accent)]" />
           <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            {connector.display_name}
+            {provider.display_name}
           </h3>
         </div>
-        <div className="flex items-center gap-1.5">
-          <StatusIcon size={14} className={statusColor[connector.status] || 'text-gray-400'} />
-          <span className={`text-xs capitalize ${statusColor[connector.status]}`}>
-            {connector.status.replace('_', ' ')}
-          </span>
-        </div>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[provider.category] || 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]'}`}>
+          {provider.category}
+        </span>
       </div>
 
-      {connector.enabled && (
-        <div className="text-xs text-[var(--color-text-muted)] mb-3">
-          {connector.account_count} accounts synced
+      <p className="text-[11px] text-[var(--color-text-muted)] mb-3 line-clamp-2">
+        {provider.description}
+      </p>
+
+      {isConnected && (
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-1">
+            <StatusIcon size={12} className={statusColor[provider.status] || 'text-gray-400'} />
+            <span className={`text-[10px] capitalize ${statusColor[provider.status]}`}>
+              {provider.status.replace('_', ' ')}
+            </span>
+          </div>
+          <span className="text-[10px] text-[var(--color-text-muted)]">
+            {provider.account_count} accounts
+          </span>
         </div>
       )}
 
-      {connector.error_message && (
-        <div className="flex items-start gap-1.5 mb-3 text-xs text-red-400">
-          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-          <span>{connector.error_message}</span>
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        {!connector.enabled ? (
+      <div className="flex gap-2 flex-wrap">
+        {isComingSoon ? (
+          <span className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium rounded-lg bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]">
+            <Clock size={10} /> Coming Soon
+          </span>
+        ) : !isConnected ? (
           <button
-            onClick={() => onConfigure(connector.name)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+            onClick={() => onSetup(provider)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90"
           >
             <Key size={12} /> Connect
           </button>
         ) : (
-          <button
-            onClick={() => onSync(connector.name)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors border border-[var(--color-border)]"
-          >
-            <RefreshCw size={12} /> Sync Now
-          </button>
-          <button
-            onClick={() => onRunDemo(connector.name)}
-            disabled={demoRunning}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
-          >
-            {demoRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            Run Demo Sync + Score
-          </button>
+          <>
+            <button
+              onClick={() => onSync(provider.provider)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)]"
+            >
+              <RefreshCw size={12} /> Sync
+            </button>
+            <button
+              onClick={() => onRunDemo(provider.provider)}
+              disabled={demoRunning}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40"
+            >
+              {demoRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+              Sync + Score
+            </button>
+            <button
+              onClick={() => onDisconnect(provider.provider)}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg text-[var(--color-text-muted)] hover:text-red-400"
+              title="Disconnect"
+            >
+              <Unplug size={12} />
+            </button>
+          </>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Configure modal (simple)
-// ---------------------------------------------------------------------------
-
-function ConfigureModal({
-  connectorName,
-  onClose,
-  onSave,
-}: {
-  connectorName: string;
-  onClose: () => void;
-  onSave: (key: string) => void;
-}) {
-  const [apiKey, setApiKey] = useState('');
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-6 w-full max-w-md">
-        <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-1">
-          Connect {connectorName}
-        </h2>
-        <p className="text-xs text-[var(--color-text-muted)] mb-4">
-          Enter your API key to connect. We'll test the connection before saving.
-        </p>
-
-        <label className="block text-xs text-[var(--color-text-secondary)] mb-1.5">API Key</label>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="sk-..."
-          className="w-full px-3 py-2 text-sm bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none"
-        />
-
-        <div className="flex justify-end gap-2 mt-5">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave(apiKey)}
-            disabled={!apiKey.trim()}
-            className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
-          >
-            Test & Save
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -210,13 +190,13 @@ function ScoresTable({ scores }: { scores: IntegrationScore[] }) {
 // ---------------------------------------------------------------------------
 
 export function IntegrationsPage() {
-  const [connectors, setConnectors] = useState<ConnectorInfo[]>([]);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [scores, setScores] = useState<IntegrationScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [scoring, setScoring] = useState(false);
   const [runningDemo, setRunningDemo] = useState<string | null>(null);
-  const [configuring, setConfiguring] = useState<string | null>(null);
+  const [wizardProvider, setWizardProvider] = useState<ProviderInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -231,7 +211,28 @@ export function IntegrationsPage() {
         api.integrations(),
         api.latestScores().catch(() => ({ scores: [], count: 0 })),
       ]);
-      setConnectors(intRes.connectors);
+
+      // Handle both new platform and legacy responses
+      if (intRes.providers) {
+        setProviders(intRes.providers);
+      } else if (intRes.connectors) {
+        // Map legacy connectors to ProviderInfo shape
+        setProviders(intRes.connectors.map((c) => ({
+          provider: c.name,
+          display_name: c.display_name,
+          category: '',
+          auth_method: 'api_key' as const,
+          icon: 'plug',
+          description: '',
+          status: c.status,
+          enabled: c.enabled,
+          connected_at: c.last_synced_at,
+          template_status: 'available' as const,
+          integration_id: null,
+          account_count: c.account_count,
+        })));
+      }
+
       setScores(scoresRes.scores);
     } catch (e: any) {
       setError(e.message);
@@ -241,18 +242,6 @@ export function IntegrationsPage() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  const handleConfigure = async (apiKey: string) => {
-    if (!configuring) return;
-    try {
-      await api.configureIntegration(configuring, apiKey);
-      showToast(`${configuring} connected successfully`);
-      setConfiguring(null);
-      loadData();
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
 
   const handleSync = async (name: string) => {
     setSyncing(name);
@@ -285,7 +274,7 @@ export function IntegrationsPage() {
     try {
       const result: RunDemoResponse = await api.runDemo(connectorName);
       showToast(
-        `Demo complete: synced ${result.sync.accounts_synced} accounts, scored ${result.scoring.accounts_scored} — ${formatCurrency(result.scoring.total_arr_at_risk)} ARR at risk`
+        `Synced ${result.synced_accounts} accounts, scored ${result.scored_accounts} — ${formatCurrency(result.total_arr_at_risk)} ARR at risk`
       );
       loadData();
     } catch (e: any) {
@@ -295,8 +284,30 @@ export function IntegrationsPage() {
     }
   };
 
-  const totalAccounts = connectors.reduce((sum, c) => sum + c.account_count, 0);
-  const enabledCount = connectors.filter((c) => c.enabled).length;
+  const handleDisconnect = async (provider: string) => {
+    try {
+      await api.disconnectIntegration(provider);
+      showToast(`${provider} disconnected`);
+      loadData();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const connectedProviders = providers.filter((p) => p.enabled);
+  const totalAccounts = providers.reduce((sum, p) => sum + (p.account_count || 0), 0);
+  const enabledCount = connectedProviders.length;
+
+  // Group by category
+  const categories = ['CRM', 'Billing', 'Support', 'Analytics', 'Import'];
+  const grouped = categories.map((cat) => ({
+    category: cat,
+    providers: providers.filter((p) => p.category === cat),
+  })).filter((g) => g.providers.length > 0);
+
+  // Ungrouped
+  const groupedProviders = new Set(grouped.flatMap((g) => g.providers.map((p) => p.provider)));
+  const ungrouped = providers.filter((p) => !groupedProviders.has(p.provider));
 
   if (loading) {
     return (
@@ -315,12 +326,15 @@ export function IntegrationsPage() {
         </div>
       )}
 
-      {/* Configure modal */}
-      {configuring && (
-        <ConfigureModal
-          connectorName={configuring}
-          onClose={() => setConfiguring(null)}
-          onSave={handleConfigure}
+      {/* Setup wizard */}
+      {wizardProvider && (
+        <IntegrationWizard
+          provider={wizardProvider}
+          onClose={() => setWizardProvider(null)}
+          onComplete={() => {
+            setWizardProvider(null);
+            loadData();
+          }}
         />
       )}
 
@@ -328,7 +342,7 @@ export function IntegrationsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Integrations</h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-1">
-          Connect HubSpot, Stripe, or other systems to score real accounts against your churn model.
+          Connect your CRM, billing, support, and analytics tools to score real accounts against your churn model.
         </p>
       </div>
 
@@ -341,11 +355,11 @@ export function IntegrationsPage() {
       )}
 
       {/* Summary strip */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
-          <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Connectors</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Connected</div>
           <div className="text-xl font-bold text-[var(--color-text-primary)]">
-            {enabledCount}<span className="text-[var(--color-text-muted)] text-sm font-normal">/{connectors.length}</span>
+            {enabledCount}<span className="text-[var(--color-text-muted)] text-sm font-normal">/{providers.length}</span>
           </div>
         </div>
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
@@ -353,29 +367,57 @@ export function IntegrationsPage() {
           <div className="text-xl font-bold text-[var(--color-text-primary)]">{totalAccounts.toLocaleString()}</div>
         </div>
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
-          <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Scored Accounts</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Scored</div>
           <div className="text-xl font-bold text-[var(--color-text-primary)]">{scores.length.toLocaleString()}</div>
+        </div>
+        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
+          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+            <Shield size={10} /> Encryption
+          </div>
+          <div className="text-xs font-medium text-green-400 mt-1">AES-256-GCM</div>
         </div>
       </div>
 
-      {/* Connectors */}
-      <div className="mb-6">
-        <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
-          <Plug size={14} /> Available Connectors
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {connectors.map((c) => (
-            <ConnectorCard
-              key={c.name}
-              connector={c}
-              onConfigure={(name) => setConfiguring(name)}
-              onSync={(name) => syncing ? undefined : handleSync(name)}
-              onRunDemo={(name) => runningDemo ? undefined : handleRunDemo(name)}
-              demoRunning={runningDemo === c.name}
-            />
-          ))}
+      {/* Provider cards by category */}
+      {grouped.map((group) => (
+        <div key={group.category} className="mb-6">
+          <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
+            {group.category}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {group.providers.map((p) => (
+              <ProviderCard
+                key={p.provider}
+                provider={p}
+                onSetup={setWizardProvider}
+                onSync={handleSync}
+                onRunDemo={handleRunDemo}
+                onDisconnect={handleDisconnect}
+                demoRunning={runningDemo === p.provider}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      ))}
+
+      {ungrouped.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">Other</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {ungrouped.map((p) => (
+              <ProviderCard
+                key={p.provider}
+                provider={p}
+                onSetup={setWizardProvider}
+                onSync={handleSync}
+                onRunDemo={handleRunDemo}
+                onDisconnect={handleDisconnect}
+                demoRunning={runningDemo === p.provider}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Pipeline: Sync → Score */}
       {enabledCount > 0 && (
@@ -392,13 +434,9 @@ export function IntegrationsPage() {
             <button
               onClick={handleScore}
               disabled={scoring || totalAccounts === 0}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40"
             >
-              {scoring ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                <Play size={12} />
-              )}
+              {scoring ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
               Score All Accounts
             </button>
             <ArrowRight size={14} className="text-[var(--color-text-muted)]" />

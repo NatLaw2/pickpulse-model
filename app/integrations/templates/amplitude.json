@@ -1,0 +1,29 @@
+{
+  "provider": "amplitude",
+  "display_name": "Amplitude",
+  "category": "Analytics",
+  "auth_method": "api_key",
+  "icon": "amplitude",
+  "description": "Sync product usage and engagement metrics from Amplitude",
+  "api_key_prefix": "",
+  "default_field_map": {
+    "user_properties.company": {"target": "name", "transform": "direct"},
+    "user_properties.plan": {"target": "plan", "transform": "direct"},
+    "event_counts.login": {"target": "monthly_logins", "transform": "to_int"},
+    "user_properties.industry": {"target": "industry", "transform": "direct"}
+  },
+  "supported_resources": ["users", "events", "cohorts"],
+  "sample_payload": {
+    "user_id": "user_123",
+    "user_properties": {
+      "company": "Acme Corp",
+      "plan": "Pro",
+      "industry": "Technology"
+    },
+    "event_counts": {
+      "login": 45,
+      "feature_used": 120
+    }
+  },
+  "status": "coming_soon"
+}

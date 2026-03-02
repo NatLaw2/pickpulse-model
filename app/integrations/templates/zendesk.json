@@ -1,0 +1,26 @@
+{
+  "provider": "zendesk",
+  "display_name": "Zendesk",
+  "category": "Support",
+  "auth_method": "api_key",
+  "icon": "zendesk",
+  "description": "Sync support tickets and customer satisfaction data from Zendesk",
+  "api_key_prefix": "",
+  "default_field_map": {
+    "organization.name": {"target": "name", "transform": "direct"},
+    "organization.domain_names[0]": {"target": "domain", "transform": "direct"},
+    "tickets_count": {"target": "support_tickets", "transform": "to_int"},
+    "satisfaction_score": {"target": "nps_score", "transform": "to_float"}
+  },
+  "supported_resources": ["organizations", "tickets", "satisfaction_ratings"],
+  "sample_payload": {
+    "organization": {
+      "id": 12345,
+      "name": "Acme Corp",
+      "domain_names": ["acme.com"]
+    },
+    "tickets_count": 15,
+    "satisfaction_score": 4.2
+  },
+  "status": "coming_soon"
+}

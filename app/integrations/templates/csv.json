@@ -1,0 +1,32 @@
+{
+  "provider": "csv",
+  "display_name": "CSV Import",
+  "category": "Import",
+  "auth_method": "none",
+  "icon": "file-spreadsheet",
+  "description": "Upload a CSV file with your account data",
+  "default_field_map": {
+    "company_name": {"target": "name", "transform": "direct"},
+    "domain": {"target": "domain", "transform": "direct"},
+    "annual_revenue": {"target": "arr", "transform": "to_float"},
+    "plan": {"target": "plan", "transform": "direct"},
+    "industry": {"target": "industry", "transform": "direct"},
+    "employee_count": {"target": "company_size", "transform": "employee_bucket"},
+    "seats": {"target": "seats", "transform": "to_int"}
+  },
+  "supported_resources": ["accounts"],
+  "validation_rules": {
+    "required_columns": ["company_name"],
+    "max_rows": 50000
+  },
+  "sample_payload": {
+    "company_name": "Acme Corp",
+    "domain": "acme.com",
+    "annual_revenue": 120000,
+    "plan": "Enterprise",
+    "industry": "Technology",
+    "employee_count": 50,
+    "seats": 25
+  },
+  "status": "available"
+}

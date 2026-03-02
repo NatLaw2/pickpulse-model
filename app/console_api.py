@@ -8,6 +8,13 @@ import traceback
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from pydantic import BaseModel as PydanticBaseModel
+
+
+class FieldMappingItem(PydanticBaseModel):
+    source_field: str
+    target_field: str
+    transform: str = "direct"
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
@@ -26,6 +33,10 @@ from .integrations.models import ConnectorConfig, ConnectorStatus
 from .integrations import registry as connector_registry
 from .integrations.sync import sync_connector, sync_all
 from .integrations.scoring import score_accounts
+try:
+    from .integrations import service as integration_service
+except Exception:
+    integration_service = None  # type: ignore[assignment]
 from .storage import repo as storage_repo
 
 app = FastAPI(title="Churn Risk Engine", version="1.0.0")
@@ -711,80 +722,163 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95)):
 
 
 # -----------------------------------------------------------------------
-# Integrations
+# Integrations (new platform endpoints)
 # -----------------------------------------------------------------------
+
+TENANT_ID = integration_service.DEFAULT_TENANT if integration_service else "00000000-0000-0000-0000-000000000000"
+
+
+def _require_service():
+    if integration_service is None:
+        raise HTTPException(503, detail="Integration service unavailable — check server env vars")
+
 
 @app.get("/api/integrations")
 def list_integrations():
-    """List all available connectors and their status."""
-    connectors = connector_registry.list_connectors()
-    # Enrich with account counts from DB
-    for c in connectors:
-        if c.enabled:
-            c.account_count = storage_repo.account_count(source=c.name)
-            cfg = connector_registry.get_config(c.name)
-            if cfg and cfg.extra.get("last_sync_result"):
-                sync_info = cfg.extra["last_sync_result"]
-                c.error_message = "; ".join(sync_info.get("errors", [])) or None
-    return {"connectors": [c.model_dump() for c in connectors]}
+    """List all providers with integration status."""
+    try:
+        if not integration_service:
+            raise RuntimeError("service unavailable")
+        providers = integration_service.list_integrations(TENANT_ID)
+        # Enrich available providers with account counts
+        for p in providers:
+            if p["enabled"]:
+                p["account_count"] = storage_repo.account_count(source=p["provider"])
+            else:
+                p["account_count"] = 0
+        return {"providers": providers}
+    except Exception:
+        # Fallback to legacy if integration tables don't exist yet
+        connectors = connector_registry.list_connectors()
+        for c in connectors:
+            if c.enabled:
+                c.account_count = storage_repo.account_count(source=c.name)
+                cfg = connector_registry.get_config(c.name)
+                if cfg and cfg.extra.get("last_sync_result"):
+                    sync_info = cfg.extra["last_sync_result"]
+                    c.error_message = "; ".join(sync_info.get("errors", [])) or None
+        return {"connectors": [c.model_dump() for c in connectors]}
 
 
-@app.post("/api/integrations/{connector_name}/configure")
-def configure_integration(connector_name: str, api_key: str = Query(...)):
-    """Configure a connector with API credentials."""
+@app.get("/api/integrations/{provider}/metadata")
+def get_provider_metadata(provider: str):
+    """Get provider template with default field mappings."""
+    _require_service()
+    tmpl = integration_service.get_template(provider)
+    if not tmpl:
+        raise HTTPException(status_code=404, detail=f"Unknown provider: {provider}")
+    return tmpl
+
+
+@app.post("/api/integrations/{provider}/connect")
+def connect_integration(provider: str, api_key: str = Query(...)):
+    """Connect a provider using an API key."""
     available = connector_registry.available_connectors()
-    if connector_name not in available:
-        raise HTTPException(status_code=404, detail=f"Unknown connector: {connector_name}")
+    if provider not in available:
+        raise HTTPException(status_code=404, detail=f"Unknown connector: {provider}")
 
+    # Test connection first using a temporary connector
     config = ConnectorConfig(
-        name=connector_name,
-        display_name=available[connector_name].__name__,
+        name=provider,
+        display_name=available[provider].__name__,
         api_key=api_key,
         enabled=True,
     )
-
-    # Test connection before saving
-    cls = available[connector_name]
+    cls = available[provider]
     instance = cls(config)
     if not instance.test_connection():
         raise HTTPException(status_code=400, detail="Connection test failed. Check your API key.")
 
-    connector_registry.configure(connector_name, config)
-    return {"status": "configured", "connector": connector_name}
+    # Persist with encrypted token
+    try:
+        if not integration_service:
+            raise RuntimeError("service unavailable")
+        integration = integration_service.connect_api_key(TENANT_ID, provider, api_key)
+    except Exception as exc:
+        # If integration tables don't exist, fall back to legacy
+        connector_registry.configure(provider, config)
+        return {"status": "configured", "connector": provider}
+
+    # Also configure legacy registry for backward compat
+    connector_registry.configure(provider, config)
+
+    return {"status": "connected", "connector": provider, "integration_id": integration["id"]}
 
 
-@app.get("/api/integrations/{connector_name}/status")
-def integration_status(connector_name: str):
-    """Get detailed status for a specific connector."""
-    cfg = connector_registry.get_config(connector_name)
-    if not cfg:
+# Legacy backward-compat: redirect /configure to /connect
+@app.post("/api/integrations/{connector_name}/configure")
+def configure_integration(connector_name: str, api_key: str = Query(...)):
+    """Configure a connector with API credentials (legacy — redirects to /connect)."""
+    return connect_integration(connector_name, api_key)
+
+
+@app.get("/api/integrations/{provider}/oauth/start")
+def start_oauth_flow(
+    provider: str,
+    redirect_uri: str = Query(...),
+):
+    """Start OAuth flow — returns auth URL and state token."""
+    _require_service()
+    try:
+        result = integration_service.start_oauth(TENANT_ID, provider, redirect_uri)
+        return result
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/api/integrations/{provider}/oauth/callback")
+def oauth_callback(
+    provider: str,
+    code: str = Query(...),
+    state: str = Query(...),
+):
+    """OAuth callback — exchanges code for tokens, stores encrypted."""
+    _require_service()
+    try:
+        # Derive redirect_uri from the state payload
+        from app.integrations.oauth import validate_state
+        payload = validate_state(state)
+        redirect_uri = payload.get("redirect", "")
+
+        integration = integration_service.complete_oauth(
+            provider, code, state, redirect_uri
+        )
         return {
-            "name": connector_name,
-            "status": "not_configured",
-            "enabled": False,
-            "account_count": 0,
+            "status": "connected",
+            "provider": provider,
+            "integration_id": integration["id"],
         }
-
-    connector = connector_registry.get_connector(connector_name)
-    connected = connector.test_connection() if connector else False
-
-    return {
-        "name": connector_name,
-        "status": "healthy" if connected else "error",
-        "enabled": cfg.enabled,
-        "account_count": storage_repo.account_count(source=connector_name),
-        "last_sync": cfg.extra.get("last_sync_result"),
-    }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
-@app.post("/api/integrations/{connector_name}/sync")
-def trigger_sync(connector_name: str):
-    """Trigger a sync for a specific connector."""
-    cfg = connector_registry.get_config(connector_name)
-    if not cfg or not cfg.enabled:
-        raise HTTPException(status_code=400, detail=f"Connector '{connector_name}' not configured or not enabled.")
+@app.post("/api/integrations/{provider}/disconnect")
+def disconnect_integration(provider: str):
+    """Disconnect a provider — purge tokens and disable."""
+    _require_service()
+    integration_service.disconnect(TENANT_ID, provider)
+    return {"status": "disconnected", "provider": provider}
 
-    result = sync_connector(connector_name)
+
+@app.post("/api/integrations/{provider}/sync")
+def trigger_sync(provider: str):
+    """Trigger a sync for a provider."""
+    # Try new service layer first
+    try:
+        if not integration_service:
+            raise RuntimeError("service unavailable")
+        result = integration_service.trigger_sync(TENANT_ID, provider)
+    except Exception:
+        # Fallback to legacy sync
+        cfg = connector_registry.get_config(provider)
+        if not cfg or not cfg.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Connector '{provider}' not configured or not enabled.",
+            )
+        result = sync_connector(provider)
 
     return {
         "status": "synced" if not result.errors else "partial",
@@ -792,6 +886,151 @@ def trigger_sync(connector_name: str):
         "signals_synced": result.signals_synced,
         "errors": result.errors,
         "duration_seconds": result.duration_seconds,
+    }
+
+
+@app.get("/api/integrations/{provider}/sync/status")
+def get_sync_status(provider: str):
+    """Get sync state for a provider."""
+    _require_service()
+    integration = integration_service.get_integration(
+        tenant_id=TENANT_ID, provider=provider
+    )
+    if not integration:
+        return {"provider": provider, "sync_states": [], "status": "not_configured"}
+
+    states = integration_service.get_sync_state(integration["id"])
+    return {
+        "provider": provider,
+        "status": integration["status"],
+        "sync_states": states,
+    }
+
+
+@app.get("/api/integrations/{provider}/mappings")
+def get_field_mappings(provider: str):
+    """Get field mappings for a provider."""
+    _require_service()
+    integration = integration_service.get_integration(
+        tenant_id=TENANT_ID, provider=provider
+    )
+    if not integration:
+        # Return template defaults
+        tmpl = integration_service.get_template(provider)
+        if not tmpl:
+            raise HTTPException(status_code=404, detail=f"Unknown provider: {provider}")
+        mappings = []
+        for source, mapping in tmpl.get("default_field_map", {}).items():
+            mappings.append({
+                "source_field": source,
+                "target_field": mapping["target"],
+                "transform": mapping.get("transform", "direct"),
+                "is_default": True,
+            })
+        return {"provider": provider, "mappings": mappings}
+
+    mappings = integration_service.get_field_mappings(integration["id"])
+    return {"provider": provider, "mappings": mappings}
+
+
+@app.put("/api/integrations/{provider}/mappings")
+def update_field_mappings(provider: str, mappings: List[FieldMappingItem]):
+    """Update field mappings for a provider."""
+    _require_service()
+    integration = integration_service.get_integration(
+        tenant_id=TENANT_ID, provider=provider
+    )
+    if not integration:
+        raise HTTPException(status_code=404, detail=f"Provider '{provider}' not connected")
+
+    count = integration_service.update_field_mappings(
+        integration["id"], [m.model_dump() for m in mappings]
+    )
+    return {"provider": provider, "updated": count}
+
+
+@app.post("/api/integrations/{provider}/preview")
+def preview_integration(provider: str):
+    """Preview first 5 records with current field mapping."""
+    _require_service()
+    from app.integrations.registry import get_connector_for_integration
+
+    integration = integration_service.get_integration(
+        tenant_id=TENANT_ID, provider=provider
+    )
+    if not integration:
+        raise HTTPException(status_code=404, detail=f"Provider '{provider}' not connected")
+
+    connector = get_connector_for_integration(integration["id"])
+    if not connector:
+        raise HTTPException(status_code=400, detail="Could not instantiate connector")
+
+    try:
+        accounts = connector.pull_accounts()
+        preview = [a.model_dump() for a in accounts[:5]]
+        return {"provider": provider, "preview": preview, "total_available": len(accounts)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/integrations/{provider}/health")
+def check_integration_health(provider: str):
+    """Check connection health for a provider."""
+    _require_service()
+    return integration_service.check_health(TENANT_ID, provider)
+
+
+@app.get("/api/integrations/{provider}/events")
+def get_integration_events(provider: str, limit: int = Query(50)):
+    """Get audit events for a provider."""
+    _require_service()
+    integration = integration_service.get_integration(
+        tenant_id=TENANT_ID, provider=provider
+    )
+    if not integration:
+        return {"provider": provider, "events": []}
+
+    events = integration_service.get_events(integration["id"], limit=limit)
+    return {"provider": provider, "events": events}
+
+
+@app.get("/api/integrations/{provider_name}/status")
+def integration_status(provider_name: str):
+    """Get detailed status for a specific connector."""
+    # Try new service layer
+    integration = None
+    if integration_service:
+        integration = integration_service.get_integration(
+            tenant_id=TENANT_ID, provider=provider_name
+        )
+    if integration:
+        return {
+            "name": provider_name,
+            "status": integration["status"],
+            "enabled": integration["enabled"],
+            "account_count": storage_repo.account_count(source=provider_name),
+            "connected_at": integration.get("connected_at"),
+        }
+
+    # Fall back to legacy
+    cfg = connector_registry.get_config(provider_name)
+    if not cfg:
+        return {
+            "name": provider_name,
+            "status": "not_configured",
+            "enabled": False,
+            "account_count": 0,
+        }
+
+    connector = connector_registry.get_connector(provider_name)
+    connected = connector.test_connection() if connector else False
+
+    return {
+        "name": provider_name,
+        "status": "healthy" if connected else "error",
+        "enabled": cfg.enabled,
+        "account_count": storage_repo.account_count(source=provider_name),
+        "last_sync": cfg.extra.get("last_sync_result"),
     }
 
 
@@ -848,16 +1087,19 @@ def get_latest_scores(limit: int = Query(200)):
 @app.post("/api/integrations/{connector_name}/run-demo")
 def run_demo(connector_name: str):
     """One-click: validate connector → sync → score. Returns combined result."""
-    # Validate configured
-    cfg = connector_registry.get_config(connector_name)
-    if not cfg or not cfg.enabled:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Connector '{connector_name}' is not configured. Call /configure first.",
-        )
-
-    # Sync
-    sync_result = sync_connector(connector_name)
+    # Try new sync first, fall back to legacy
+    try:
+        if not integration_service:
+            raise RuntimeError("service unavailable")
+        sync_result = integration_service.trigger_sync(TENANT_ID, connector_name)
+    except Exception:
+        cfg = connector_registry.get_config(connector_name)
+        if not cfg or not cfg.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Connector '{connector_name}' is not configured. Call /connect first.",
+            )
+        sync_result = sync_connector(connector_name)
 
     # Score (only if we have accounts + a trained model)
     scored = 0

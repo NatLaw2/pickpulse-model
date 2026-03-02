@@ -1,0 +1,30 @@
+{
+  "provider": "custom_crm",
+  "display_name": "Custom CRM",
+  "category": "CRM",
+  "auth_method": "api_key",
+  "icon": "database",
+  "description": "Connect any REST API with custom endpoint configuration",
+  "api_key_prefix": "",
+  "requires_config": {
+    "base_url": {"label": "API Base URL", "placeholder": "https://api.yourcrm.com/v1"},
+    "accounts_endpoint": {"label": "Accounts Endpoint", "placeholder": "/accounts"},
+    "auth_header": {"label": "Auth Header Name", "placeholder": "Authorization", "default": "Authorization"},
+    "auth_prefix": {"label": "Auth Prefix", "placeholder": "Bearer", "default": "Bearer"}
+  },
+  "default_field_map": {
+    "name": {"target": "name", "transform": "direct"},
+    "email": {"target": "domain", "transform": "direct"},
+    "revenue": {"target": "arr", "transform": "to_float"},
+    "industry": {"target": "industry", "transform": "direct"}
+  },
+  "supported_resources": ["accounts"],
+  "sample_payload": {
+    "id": "acct_123",
+    "name": "Acme Corp",
+    "email": "contact@acme.com",
+    "revenue": 120000,
+    "industry": "Technology"
+  },
+  "status": "available"
+}

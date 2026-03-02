@@ -23,6 +23,19 @@ class BaseConnector(ABC):
     def display_name(self) -> str:
         ...
 
+    @property
+    def auth_method(self) -> str:
+        """Authentication method: 'api_key' or 'oauth'."""
+        return "api_key"
+
+    def _get_token(self) -> str:
+        """Get the active token (API key or OAuth access token)."""
+        # Prefer access_token from config.extra (set by service layer)
+        token = self.config.extra.get("access_token")
+        if token:
+            return token
+        return self.config.api_key or ""
+
     @abstractmethod
     def test_connection(self) -> bool:
         """Return True if the API key / credentials are valid."""

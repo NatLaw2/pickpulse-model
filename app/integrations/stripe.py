@@ -31,7 +31,7 @@ class StripeConnector(BaseConnector):
 
     def _headers(self) -> Dict[str, str]:
         return {
-            "Authorization": f"Bearer {self.config.api_key}",
+            "Authorization": f"Bearer {self._get_token()}",
         }
 
     # ------------------------------------------------------------------
