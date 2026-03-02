@@ -10,8 +10,7 @@
     "crm.objects.deals.read",
     "crm.objects.contacts.read",
     "crm.schemas.companies.read",
-    "crm.objects.owners.read",
-    "crm.objects.activities.read"
+    "crm.objects.owners.read"
   ],
   "oauth_authorize_url": "https://app.hubspot.com/oauth/authorize",
   "oauth_token_url": "https://api.hubapi.com/oauth/v1/token",
