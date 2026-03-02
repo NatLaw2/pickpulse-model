@@ -1191,7 +1191,7 @@ def debug_oauth_config(key: str = Query(...)):
     try:
         _require_service()
         result = integration_service.start_oauth(
-            TENANT_ID, "hubspot", "https://pickpulse-console.netlify.app/integrations"
+            TENANT_ID, "hubspot", "https://pickpulseintelligence.netlify.app/integrations"
         )
         test_url = result.get("auth_url", "")
     except Exception as exc:
