@@ -20,9 +20,11 @@ class FieldMappingItem(PydanticBaseModel):
     transform: str = "direct"
 
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+
+from .auth import get_tenant_id
 
 from .engine.config import MODULES, get_module, ModuleConfig
 from .engine.schema import validate_dataset, ValidationResult
@@ -87,25 +89,37 @@ def _save_persisted_datasets(datasets: Dict[str, Any]) -> None:
         json.dump(datasets, f, indent=2)
 
 
-# In-memory state (with persistent dataset layer)
-_state: Dict[str, Any] = {
-    "datasets": _load_persisted_datasets(),
-    "train_logs": {},
-    "metrics": {},
-    "predictions": {},
-    "account_statuses": {},  # customer_id -> status string
-}
+# Per-tenant in-memory state (with persistent dataset layer)
+_tenant_state: Dict[str, Dict[str, Any]] = {}
+
+# Default tenant for backward compatibility during migration
+_DEFAULT_TENANT = "00000000-0000-0000-0000-000000000000"
 
 
-def _register_dataset(module_name: str, info: Dict[str, Any]) -> None:
+def _get_state(tenant_id: str) -> Dict[str, Any]:
+    """Get or create per-tenant state."""
+    if tenant_id not in _tenant_state:
+        _tenant_state[tenant_id] = {
+            "datasets": _load_persisted_datasets(),
+            "train_logs": {},
+            "metrics": {},
+            "predictions": {},
+            "account_statuses": {},
+        }
+    return _tenant_state[tenant_id]
+
+
+def _register_dataset(module_name: str, info: Dict[str, Any], tenant_id: str = _DEFAULT_TENANT) -> None:
     """Register a dataset in both memory and on disk."""
-    _state["datasets"][module_name] = info
-    _save_persisted_datasets(_state["datasets"])
+    state = _get_state(tenant_id)
+    state["datasets"][module_name] = info
+    _save_persisted_datasets(state["datasets"])
 
 
-def _get_dataset(module_name: str) -> Optional[Dict[str, Any]]:
+def _get_dataset(module_name: str, tenant_id: str = _DEFAULT_TENANT) -> Optional[Dict[str, Any]]:
     """Get dataset info, validating the file still exists on disk."""
-    ds = _state["datasets"].get(module_name)
+    state = _get_state(tenant_id)
+    ds = state["datasets"].get(module_name)
     if ds and os.path.exists(ds["path"]):
         return ds
     return None
@@ -123,18 +137,19 @@ def health():
 # Modules
 # -----------------------------------------------------------------------
 @app.get("/api/modules")
-def list_modules():
+def list_modules(tenant_id: str = Depends(get_tenant_id)):
     result = []
     for name, mod in MODULES.items():
-        has_model = os.path.exists(os.path.join(mod.artifact_dir, "model.joblib"))
+        artifact_dir = mod.get_artifact_dir(tenant_id)
+        has_model = os.path.exists(os.path.join(artifact_dir, "model.joblib"))
         metadata = None
         if has_model:
-            meta_path = os.path.join(mod.artifact_dir, "metadata.json")
+            meta_path = os.path.join(artifact_dir, "metadata.json")
             if os.path.exists(meta_path):
                 with open(meta_path) as f:
                     metadata = json.load(f)
 
-        ds = _get_dataset(name)
+        ds = _get_dataset(name, tenant_id=tenant_id)
         result.append({
             "name": name,
             "display_name": mod.display_name,
@@ -153,18 +168,20 @@ def list_modules():
 
 
 @app.get("/api/modules/{module_name}")
-def get_module_detail(module_name: str):
+def get_module_detail(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
-    has_model = os.path.exists(os.path.join(mod.artifact_dir, "model.joblib"))
+    artifact_dir = mod.get_artifact_dir(tenant_id)
+    has_model = os.path.exists(os.path.join(artifact_dir, "model.joblib"))
 
     metadata = None
     if has_model:
-        meta_path = os.path.join(mod.artifact_dir, "metadata.json")
+        meta_path = os.path.join(artifact_dir, "metadata.json")
         if os.path.exists(meta_path):
             with open(meta_path) as f:
                 metadata = json.load(f)
 
-    ds = _get_dataset(mod.name)
+    state = _get_state(tenant_id)
+    ds = _get_dataset(mod.name, tenant_id=tenant_id)
     return {
         "name": mod.name,
         "display_name": mod.display_name,
@@ -172,7 +189,7 @@ def get_module_detail(module_name: str):
         "has_dataset": ds is not None,
         "dataset_info": ds,
         "metadata": metadata,
-        "metrics": _state["metrics"].get(mod.name),
+        "metrics": state["metrics"].get(mod.name),
         "required_columns": mod.required_columns,
         "optional_columns": mod.optional_columns,
     }
@@ -182,7 +199,7 @@ def get_module_detail(module_name: str):
 # Dataset upload
 # -----------------------------------------------------------------------
 @app.post("/api/datasets/{module_name}/upload")
-async def upload_dataset(module_name: str, file: UploadFile = File(...)):
+async def upload_dataset(module_name: str, file: UploadFile = File(...), tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -214,7 +231,7 @@ async def upload_dataset(module_name: str, file: UploadFile = File(...)):
         "is_demo": False,
         "loaded_at": datetime.now(timezone.utc).isoformat(),
     }
-    _register_dataset(module_name, ds_info)
+    _register_dataset(module_name, ds_info, tenant_id=tenant_id)
 
     return {
         "status": "uploaded",
@@ -225,7 +242,7 @@ async def upload_dataset(module_name: str, file: UploadFile = File(...)):
 
 
 @app.post("/api/datasets/{module_name}/sample")
-def load_sample_dataset(module_name: str):
+def load_sample_dataset(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
     os.makedirs(SAMPLE_DIR, exist_ok=True)
 
@@ -246,7 +263,7 @@ def load_sample_dataset(module_name: str):
         "is_demo": True,
         "loaded_at": datetime.now(timezone.utc).isoformat(),
     }
-    _register_dataset(module_name, ds_info)
+    _register_dataset(module_name, ds_info, tenant_id=tenant_id)
 
     return {
         "status": "loaded",
@@ -256,19 +273,19 @@ def load_sample_dataset(module_name: str):
 
 
 @app.get("/api/datasets/{module_name}/current")
-def get_current_dataset(module_name: str):
+def get_current_dataset(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     """Return metadata for the currently loaded dataset (or 404)."""
     get_module(module_name)  # validate module name
-    ds = _get_dataset(module_name)
+    ds = _get_dataset(module_name, tenant_id=tenant_id)
     if not ds:
         raise HTTPException(status_code=404, detail="No dataset loaded.")
     return ds
 
 
 @app.get("/api/datasets/{module_name}/validate")
-def validate_current_dataset(module_name: str):
+def validate_current_dataset(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
-    ds = _get_dataset(module_name)
+    ds = _get_dataset(module_name, tenant_id=tenant_id)
     if not ds:
         raise HTTPException(status_code=404, detail="No dataset loaded.")
 
@@ -281,9 +298,9 @@ def validate_current_dataset(module_name: str):
 # Training
 # -----------------------------------------------------------------------
 @app.post("/api/train/{module_name}")
-def train_module(module_name: str, val_frac: float = Query(0.2)):
+def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
-    ds = _get_dataset(module_name)
+    ds = _get_dataset(module_name, tenant_id=tenant_id)
     if not ds:
         raise HTTPException(status_code=400, detail="No dataset loaded. Upload or load sample first.")
 
@@ -295,11 +312,12 @@ def train_module(module_name: str, val_frac: float = Query(0.2)):
             df = adapter.normalize_columns(df)
             df = adapter.add_derived_features(df)
 
-        metadata = train_model(df, mod, val_frac=val_frac)
+        metadata = train_model(df, mod, val_frac=val_frac, tenant_id=tenant_id)
 
         if "error" in metadata:
             raise HTTPException(status_code=400, detail=metadata.get("message", metadata["error"]))
 
+        state = _get_state(tenant_id)
         # Auto-evaluate on val split
         ts_col = mod.timestamp_column
         if ts_col in df.columns:
@@ -311,15 +329,15 @@ def train_module(module_name: str, val_frac: float = Query(0.2)):
             if adapter:
                 val_df = adapter.add_derived_features(val_df)
             if len(val_df) >= 10:
-                metrics = evaluate_model(val_df, mod)
-                _state["metrics"][module_name] = metrics
+                metrics = evaluate_model(val_df, mod, tenant_id=tenant_id)
+                state["metrics"][module_name] = metrics
         elif metadata.get("val_metrics"):
-            _state["metrics"][module_name] = metadata["val_metrics"]
+            state["metrics"][module_name] = metadata["val_metrics"]
 
         return {
             "status": "trained",
             "metadata": metadata,
-            "metrics": _state["metrics"].get(module_name),
+            "metrics": state["metrics"].get(module_name),
         }
 
     except HTTPException:
@@ -333,25 +351,27 @@ def train_module(module_name: str, val_frac: float = Query(0.2)):
 # Evaluation
 # -----------------------------------------------------------------------
 @app.get("/api/evaluate/{module_name}")
-def get_evaluation(module_name: str):
+def get_evaluation(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
-    metrics = _state["metrics"].get(module_name)
+    state = _get_state(tenant_id)
+    artifact_dir = mod.get_artifact_dir(tenant_id)
+    metrics = state["metrics"].get(module_name)
 
     if not metrics:
         report_path = os.path.join("outputs", f"{module_name}_evaluation.json")
         if os.path.exists(report_path):
             with open(report_path) as f:
                 metrics = json.load(f)
-            _state["metrics"][module_name] = metrics
+            state["metrics"][module_name] = metrics
 
     if not metrics:
-        meta_path = os.path.join(mod.artifact_dir, "metadata.json")
+        meta_path = os.path.join(artifact_dir, "metadata.json")
         if os.path.exists(meta_path):
             with open(meta_path) as f:
                 metadata = json.load(f)
             metrics = metadata.get("val_metrics")
             if metrics:
-                _state["metrics"][module_name] = metrics
+                state["metrics"][module_name] = metrics
 
     if not metrics:
         raise HTTPException(status_code=404, detail="No evaluation results. Train a model first.")
@@ -360,9 +380,10 @@ def get_evaluation(module_name: str):
 
 
 @app.post("/api/evaluate/{module_name}/report")
-def generate_report(module_name: str):
+def generate_report(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
-    metrics = _state["metrics"].get(module_name)
+    state = _get_state(tenant_id)
+    metrics = state["metrics"].get(module_name)
     if not metrics:
         raise HTTPException(status_code=404, detail="No evaluation metrics. Train first.")
 
@@ -383,14 +404,16 @@ def predict_module(
     module_name: str,
     limit: int = Query(100),
     include_archived: bool = Query(False),
+    tenant_id: str = Depends(get_tenant_id),
 ):
     """Generate predictions on the loaded dataset."""
     mod = get_module(module_name)
-    ds = _get_dataset(module_name)
+    artifact_dir = mod.get_artifact_dir(tenant_id)
+    ds = _get_dataset(module_name, tenant_id=tenant_id)
     if not ds:
         raise HTTPException(status_code=400, detail="No dataset loaded.")
 
-    if not os.path.exists(os.path.join(mod.artifact_dir, "model.joblib")):
+    if not os.path.exists(os.path.join(artifact_dir, "model.joblib")):
         raise HTTPException(status_code=400, detail="No trained model. Train first.")
 
     try:
@@ -400,10 +423,11 @@ def predict_module(
             df = adapter.normalize_columns(df)
             df = adapter.add_derived_features(df)
 
-        scored = predict(df, mod)
+        scored = predict(df, mod, tenant_id=tenant_id)
 
+        state = _get_state(tenant_id)
         # Apply any manual status overrides
-        for cid, status in _state["account_statuses"].items():
+        for cid, status in state["account_statuses"].items():
             mask = scored[mod.id_column] == cid
             if mask.any():
                 scored.loc[mask, "account_status"] = status
@@ -435,7 +459,7 @@ def predict_module(
             display_cols = [c for c in display_cols if c in scored_display.columns]
 
         records = scored_display[display_cols].head(limit).to_dict(orient="records")
-        _state["predictions"][module_name] = records
+        state["predictions"][module_name] = records
 
         # Tier counts (from full active set)
         tier_counts = scored_display["tier"].value_counts().to_dict()
@@ -469,7 +493,7 @@ def predict_module(
 
 
 @app.get("/api/predict/{module_name}/export")
-def export_predictions(module_name: str):
+def export_predictions(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
     scored_path = os.path.join("outputs", f"{module_name}_scored.csv")
     if not os.path.exists(scored_path):
@@ -483,7 +507,7 @@ def export_predictions(module_name: str):
 # Account status management
 # -----------------------------------------------------------------------
 @app.post("/api/accounts/{customer_id}/status")
-def update_account_status(customer_id: str, status: str = Query(...)):
+def update_account_status(customer_id: str, status: str = Query(...), tenant_id: str = Depends(get_tenant_id)):
     """Update account lifecycle status.
 
     Valid statuses: active, at_risk, save_in_progress, renewed, churned,
@@ -494,19 +518,20 @@ def update_account_status(customer_id: str, status: str = Query(...)):
     if status not in valid:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid}")
 
-    _state["account_statuses"][customer_id] = status
+    _get_state(tenant_id)["account_statuses"][customer_id] = status
     return {"customer_id": customer_id, "status": status}
 
 
 @app.get("/api/accounts")
-def list_accounts(status: Optional[str] = Query(None)):
+def list_accounts(status: Optional[str] = Query(None), tenant_id: str = Depends(get_tenant_id)):
     """List accounts with optional status filter."""
-    predictions = _state["predictions"].get(MODULE_NAME, [])
+    state = _get_state(tenant_id)
+    predictions = state["predictions"].get(MODULE_NAME, [])
     if status:
         # Filter by status from overrides or from predictions
         filtered = []
         for p in predictions:
-            acct_status = _state["account_statuses"].get(
+            acct_status = state["account_statuses"].get(
                 p.get("customer_id"), p.get("account_status", "active")
             )
             if acct_status == status:
@@ -520,7 +545,7 @@ def list_accounts(status: Optional[str] = Query(None)):
 # API docs
 # -----------------------------------------------------------------------
 @app.get("/api/api-docs")
-def api_docs_meta():
+def api_docs_meta(tenant_id: str = Depends(get_tenant_id)):
     return {
         "base_url": "http://localhost:8000",
         "endpoints": [
@@ -624,7 +649,7 @@ _onboarding_state: Dict[str, str] = {}
 
 
 @app.get("/api/onboarding")
-def get_onboarding():
+def get_onboarding(tenant_id: str = Depends(get_tenant_id)):
     steps = []
     for step in ONBOARDING_STEPS:
         steps.append({
@@ -635,7 +660,7 @@ def get_onboarding():
 
 
 @app.post("/api/onboarding/{step_id}/complete")
-def complete_onboarding_step(step_id: str):
+def complete_onboarding_step(step_id: str, tenant_id: str = Depends(get_tenant_id)):
     valid_ids = [s["id"] for s in ONBOARDING_STEPS]
     if step_id not in valid_ids:
         raise HTTPException(status_code=404, detail=f"Unknown step: {step_id}")
@@ -644,13 +669,13 @@ def complete_onboarding_step(step_id: str):
 
 
 @app.post("/api/onboarding/{step_id}/reset")
-def reset_onboarding_step(step_id: str):
+def reset_onboarding_step(step_id: str, tenant_id: str = Depends(get_tenant_id)):
     _onboarding_state[step_id] = "pending"
     return {"step_id": step_id, "status": "pending"}
 
 
 @app.get("/api/onboarding/template/{module_name}")
-def download_data_template(module_name: str):
+def download_data_template(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
     cols = mod.required_columns + mod.optional_columns
     df = pd.DataFrame(columns=cols)
@@ -665,22 +690,24 @@ def download_data_template(module_name: str):
 # Dashboard summary (churn-specific)
 # -----------------------------------------------------------------------
 @app.get("/api/dashboard")
-def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95)):
+def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_id: str = Depends(get_tenant_id)):
     mod = get_module("churn")
-    meta_path = os.path.join(mod.artifact_dir, "metadata.json")
+    artifact_dir = mod.get_artifact_dir(tenant_id)
+    meta_path = os.path.join(artifact_dir, "metadata.json")
     metadata = None
     if os.path.exists(meta_path):
         with open(meta_path) as f:
             metadata = json.load(f)
 
-    metrics = _state["metrics"].get("churn")
+    state = _get_state(tenant_id)
+    metrics = state["metrics"].get("churn")
     if not metrics:
         eval_path = os.path.join("outputs", "churn_evaluation.json")
         if os.path.exists(eval_path):
             with open(eval_path) as f:
                 metrics = json.load(f)
 
-    predictions = _state["predictions"].get("churn", [])
+    predictions = state["predictions"].get("churn", [])
 
     # Compute summary KPIs from cached predictions
     total_arr_at_risk = 0.0
@@ -697,13 +724,13 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95)):
     # Top 10 at-risk accounts
     top_10 = sorted(predictions, key=lambda x: x.get("arr_at_risk", 0) or 0, reverse=True)[:10]
 
-    ds = _get_dataset("churn")
+    ds = _get_dataset("churn", tenant_id=tenant_id)
 
     return {
         "module": {
             "name": "churn",
             "display_name": mod.display_name,
-            "has_model": os.path.exists(os.path.join(mod.artifact_dir, "model.joblib")),
+            "has_model": os.path.exists(os.path.join(artifact_dir, "model.joblib")),
             "has_dataset": ds is not None,
             "trained_at": metadata.get("trained_at") if metadata else None,
             "version": metadata.get("version") if metadata else None,
@@ -728,25 +755,22 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95)):
 # Integrations (new platform endpoints)
 # -----------------------------------------------------------------------
 
-TENANT_ID = integration_service.DEFAULT_TENANT if integration_service else "00000000-0000-0000-0000-000000000000"
-
-
 def _require_service():
     if integration_service is None:
         raise HTTPException(503, detail="Integration service unavailable — check server env vars")
 
 
 @app.get("/api/integrations")
-def list_integrations():
+def list_integrations(tenant_id: str = Depends(get_tenant_id)):
     """List all providers with integration status."""
     try:
         if not integration_service:
             raise RuntimeError("service unavailable")
-        providers = integration_service.list_integrations(TENANT_ID)
+        providers = integration_service.list_integrations(tenant_id)
         # Enrich available providers with account counts
         for p in providers:
             if p["enabled"]:
-                p["account_count"] = storage_repo.account_count(source=p["provider"])
+                p["account_count"] = storage_repo.account_count(source=p["provider"], tenant_id=tenant_id)
             else:
                 p["account_count"] = 0
         return {"providers": providers}
@@ -764,7 +788,7 @@ def list_integrations():
 
 
 @app.get("/api/integrations/{provider}/metadata")
-def get_provider_metadata(provider: str):
+def get_provider_metadata(provider: str, tenant_id: str = Depends(get_tenant_id)):
     """Get provider template with default field mappings."""
     _require_service()
     tmpl = integration_service.get_template(provider)
@@ -774,7 +798,7 @@ def get_provider_metadata(provider: str):
 
 
 @app.post("/api/integrations/{provider}/connect")
-def connect_integration(provider: str, api_key: str = Query(...)):
+def connect_integration(provider: str, api_key: str = Query(...), tenant_id: str = Depends(get_tenant_id)):
     """Connect a provider using an API key."""
     available = connector_registry.available_connectors()
     if provider not in available:
@@ -796,7 +820,7 @@ def connect_integration(provider: str, api_key: str = Query(...)):
     try:
         if not integration_service:
             raise RuntimeError("service unavailable")
-        integration = integration_service.connect_api_key(TENANT_ID, provider, api_key)
+        integration = integration_service.connect_api_key(tenant_id, provider, api_key)
     except Exception as exc:
         # If integration tables don't exist, fall back to legacy
         connector_registry.configure(provider, config)
@@ -810,20 +834,21 @@ def connect_integration(provider: str, api_key: str = Query(...)):
 
 # Legacy backward-compat: redirect /configure to /connect
 @app.post("/api/integrations/{connector_name}/configure")
-def configure_integration(connector_name: str, api_key: str = Query(...)):
+def configure_integration(connector_name: str, api_key: str = Query(...), tenant_id: str = Depends(get_tenant_id)):
     """Configure a connector with API credentials (legacy — redirects to /connect)."""
-    return connect_integration(connector_name, api_key)
+    return connect_integration(connector_name, api_key, tenant_id=tenant_id)
 
 
 @app.get("/api/integrations/{provider}/oauth/start")
 def start_oauth_flow(
     provider: str,
     redirect_uri: str = Query(...),
+    tenant_id: str = Depends(get_tenant_id),
 ):
     """Start OAuth flow — returns auth URL and state token."""
     _require_service()
     try:
-        result = integration_service.start_oauth(TENANT_ID, provider, redirect_uri)
+        result = integration_service.start_oauth(tenant_id, provider, redirect_uri)
         auth_url = result.get("auth_url", "")
         logger.info("[oauth/start] provider=%s redirect_uri=%s", provider, redirect_uri)
         logger.info("[oauth/start] auth_url=%s", auth_url)
@@ -874,21 +899,21 @@ def oauth_callback(
 
 
 @app.post("/api/integrations/{provider}/disconnect")
-def disconnect_integration(provider: str):
+def disconnect_integration(provider: str, tenant_id: str = Depends(get_tenant_id)):
     """Disconnect a provider — purge tokens and disable."""
     _require_service()
-    integration_service.disconnect(TENANT_ID, provider)
+    integration_service.disconnect(tenant_id, provider)
     return {"status": "disconnected", "provider": provider}
 
 
 @app.post("/api/integrations/{provider}/sync")
-def trigger_sync(provider: str):
+def trigger_sync(provider: str, tenant_id: str = Depends(get_tenant_id)):
     """Trigger a sync for a provider."""
     # Try new service layer first
     try:
         if not integration_service:
             raise RuntimeError("service unavailable")
-        result = integration_service.trigger_sync(TENANT_ID, provider)
+        result = integration_service.trigger_sync(tenant_id, provider)
     except Exception:
         # Fallback to legacy sync
         cfg = connector_registry.get_config(provider)
@@ -909,11 +934,11 @@ def trigger_sync(provider: str):
 
 
 @app.get("/api/integrations/{provider}/sync/status")
-def get_sync_status(provider: str):
+def get_sync_status(provider: str, tenant_id: str = Depends(get_tenant_id)):
     """Get sync state for a provider."""
     _require_service()
     integration = integration_service.get_integration(
-        tenant_id=TENANT_ID, provider=provider
+        tenant_id=tenant_id, provider=provider
     )
     if not integration:
         return {"provider": provider, "sync_states": [], "status": "not_configured"}
@@ -927,11 +952,11 @@ def get_sync_status(provider: str):
 
 
 @app.get("/api/integrations/{provider}/mappings")
-def get_field_mappings(provider: str):
+def get_field_mappings(provider: str, tenant_id: str = Depends(get_tenant_id)):
     """Get field mappings for a provider."""
     _require_service()
     integration = integration_service.get_integration(
-        tenant_id=TENANT_ID, provider=provider
+        tenant_id=tenant_id, provider=provider
     )
     if not integration:
         # Return template defaults
@@ -953,11 +978,11 @@ def get_field_mappings(provider: str):
 
 
 @app.put("/api/integrations/{provider}/mappings")
-def update_field_mappings(provider: str, mappings: List[FieldMappingItem]):
+def update_field_mappings(provider: str, mappings: List[FieldMappingItem], tenant_id: str = Depends(get_tenant_id)):
     """Update field mappings for a provider."""
     _require_service()
     integration = integration_service.get_integration(
-        tenant_id=TENANT_ID, provider=provider
+        tenant_id=tenant_id, provider=provider
     )
     if not integration:
         raise HTTPException(status_code=404, detail=f"Provider '{provider}' not connected")
@@ -969,13 +994,13 @@ def update_field_mappings(provider: str, mappings: List[FieldMappingItem]):
 
 
 @app.post("/api/integrations/{provider}/preview")
-def preview_integration(provider: str):
+def preview_integration(provider: str, tenant_id: str = Depends(get_tenant_id)):
     """Preview first 5 records with current field mapping."""
     _require_service()
     from app.integrations.registry import get_connector_for_integration
 
     integration = integration_service.get_integration(
-        tenant_id=TENANT_ID, provider=provider
+        tenant_id=tenant_id, provider=provider
     )
     if not integration:
         raise HTTPException(status_code=404, detail=f"Provider '{provider}' not connected")
@@ -993,18 +1018,18 @@ def preview_integration(provider: str):
 
 
 @app.get("/api/integrations/{provider}/health")
-def check_integration_health(provider: str):
+def check_integration_health(provider: str, tenant_id: str = Depends(get_tenant_id)):
     """Check connection health for a provider."""
     _require_service()
-    return integration_service.check_health(TENANT_ID, provider)
+    return integration_service.check_health(tenant_id, provider)
 
 
 @app.get("/api/integrations/{provider}/events")
-def get_integration_events(provider: str, limit: int = Query(50)):
+def get_integration_events(provider: str, limit: int = Query(50), tenant_id: str = Depends(get_tenant_id)):
     """Get audit events for a provider."""
     _require_service()
     integration = integration_service.get_integration(
-        tenant_id=TENANT_ID, provider=provider
+        tenant_id=tenant_id, provider=provider
     )
     if not integration:
         return {"provider": provider, "events": []}
@@ -1014,20 +1039,20 @@ def get_integration_events(provider: str, limit: int = Query(50)):
 
 
 @app.get("/api/integrations/{provider_name}/status")
-def integration_status(provider_name: str):
+def integration_status(provider_name: str, tenant_id: str = Depends(get_tenant_id)):
     """Get detailed status for a specific connector."""
     # Try new service layer
     integration = None
     if integration_service:
         integration = integration_service.get_integration(
-            tenant_id=TENANT_ID, provider=provider_name
+            tenant_id=tenant_id, provider=provider_name
         )
     if integration:
         return {
             "name": provider_name,
             "status": integration["status"],
             "enabled": integration["enabled"],
-            "account_count": storage_repo.account_count(source=provider_name),
+            "account_count": storage_repo.account_count(source=provider_name, tenant_id=tenant_id),
             "connected_at": integration.get("connected_at"),
         }
 
@@ -1048,7 +1073,7 @@ def integration_status(provider_name: str):
         "name": provider_name,
         "status": "healthy" if connected else "error",
         "enabled": cfg.enabled,
-        "account_count": storage_repo.account_count(source=provider_name),
+        "account_count": storage_repo.account_count(source=provider_name, tenant_id=tenant_id),
         "last_sync": cfg.extra.get("last_sync_result"),
     }
 
@@ -1058,28 +1083,30 @@ def list_integration_accounts(
     source: Optional[str] = Query(None),
     limit: int = Query(200),
     offset: int = Query(0),
+    tenant_id: str = Depends(get_tenant_id),
 ):
     """List accounts from the integration database."""
-    accounts = storage_repo.list_accounts(source=source, limit=limit, offset=offset)
-    total = storage_repo.account_count(source=source)
+    accounts = storage_repo.list_accounts(source=source, limit=limit, offset=offset, tenant_id=tenant_id)
+    total = storage_repo.account_count(source=source, tenant_id=tenant_id)
     return {"accounts": accounts, "total": total, "showing": len(accounts)}
 
 
 @app.post("/api/integrations/score")
-def trigger_live_scoring():
+def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
     """Score all integrated accounts using the trained churn model."""
     mod = get_module("churn")
-    model_path = os.path.join(mod.artifact_dir, "model.joblib")
+    artifact_dir = mod.get_artifact_dir(tenant_id)
+    model_path = os.path.join(artifact_dir, "model.joblib")
 
     if not os.path.exists(model_path):
         raise HTTPException(status_code=400, detail="No trained model. Train a model first.")
 
-    acct_count = storage_repo.account_count()
+    acct_count = storage_repo.account_count(tenant_id=tenant_id)
     if acct_count == 0:
         raise HTTPException(status_code=400, detail="No accounts in database. Sync an integration first.")
 
     try:
-        scores = score_accounts()
+        scores = score_accounts(tenant_id=tenant_id)
         high = sum(1 for s in scores if s.tier == "High Risk")
         med = sum(1 for s in scores if s.tier == "Medium Risk")
         low = sum(1 for s in scores if s.tier == "Low Risk")
@@ -1097,20 +1124,20 @@ def trigger_live_scoring():
 
 
 @app.get("/api/integrations/scores/latest")
-def get_latest_scores(limit: int = Query(200)):
+def get_latest_scores(limit: int = Query(200), tenant_id: str = Depends(get_tenant_id)):
     """Get the most recent churn scores for all accounts."""
-    scores = storage_repo.latest_scores(limit=limit)
+    scores = storage_repo.latest_scores(limit=limit, tenant_id=tenant_id)
     return {"scores": scores, "count": len(scores)}
 
 
 @app.post("/api/integrations/{connector_name}/run-demo")
-def run_demo(connector_name: str):
+def run_demo(connector_name: str, tenant_id: str = Depends(get_tenant_id)):
     """One-click: validate connector → sync → score. Returns combined result."""
     # Try new sync first, fall back to legacy
     try:
         if not integration_service:
             raise RuntimeError("service unavailable")
-        sync_result = integration_service.trigger_sync(TENANT_ID, connector_name)
+        sync_result = integration_service.trigger_sync(tenant_id, connector_name)
     except Exception:
         cfg = connector_registry.get_config(connector_name)
         if not cfg or not cfg.enabled:
@@ -1127,12 +1154,13 @@ def run_demo(connector_name: str):
     score_error = None
 
     mod = get_module("churn")
-    model_exists = os.path.exists(os.path.join(mod.artifact_dir, "model.joblib"))
-    acct_count = storage_repo.account_count()
+    artifact_dir = mod.get_artifact_dir(tenant_id)
+    model_exists = os.path.exists(os.path.join(artifact_dir, "model.joblib"))
+    acct_count = storage_repo.account_count(tenant_id=tenant_id)
 
     if model_exists and acct_count > 0:
         try:
-            scores = score_accounts()
+            scores = score_accounts(tenant_id=tenant_id)
             scored = len(scores)
             tier_counts = {
                 "High Risk": sum(1 for s in scores if s.tier == "High Risk"),
@@ -1191,7 +1219,7 @@ def debug_oauth_config(key: str = Query(...)):
     try:
         _require_service()
         result = integration_service.start_oauth(
-            TENANT_ID, "hubspot", "https://pickpulseintelligence.netlify.app/integrations"
+            _DEFAULT_TENANT, "hubspot", "https://pickpulseintelligence.netlify.app/integrations"
         )
         test_url = result.get("auth_url", "")
     except Exception as exc:

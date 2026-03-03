@@ -13,11 +13,12 @@ from .config import ModuleConfig
 from .features import prepare_features
 
 
-def load_model(module: ModuleConfig) -> Dict[str, Any]:
+def load_model(module: ModuleConfig, tenant_id: str | None = None) -> Dict[str, Any]:
     """Load trained model and feature metadata for a module."""
-    model_path = os.path.join(module.artifact_dir, "model.joblib")
-    meta_path = os.path.join(module.artifact_dir, "feature_meta.json")
-    metadata_path = os.path.join(module.artifact_dir, "metadata.json")
+    artifact_dir = module.get_artifact_dir(tenant_id)
+    model_path = os.path.join(artifact_dir, "model.joblib")
+    meta_path = os.path.join(artifact_dir, "feature_meta.json")
+    metadata_path = os.path.join(artifact_dir, "metadata.json")
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(
@@ -48,6 +49,7 @@ def predict(
     df: pd.DataFrame,
     module: ModuleConfig,
     artifacts: Optional[Dict[str, Any]] = None,
+    tenant_id: str | None = None,
 ) -> pd.DataFrame:
     """Score a DataFrame and return predictions with tiers.
 
@@ -57,7 +59,7 @@ def predict(
       arr_at_risk, recommended_action, account_status
     """
     if artifacts is None:
-        artifacts = load_model(module)
+        artifacts = load_model(module, tenant_id=tenant_id)
 
     model = artifacts["model"]
     feature_meta = artifacts["feature_meta"]

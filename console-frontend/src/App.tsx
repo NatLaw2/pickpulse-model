@@ -10,8 +10,24 @@ import { OnboardingPage } from './pages/OnboardingPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { DatasetProvider } from './lib/DatasetContext';
+import { AuthProvider, useAuth } from './lib/AuthContext';
+import { LoginPage } from './pages/LoginPage';
 
-function App() {
+function AppShell() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg-primary)]">
+        <div className="text-sm text-[var(--color-text-muted)]">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginPage />;
+  }
+
   return (
     <DatasetProvider>
       <div className="flex min-h-screen">
@@ -31,6 +47,14 @@ function App() {
         </main>
       </div>
     </DatasetProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   );
 }
 

@@ -23,15 +23,15 @@ from app.storage import repo
 logger = logging.getLogger(__name__)
 
 
-def _build_scoring_dataframe() -> pd.DataFrame:
+def _build_scoring_dataframe(tenant_id: str = repo.DEFAULT_TENANT) -> pd.DataFrame:
     """Merge accounts + latest signals into a flat DataFrame ready for scoring."""
-    accounts = repo.list_accounts(limit=50000)
+    accounts = repo.list_accounts(limit=50000, tenant_id=tenant_id)
     if not accounts:
         return pd.DataFrame()
 
     rows = []
     for acct in accounts:
-        sig = repo.latest_signals(acct["external_id"])
+        sig = repo.latest_signals(acct["external_id"], tenant_id=tenant_id)
         row: Dict[str, Any] = {
             "customer_id": acct["external_id"],
             "snapshot_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -57,20 +57,21 @@ def _build_scoring_dataframe() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def score_accounts() -> List[ChurnScore]:
+def score_accounts(tenant_id: str = repo.DEFAULT_TENANT) -> List[ChurnScore]:
     """Score all stored accounts using the trained churn model.
 
     Returns a list of ChurnScore objects (also persisted to DB).
     """
     module = get_module("churn")
-    model_path = os.path.join(module.artifact_dir, "model.joblib")
+    artifact_dir = module.get_artifact_dir(tenant_id)
+    model_path = os.path.join(artifact_dir, "model.joblib")
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(
             f"No trained model found at {model_path}. Train the model first."
         )
 
-    df = _build_scoring_dataframe()
+    df = _build_scoring_dataframe(tenant_id=tenant_id)
     if df.empty:
         logger.info("No accounts to score")
         return []
@@ -81,7 +82,7 @@ def score_accounts() -> List[ChurnScore]:
 
     # Load model + feature metadata
     model = joblib.load(model_path)
-    meta_path = os.path.join(module.artifact_dir, "feature_meta.json")
+    meta_path = os.path.join(artifact_dir, "feature_meta.json")
 
     import json as _json
     with open(meta_path) as _f:
@@ -96,7 +97,7 @@ def score_accounts() -> List[ChurnScore]:
 
     # CalibratedClassifierCV can fail on very small batches, so use the
     # uncalibrated base model when available for small scoring runs.
-    base_path = os.path.join(module.artifact_dir, "base_model.joblib")
+    base_path = os.path.join(artifact_dir, "base_model.joblib")
     if len(X) < 50 and os.path.exists(base_path):
         model = joblib.load(base_path)
 
@@ -131,7 +132,7 @@ def score_accounts() -> List[ChurnScore]:
         ))
 
     # Persist
-    repo.insert_scores(scores)
+    repo.insert_scores(scores, tenant_id=tenant_id)
     logger.info("Scored %d accounts", len(scores))
 
     return scores

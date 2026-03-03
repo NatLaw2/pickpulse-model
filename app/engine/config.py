@@ -64,6 +64,16 @@ class ModuleConfig:
         if not self.artifact_dir:
             self.artifact_dir = f"artifacts/{self.name}"
 
+    def get_artifact_dir(self, tenant_id: Optional[str] = None) -> str:
+        """Return per-tenant artifact directory.
+
+        If tenant_id is None, returns the default (shared) artifact_dir.
+        """
+        if tenant_id is None:
+            return self.artifact_dir
+        base = os.path.dirname(self.artifact_dir)  # e.g. "artifacts"
+        return os.path.join(base, tenant_id, self.name)
+
 
 # ---------------------------------------------------------------------------
 # Churn module config

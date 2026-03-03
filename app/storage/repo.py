@@ -1,9 +1,9 @@
 """Repository layer — CRUD over Supabase Postgres tables.
 
 Tables:
-  accounts              (source, external_id unique)
-  account_signals_daily (account_id, signal_date, signal_key unique)
-  churn_scores_daily    (account_id, score_date unique)
+  accounts              (tenant_id, source, external_id unique)
+  account_signals_daily (tenant_id, account_id, signal_date, signal_key unique)
+  churn_scores_daily    (tenant_id, account_id, score_date unique)
 """
 from __future__ import annotations
 
@@ -14,12 +14,14 @@ from typing import Any, Dict, List, Optional
 from app.storage.db import get_client
 from app.integrations.models import Account, AccountSignal, ChurnScore
 
+DEFAULT_TENANT = "00000000-0000-0000-0000-000000000000"
+
 
 # ---------------------------------------------------------------------------
 # Accounts
 # ---------------------------------------------------------------------------
 
-def upsert_accounts(accounts: List[Account]) -> int:
+def upsert_accounts(accounts: List[Account], tenant_id: str = DEFAULT_TENANT) -> int:
     """Upsert accounts into Supabase. Returns count upserted."""
     if not accounts:
         return 0
@@ -28,6 +30,7 @@ def upsert_accounts(accounts: List[Account]) -> int:
     rows = []
     for acct in accounts:
         rows.append({
+            "tenant_id": tenant_id,
             "external_id": acct.external_id,
             "source": acct.source,
             "name": acct.name,
@@ -46,7 +49,7 @@ def upsert_accounts(accounts: List[Account]) -> int:
 
     res = sb.table("accounts").upsert(
         rows,
-        on_conflict="source,external_id",
+        on_conflict="tenant_id,source,external_id",
     ).execute()
 
     return len(res.data) if res.data else 0
@@ -56,9 +59,10 @@ def list_accounts(
     source: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
+    tenant_id: str = DEFAULT_TENANT,
 ) -> List[Dict[str, Any]]:
     sb = get_client()
-    q = sb.table("accounts").select("*")
+    q = sb.table("accounts").select("*").eq("tenant_id", tenant_id)
     if source:
         q = q.eq("source", source)
     q = q.order("arr", desc=True).range(offset, offset + limit - 1)
@@ -66,24 +70,28 @@ def list_accounts(
     return res.data or []
 
 
-def get_account(external_id: str, source: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def get_account(
+    external_id: str,
+    source: Optional[str] = None,
+    tenant_id: str = DEFAULT_TENANT,
+) -> Optional[Dict[str, Any]]:
     sb = get_client()
-    q = sb.table("accounts").select("*").eq("external_id", external_id)
+    q = sb.table("accounts").select("*").eq("tenant_id", tenant_id).eq("external_id", external_id)
     if source:
         q = q.eq("source", source)
     res = q.limit(1).execute()
     return res.data[0] if res.data else None
 
 
-def get_account_id(external_id: str) -> Optional[str]:
+def get_account_id(external_id: str, tenant_id: str = DEFAULT_TENANT) -> Optional[str]:
     """Look up the uuid for an external_id."""
-    row = get_account(external_id)
+    row = get_account(external_id, tenant_id=tenant_id)
     return row["id"] if row else None
 
 
-def account_count(source: Optional[str] = None) -> int:
+def account_count(source: Optional[str] = None, tenant_id: str = DEFAULT_TENANT) -> int:
     sb = get_client()
-    q = sb.table("accounts").select("id", count="exact")
+    q = sb.table("accounts").select("id", count="exact").eq("tenant_id", tenant_id)
     if source:
         q = q.eq("source", source)
     res = q.execute()
@@ -102,7 +110,7 @@ _SIGNAL_KEYS = [
 ]
 
 
-def upsert_signals(signals: List[AccountSignal]) -> int:
+def upsert_signals(signals: List[AccountSignal], tenant_id: str = DEFAULT_TENANT) -> int:
     """Upsert signals. Each AccountSignal field becomes a separate signal_key row."""
     if not signals:
         return 0
@@ -110,7 +118,7 @@ def upsert_signals(signals: List[AccountSignal]) -> int:
     sb = get_client()
     rows = []
     for sig in signals:
-        account_id = get_account_id(sig.external_id)
+        account_id = get_account_id(sig.external_id, tenant_id=tenant_id)
         if not account_id:
             continue
 
@@ -121,6 +129,7 @@ def upsert_signals(signals: List[AccountSignal]) -> int:
                 continue
             if isinstance(val, str):
                 rows.append({
+                    "tenant_id": tenant_id,
                     "account_id": account_id,
                     "signal_date": sig.signal_date,
                     "signal_key": key,
@@ -129,6 +138,7 @@ def upsert_signals(signals: List[AccountSignal]) -> int:
                 })
             else:
                 rows.append({
+                    "tenant_id": tenant_id,
                     "account_id": account_id,
                     "signal_date": sig.signal_date,
                     "signal_key": key,
@@ -139,6 +149,7 @@ def upsert_signals(signals: List[AccountSignal]) -> int:
         # Store extra as a single JSON signal
         if sig.extra:
             rows.append({
+                "tenant_id": tenant_id,
                 "account_id": account_id,
                 "signal_date": sig.signal_date,
                 "signal_key": "extra",
@@ -151,15 +162,15 @@ def upsert_signals(signals: List[AccountSignal]) -> int:
 
     res = sb.table("account_signals_daily").upsert(
         rows,
-        on_conflict="account_id,signal_date,signal_key",
+        on_conflict="tenant_id,account_id,signal_date,signal_key",
     ).execute()
 
     return len(res.data) if res.data else 0
 
 
-def latest_signals(external_id: str) -> Optional[Dict[str, Any]]:
+def latest_signals(external_id: str, tenant_id: str = DEFAULT_TENANT) -> Optional[Dict[str, Any]]:
     """Get latest signals for an account, pivoted back to a flat dict."""
-    account_id = get_account_id(external_id)
+    account_id = get_account_id(external_id, tenant_id=tenant_id)
     if not account_id:
         return None
 
@@ -167,6 +178,7 @@ def latest_signals(external_id: str) -> Optional[Dict[str, Any]]:
     res = (
         sb.table("account_signals_daily")
         .select("signal_key, signal_value, signal_text, signal_date")
+        .eq("tenant_id", tenant_id)
         .eq("account_id", account_id)
         .order("signal_date", desc=True)
         .limit(20)  # get enough rows for latest date
@@ -194,7 +206,7 @@ def latest_signals(external_id: str) -> Optional[Dict[str, Any]]:
 # Churn scores
 # ---------------------------------------------------------------------------
 
-def insert_scores(scores: List[ChurnScore]) -> int:
+def insert_scores(scores: List[ChurnScore], tenant_id: str = DEFAULT_TENANT) -> int:
     """Upsert churn scores."""
     if not scores:
         return 0
@@ -204,10 +216,11 @@ def insert_scores(scores: List[ChurnScore]) -> int:
     today = date.today().isoformat()
 
     for score in scores:
-        account_id = get_account_id(score.external_id)
+        account_id = get_account_id(score.external_id, tenant_id=tenant_id)
         if not account_id:
             continue
         rows.append({
+            "tenant_id": tenant_id,
             "account_id": account_id,
             "score_date": today,
             "churn_risk_pct": float(score.churn_probability * 100),
@@ -224,13 +237,13 @@ def insert_scores(scores: List[ChurnScore]) -> int:
 
     res = sb.table("churn_scores_daily").upsert(
         rows,
-        on_conflict="account_id,score_date",
+        on_conflict="tenant_id,account_id,score_date",
     ).execute()
 
     return len(res.data) if res.data else 0
 
 
-def latest_scores(limit: int = 200) -> List[Dict[str, Any]]:
+def latest_scores(limit: int = 200, tenant_id: str = DEFAULT_TENANT) -> List[Dict[str, Any]]:
     """Get the most recent score per account, joined with account info."""
     sb = get_client()
 
@@ -238,6 +251,7 @@ def latest_scores(limit: int = 200) -> List[Dict[str, Any]]:
     res = (
         sb.table("churn_scores_daily")
         .select("*, accounts(name, domain, arr, source, external_id, metadata)")
+        .eq("tenant_id", tenant_id)
         .order("score_date", desc=True)
         .order("churn_risk_pct", desc=True)
         .limit(limit)
@@ -275,8 +289,8 @@ def latest_scores(limit: int = 200) -> List[Dict[str, Any]]:
     return results
 
 
-def score_history(external_id: str, limit: int = 30) -> List[Dict[str, Any]]:
-    account_id = get_account_id(external_id)
+def score_history(external_id: str, limit: int = 30, tenant_id: str = DEFAULT_TENANT) -> List[Dict[str, Any]]:
+    account_id = get_account_id(external_id, tenant_id=tenant_id)
     if not account_id:
         return []
 
@@ -284,6 +298,7 @@ def score_history(external_id: str, limit: int = 30) -> List[Dict[str, Any]]:
     res = (
         sb.table("churn_scores_daily")
         .select("*")
+        .eq("tenant_id", tenant_id)
         .eq("account_id", account_id)
         .order("score_date", desc=True)
         .limit(limit)

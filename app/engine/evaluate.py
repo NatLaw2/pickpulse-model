@@ -17,6 +17,7 @@ def evaluate_model(
     df: pd.DataFrame,
     module: ModuleConfig,
     output_dir: str = "outputs",
+    tenant_id: str | None = None,
 ) -> Dict[str, Any]:
     """Run full evaluation on a labeled dataset.
 
@@ -38,7 +39,7 @@ def evaluate_model(
     print(f"{'=' * 60}\n")
 
     # Score the dataset
-    scored = predict(df, module)
+    scored = predict(df, module, tenant_id=tenant_id)
     # Reset index so scored and arrays align
     scored = scored.reset_index(drop=True)
 

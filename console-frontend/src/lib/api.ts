@@ -1,11 +1,44 @@
+import { supabase } from './supabase';
+
 const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://pickpulse-churn-api.onrender.com/api';
 const MOD = 'churn';
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    return { Authorization: `Bearer ${session.access_token}` };
+  }
+  return {};
+}
+
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...opts?.headers },
+  const authHeaders = await getAuthHeaders();
+  let res = await fetch(`${BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...authHeaders, ...opts?.headers },
     ...opts,
   });
+
+  // If 401, try refreshing the session once
+  if (res.status === 401) {
+    const { data: { session } } = await supabase.auth.refreshSession();
+    if (session?.access_token) {
+      res = await fetch(`${BASE}${path}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          ...opts?.headers,
+        },
+        ...opts,
+      });
+    }
+    if (res.status === 401) {
+      // Session expired — redirect to login
+      await supabase.auth.signOut();
+      window.location.href = '/login';
+      throw new Error('Session expired');
+    }
+  }
+
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`${res.status}: ${body}`);
@@ -41,7 +74,12 @@ export const api = {
   uploadDataset: async (file: File) => {
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(`${BASE}/datasets/${MOD}/upload`, { method: 'POST', body: form });
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${BASE}/datasets/${MOD}/upload`, {
+      method: 'POST',
+      body: form,
+      headers: authHeaders,
+    });
     if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
     return res.json() as Promise<UploadResponse>;
   },

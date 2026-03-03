@@ -19,6 +19,7 @@ def train_model(
     module: ModuleConfig,
     val_frac: float = 0.2,
     model_type: str = "auto",
+    tenant_id: str | None = None,
 ) -> Dict[str, Any]:
     """Train a binary classifier for the given module.
 
@@ -141,16 +142,17 @@ def train_model(
         print(f"  {f['feature']:30s}  importance={f['importance']:+.5f}")
 
     # Save artifacts
-    os.makedirs(module.artifact_dir, exist_ok=True)
+    artifact_dir = module.get_artifact_dir(tenant_id)
+    os.makedirs(artifact_dir, exist_ok=True)
 
-    model_path = os.path.join(module.artifact_dir, "model.joblib")
+    model_path = os.path.join(artifact_dir, "model.joblib")
     joblib.dump(calibrated_model, model_path)
     print(f"\n[train] Saved model -> {model_path}")
 
-    base_model_path = os.path.join(module.artifact_dir, "base_model.joblib")
+    base_model_path = os.path.join(artifact_dir, "base_model.joblib")
     joblib.dump(base_model, base_model_path)
 
-    feature_meta_path = os.path.join(module.artifact_dir, "feature_meta.json")
+    feature_meta_path = os.path.join(artifact_dir, "feature_meta.json")
     # Convert numpy types for JSON serialization
     serializable_meta = _make_serializable(feature_meta)
     with open(feature_meta_path, "w") as f:
@@ -158,7 +160,7 @@ def train_model(
 
     # Model versioning — increment from previous version
     version_num = 1
-    prev_meta_path = os.path.join(module.artifact_dir, "metadata.json")
+    prev_meta_path = os.path.join(artifact_dir, "metadata.json")
     if os.path.exists(prev_meta_path):
         try:
             with open(prev_meta_path) as f:
@@ -192,7 +194,7 @@ def train_model(
         },
     }
 
-    meta_path = os.path.join(module.artifact_dir, "metadata.json")
+    meta_path = os.path.join(artifact_dir, "metadata.json")
     with open(meta_path, "w") as f:
         json.dump(metadata, f, indent=2, default=str)
     print(f"[train] Saved metadata -> {meta_path}")

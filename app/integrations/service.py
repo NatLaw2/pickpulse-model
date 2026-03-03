@@ -518,7 +518,7 @@ def trigger_sync(tenant_id: str, provider: str) -> SyncResult:
     update_sync_state(integration_id, "accounts", status="running")
     try:
         accounts = connector.pull_accounts()
-        result.accounts_synced = repo.upsert_accounts(accounts)
+        result.accounts_synced = repo.upsert_accounts(accounts, tenant_id=tenant_id)
         update_sync_state(
             integration_id, "accounts",
             status="completed",
@@ -537,10 +537,10 @@ def trigger_sync(tenant_id: str, provider: str) -> SyncResult:
     if result.accounts_synced > 0:
         update_sync_state(integration_id, "signals", status="running")
         try:
-            stored = repo.list_accounts(source=provider, limit=10000)
+            stored = repo.list_accounts(source=provider, limit=10000, tenant_id=tenant_id)
             eids = [a["external_id"] for a in stored]
             signals = connector.pull_signals(eids)
-            result.signals_synced = repo.upsert_signals(signals)
+            result.signals_synced = repo.upsert_signals(signals, tenant_id=tenant_id)
             update_sync_state(
                 integration_id, "signals",
                 status="completed",
@@ -593,7 +593,7 @@ def check_health(tenant_id: str, provider: str) -> Dict[str, Any]:
         except Exception:
             connected = False
 
-    account_count = repo.account_count(source=provider)
+    account_count = repo.account_count(source=provider, tenant_id=tenant_id)
     sync_states = get_sync_state(integration["id"])
 
     return {

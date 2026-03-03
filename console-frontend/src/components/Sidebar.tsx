@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Database, Brain, BarChart3,
-  Crosshair, Code2, ListChecks, FileText, ShieldAlert, Plug
+  Crosshair, Code2, ListChecks, FileText, ShieldAlert, Plug, LogOut
 } from 'lucide-react';
 import { useDataset } from '../lib/DatasetContext';
+import { useAuth } from '../lib/AuthContext';
 
 const links = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -19,6 +20,7 @@ const links = [
 
 export function Sidebar() {
   const { dataset } = useDataset();
+  const { user, signOut } = useAuth();
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-56 bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)] flex flex-col z-30">
@@ -88,8 +90,22 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="px-4 py-3 border-t border-[var(--color-border)] text-[10px] text-[var(--color-text-muted)]">
-        v1.0.0
+      <div className="px-4 py-3 border-t border-[var(--color-border)]">
+        {user && (
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-[var(--color-text-muted)] truncate max-w-[120px]" title={user.email}>
+              {user.email}
+            </span>
+            <button
+              onClick={() => signOut()}
+              className="p-1 text-[var(--color-text-muted)] hover:text-red-400 transition-colors"
+              title="Sign out"
+            >
+              <LogOut size={13} />
+            </button>
+          </div>
+        )}
+        <div className="text-[10px] text-[var(--color-text-muted)] mt-1">v1.0.0</div>
       </div>
     </aside>
   );
