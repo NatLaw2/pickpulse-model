@@ -50,49 +50,42 @@ CREATE INDEX IF NOT EXISTS idx_scores_tenant
     ON public.churn_scores_daily (tenant_id);
 
 -- ---------------------------------------------------------------------------
--- 4) model_runs — add tenant_id
+-- 4-8) Engine tables — only alter if they exist in this database
+--      (these tables may not have been created in Supabase; the app
+--       stores model artifacts on disk, not in these tables)
 -- ---------------------------------------------------------------------------
-ALTER TABLE public.model_runs
-    ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
+DO $$
+BEGIN
+    -- model_runs
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'model_runs') THEN
+        ALTER TABLE public.model_runs ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
+        CREATE INDEX IF NOT EXISTS idx_model_runs_tenant ON public.model_runs (tenant_id);
+    END IF;
 
-CREATE INDEX IF NOT EXISTS idx_model_runs_tenant
-    ON public.model_runs (tenant_id);
+    -- model_run_rows
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'model_run_rows') THEN
+        ALTER TABLE public.model_run_rows ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
+        CREATE INDEX IF NOT EXISTS idx_model_run_rows_tenant ON public.model_run_rows (tenant_id);
+    END IF;
 
--- ---------------------------------------------------------------------------
--- 5) model_run_rows — add tenant_id
--- ---------------------------------------------------------------------------
-ALTER TABLE public.model_run_rows
-    ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
+    -- predictions_live
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'predictions_live') THEN
+        ALTER TABLE public.predictions_live ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
+        CREATE INDEX IF NOT EXISTS idx_predictions_live_tenant ON public.predictions_live (tenant_id);
+    END IF;
 
-CREATE INDEX IF NOT EXISTS idx_model_run_rows_tenant
-    ON public.model_run_rows (tenant_id);
+    -- datasets
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'datasets') THEN
+        ALTER TABLE public.datasets ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
+        CREATE INDEX IF NOT EXISTS idx_datasets_tenant ON public.datasets (tenant_id);
+    END IF;
 
--- ---------------------------------------------------------------------------
--- 6) predictions_live — add tenant_id
--- ---------------------------------------------------------------------------
-ALTER TABLE public.predictions_live
-    ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
-
-CREATE INDEX IF NOT EXISTS idx_predictions_live_tenant
-    ON public.predictions_live (tenant_id);
-
--- ---------------------------------------------------------------------------
--- 7) datasets — add tenant_id
--- ---------------------------------------------------------------------------
-ALTER TABLE public.datasets
-    ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
-
-CREATE INDEX IF NOT EXISTS idx_datasets_tenant
-    ON public.datasets (tenant_id);
-
--- ---------------------------------------------------------------------------
--- 8) onboarding_customers — add tenant_id
--- ---------------------------------------------------------------------------
-ALTER TABLE public.onboarding_customers
-    ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
-
-CREATE INDEX IF NOT EXISTS idx_onboarding_customers_tenant
-    ON public.onboarding_customers (tenant_id);
+    -- onboarding_customers
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'onboarding_customers') THEN
+        ALTER TABLE public.onboarding_customers ADD COLUMN IF NOT EXISTS tenant_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
+        CREATE INDEX IF NOT EXISTS idx_onboarding_customers_tenant ON public.onboarding_customers (tenant_id);
+    END IF;
+END $$;
 
 -- ===========================================================================
 -- RLS Policies for authenticated role (tenant_id = auth.uid())
@@ -125,40 +118,29 @@ CREATE POLICY "Tenant isolation on churn_scores_daily"
     USING (tenant_id = auth.uid())
     WITH CHECK (tenant_id = auth.uid());
 
--- model_runs
-CREATE POLICY "Tenant isolation on model_runs"
-    ON public.model_runs FOR ALL
-    TO authenticated
-    USING (tenant_id = auth.uid())
-    WITH CHECK (tenant_id = auth.uid());
+-- Engine tables RLS policies (only if tables exist)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'model_runs') THEN
+        EXECUTE 'CREATE POLICY "Tenant isolation on model_runs" ON public.model_runs FOR ALL TO authenticated USING (tenant_id = auth.uid()) WITH CHECK (tenant_id = auth.uid())';
+    END IF;
 
--- model_run_rows
-CREATE POLICY "Tenant isolation on model_run_rows"
-    ON public.model_run_rows FOR ALL
-    TO authenticated
-    USING (tenant_id = auth.uid())
-    WITH CHECK (tenant_id = auth.uid());
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'model_run_rows') THEN
+        EXECUTE 'CREATE POLICY "Tenant isolation on model_run_rows" ON public.model_run_rows FOR ALL TO authenticated USING (tenant_id = auth.uid()) WITH CHECK (tenant_id = auth.uid())';
+    END IF;
 
--- predictions_live
-CREATE POLICY "Tenant isolation on predictions_live"
-    ON public.predictions_live FOR ALL
-    TO authenticated
-    USING (tenant_id = auth.uid())
-    WITH CHECK (tenant_id = auth.uid());
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'predictions_live') THEN
+        EXECUTE 'CREATE POLICY "Tenant isolation on predictions_live" ON public.predictions_live FOR ALL TO authenticated USING (tenant_id = auth.uid()) WITH CHECK (tenant_id = auth.uid())';
+    END IF;
 
--- datasets
-CREATE POLICY "Tenant isolation on datasets"
-    ON public.datasets FOR ALL
-    TO authenticated
-    USING (tenant_id = auth.uid())
-    WITH CHECK (tenant_id = auth.uid());
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'datasets') THEN
+        EXECUTE 'CREATE POLICY "Tenant isolation on datasets" ON public.datasets FOR ALL TO authenticated USING (tenant_id = auth.uid()) WITH CHECK (tenant_id = auth.uid())';
+    END IF;
 
--- onboarding_customers
-CREATE POLICY "Tenant isolation on onboarding_customers"
-    ON public.onboarding_customers FOR ALL
-    TO authenticated
-    USING (tenant_id = auth.uid())
-    WITH CHECK (tenant_id = auth.uid());
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'onboarding_customers') THEN
+        EXECUTE 'CREATE POLICY "Tenant isolation on onboarding_customers" ON public.onboarding_customers FOR ALL TO authenticated USING (tenant_id = auth.uid()) WITH CHECK (tenant_id = auth.uid())';
+    END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- Integration child tables: tenant isolation via join to integrations
