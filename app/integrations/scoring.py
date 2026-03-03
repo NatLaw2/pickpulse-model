@@ -98,10 +98,20 @@ def score_accounts() -> List[ChurnScore]:
     # "bins must increase monotonically". For small batches, use the
     # uncalibrated base model directly.
     base_path = os.path.join(module.artifact_dir, "base_model.joblib")
-    if len(X) < 10 and os.path.exists(base_path):
+    logger.info("Scoring %d rows, base_model exists=%s", len(X), os.path.exists(base_path))
+    if len(X) < 50 and os.path.exists(base_path):
+        logger.info("Using base (uncalibrated) model for small batch")
         model = joblib.load(base_path)
 
-    probs = model.predict_proba(X)[:, 1]
+    try:
+        probs = model.predict_proba(X)[:, 1]
+    except ValueError:
+        logger.warning("Calibrated model failed, falling back to base model")
+        if os.path.exists(base_path):
+            model = joblib.load(base_path)
+            probs = model.predict_proba(X)[:, 1]
+        else:
+            raise
     probs = probs.clip(module.calibration.prob_floor, module.calibration.prob_ceil)
 
     # Build scores
