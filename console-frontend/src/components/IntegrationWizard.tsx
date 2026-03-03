@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../lib/api';
 import type { FieldMapping, ProviderInfo } from '../lib/api';
 import {
-  ArrowLeft, ArrowRight, Check, ExternalLink, Key, Loader2, Upload, X,
+  ArrowLeft, ArrowRight, Check, ExternalLink, Loader2, Upload, X,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------

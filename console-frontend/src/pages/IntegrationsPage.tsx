@@ -1,16 +1,34 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import type { ProviderInfo, IntegrationScore, RunDemoResponse } from '../lib/api';
+import type {
+  ProviderInfo, IntegrationScore, HealthResponse,
+  IntegrationAccount,
+} from '../lib/api';
 import { formatCurrency } from '../lib/format';
 import { IntegrationWizard } from '../components/IntegrationWizard';
 import {
   Plug, RefreshCw, Play, Key, CheckCircle2, XCircle,
   AlertTriangle, Loader2, Users, Zap, ArrowRight, ExternalLink,
-  Unplug, Clock, Shield,
+  Unplug, Clock, Shield, Activity,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
-// Provider card (new platform)
+// Helpers
+// ---------------------------------------------------------------------------
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return 'never';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+// ---------------------------------------------------------------------------
+// Provider card
 // ---------------------------------------------------------------------------
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -23,21 +41,21 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 function ProviderCard({
   provider,
+  health,
   onSetup,
   onSync,
-  onRunDemo,
   onDisconnect,
-  demoRunning,
+  syncing,
 }: {
   provider: ProviderInfo;
+  health: HealthResponse | null;
   onSetup: (p: ProviderInfo) => void;
   onSync: (name: string) => void;
-  onRunDemo: (name: string) => void;
   onDisconnect: (name: string) => void;
-  demoRunning: boolean;
+  syncing: boolean;
 }) {
   const isComingSoon = provider.template_status === 'coming_soon';
-  const isConnected = provider.enabled && provider.status !== 'not_configured';
+  const isConnected = health?.connected || (provider.enabled && provider.status !== 'not_configured');
 
   const statusColor: Record<string, string> = {
     not_configured: 'text-[var(--color-text-muted)]',
@@ -49,12 +67,21 @@ function ProviderCard({
     disconnected: 'text-[var(--color-text-muted)]',
   };
 
+  const displayStatus = health?.status || provider.status;
+
   const StatusIcon = isConnected
-    ? provider.status === 'healthy' ? CheckCircle2
-      : provider.status === 'error' ? XCircle
-      : provider.status === 'syncing' ? Loader2
+    ? displayStatus === 'healthy' ? CheckCircle2
+      : displayStatus === 'error' ? XCircle
+      : displayStatus === 'syncing' ? Loader2
       : Plug
     : Key;
+
+  // Find last sync time from health data
+  const lastSync = health?.sync_states
+    ?.map(s => s.last_synced_at)
+    .filter(Boolean)
+    .sort()
+    .reverse()[0] ?? null;
 
   return (
     <div className={`
@@ -78,16 +105,21 @@ function ProviderCard({
       </p>
 
       {isConnected && (
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
           <div className="flex items-center gap-1">
-            <StatusIcon size={12} className={statusColor[provider.status] || 'text-gray-400'} />
-            <span className={`text-[10px] capitalize ${statusColor[provider.status]}`}>
-              {provider.status.replace('_', ' ')}
+            <StatusIcon size={12} className={statusColor[displayStatus] || 'text-gray-400'} />
+            <span className={`text-[10px] capitalize ${statusColor[displayStatus]}`}>
+              {displayStatus.replace('_', ' ')}
             </span>
           </div>
           <span className="text-[10px] text-[var(--color-text-muted)]">
-            {provider.account_count} accounts
+            {health?.account_count ?? provider.account_count} accounts
           </span>
+          {lastSync && (
+            <span className="text-[10px] text-[var(--color-text-muted)]">
+              synced {timeAgo(lastSync)}
+            </span>
+          )}
         </div>
       )}
 
@@ -101,23 +133,18 @@ function ProviderCard({
             onClick={() => onSetup(provider)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90"
           >
-            <Key size={12} /> Connect
+            {provider.auth_method === 'oauth' ? <ExternalLink size={12} /> : <Key size={12} />}
+            Connect{provider.auth_method === 'oauth' ? ` ${provider.display_name}` : ''}
           </button>
         ) : (
           <>
             <button
               onClick={() => onSync(provider.provider)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)]"
+              disabled={syncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)] disabled:opacity-40"
             >
-              <RefreshCw size={12} /> Sync
-            </button>
-            <button
-              onClick={() => onRunDemo(provider.provider)}
-              disabled={demoRunning}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40"
-            >
-              {demoRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-              Sync + Score
+              {syncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Sync Now
             </button>
             <button
               onClick={() => onDisconnect(provider.provider)}
@@ -129,6 +156,48 @@ function ProviderCard({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Accounts table
+// ---------------------------------------------------------------------------
+
+function AccountsTable({ accounts }: { accounts: IntegrationAccount[] }) {
+  if (accounts.length === 0) return null;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-[var(--color-border)]">
+            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Name</th>
+            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Source</th>
+            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Plan</th>
+            <th className="text-right py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">ARR</th>
+            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Industry</th>
+            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Synced</th>
+          </tr>
+        </thead>
+        <tbody>
+          {accounts.map((a) => (
+            <tr key={a.external_id} className="border-b border-[var(--color-border)]/50 hover:bg-[rgba(255,255,255,0.02)]">
+              <td className="py-2.5 px-3">
+                <div className="text-[var(--color-text-primary)] font-medium">{a.name || a.external_id}</div>
+                {a.email && <div className="text-[10px] text-[var(--color-text-muted)]">{a.email}</div>}
+              </td>
+              <td className="py-2.5 px-3 text-[var(--color-text-muted)] text-xs capitalize">{a.source}</td>
+              <td className="py-2.5 px-3 text-xs text-[var(--color-text-secondary)]">{a.plan || '—'}</td>
+              <td className="py-2.5 px-3 text-right font-mono text-[var(--color-text-primary)]">
+                {a.arr != null ? formatCurrency(a.arr) : '—'}
+              </td>
+              <td className="py-2.5 px-3 text-xs text-[var(--color-text-secondary)]">{a.industry || '—'}</td>
+              <td className="py-2.5 px-3 text-xs text-[var(--color-text-muted)]">{timeAgo(a.synced_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -191,33 +260,39 @@ function ScoresTable({ scores }: { scores: IntegrationScore[] }) {
 
 export function IntegrationsPage() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [healthMap, setHealthMap] = useState<Record<string, HealthResponse>>({});
+  const [accounts, setAccounts] = useState<IntegrationAccount[]>([]);
   const [scores, setScores] = useState<IntegrationScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [scoring, setScoring] = useState(false);
-  const [runningDemo, setRunningDemo] = useState<string | null>(null);
   const [wizardProvider, setWizardProvider] = useState<ProviderInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 5000);
   };
+
+  // ------------------------------------------------------------------
+  // Data loading
+  // ------------------------------------------------------------------
 
   const loadData = useCallback(async () => {
     try {
-      const [intRes, scoresRes] = await Promise.all([
-        api.integrations(),
+      const [intRes, acctRes, scoresRes] = await Promise.all([
+        api.integrations().catch(() => ({ providers: [], connectors: [] })),
+        api.integrationAccounts().catch(() => ({ accounts: [], total: 0, showing: 0 })),
         api.latestScores().catch(() => ({ scores: [], count: 0 })),
       ]);
 
       // Handle both new platform and legacy responses
-      if (intRes.providers) {
-        setProviders(intRes.providers);
-      } else if (intRes.connectors) {
-        // Map legacy connectors to ProviderInfo shape
-        setProviders(intRes.connectors.map((c) => ({
+      let providerList: ProviderInfo[] = [];
+      if (intRes.providers && intRes.providers.length > 0) {
+        providerList = intRes.providers;
+      } else if (intRes.connectors && intRes.connectors.length > 0) {
+        providerList = intRes.connectors.map((c) => ({
           provider: c.name,
           display_name: c.display_name,
           category: '',
@@ -230,10 +305,25 @@ export function IntegrationsPage() {
           template_status: 'available' as const,
           integration_id: null,
           account_count: c.account_count,
-        })));
+        }));
       }
-
+      setProviders(providerList);
+      setAccounts(acctRes.accounts);
       setScores(scoresRes.scores);
+
+      // Fetch health for connected providers
+      const connected = providerList.filter(
+        (p) => p.enabled || p.status === 'healthy' || p.status === 'connected'
+      );
+      const healthResults: Record<string, HealthResponse> = {};
+      await Promise.all(
+        connected.map(async (p) => {
+          try {
+            healthResults[p.provider] = await api.integrationHealth(p.provider);
+          } catch { /* ignore */ }
+        })
+      );
+      setHealthMap(healthResults);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -241,14 +331,49 @@ export function IntegrationsPage() {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // ------------------------------------------------------------------
+  // OAuth return detection
+  // ------------------------------------------------------------------
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthStatus = params.get('oauth');
+    const oauthProvider = params.get('provider');
+
+    if (oauthStatus === 'success' && oauthProvider) {
+      showToast(`${oauthProvider.charAt(0).toUpperCase() + oauthProvider.slice(1)} connected successfully! Fetching latest data...`);
+      // Clean up URL params without page reload
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    loadData();
+  }, [loadData]);
+
+  // ------------------------------------------------------------------
+  // Actions
+  // ------------------------------------------------------------------
+
+  const handleConnectOAuth = async (provider: ProviderInfo) => {
+    if (provider.auth_method === 'oauth') {
+      try {
+        const redirectUri = `${window.location.origin}/integrations`;
+        const res = await api.startOAuth(provider.provider, redirectUri);
+        window.location.href = res.auth_url;
+      } catch (e: any) {
+        setError(e.message);
+      }
+    } else {
+      setWizardProvider(provider);
+    }
+  };
 
   const handleSync = async (name: string) => {
     setSyncing(name);
+    setError(null);
     try {
       const result = await api.syncIntegration(name);
-      showToast(`Synced ${result.accounts_synced} accounts from ${name}`);
-      loadData();
+      showToast(`Synced ${result.accounts_synced} accounts, ${result.signals_synced} signals from ${name}`);
+      await loadData();
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -258,10 +383,11 @@ export function IntegrationsPage() {
 
   const handleScore = async () => {
     setScoring(true);
+    setError(null);
     try {
       const result = await api.triggerScoring();
       showToast(`Scored ${result.accounts_scored} accounts — ${formatCurrency(result.total_arr_at_risk)} ARR at risk`);
-      loadData();
+      await loadData();
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -269,33 +395,24 @@ export function IntegrationsPage() {
     }
   };
 
-  const handleRunDemo = async (connectorName: string) => {
-    setRunningDemo(connectorName);
-    try {
-      const result: RunDemoResponse = await api.runDemo(connectorName);
-      showToast(
-        `Synced ${result.synced_accounts} accounts, scored ${result.scored_accounts} — ${formatCurrency(result.total_arr_at_risk)} ARR at risk`
-      );
-      loadData();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setRunningDemo(null);
-    }
-  };
-
   const handleDisconnect = async (provider: string) => {
     try {
       await api.disconnectIntegration(provider);
       showToast(`${provider} disconnected`);
-      loadData();
+      await loadData();
     } catch (e: any) {
       setError(e.message);
     }
   };
 
-  const connectedProviders = providers.filter((p) => p.enabled);
-  const totalAccounts = providers.reduce((sum, p) => sum + (p.account_count || 0), 0);
+  // ------------------------------------------------------------------
+  // Computed
+  // ------------------------------------------------------------------
+
+  const connectedProviders = providers.filter(
+    (p) => p.enabled || healthMap[p.provider]?.connected
+  );
+  const totalAccounts = accounts.length;
   const enabledCount = connectedProviders.length;
 
   // Group by category
@@ -305,7 +422,6 @@ export function IntegrationsPage() {
     providers: providers.filter((p) => p.category === cat),
   })).filter((g) => g.providers.length > 0);
 
-  // Ungrouped
   const groupedProviders = new Set(grouped.flatMap((g) => g.providers.map((p) => p.provider)));
   const ungrouped = providers.filter((p) => !groupedProviders.has(p.provider));
 
@@ -313,6 +429,7 @@ export function IntegrationsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-6 w-6 animate-spin text-[var(--color-accent)]" />
+        <span className="ml-2 text-sm text-[var(--color-text-muted)]">Loading integrations...</span>
       </div>
     );
   }
@@ -321,7 +438,8 @@ export function IntegrationsPage() {
     <div className="max-w-5xl">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-green-500/20 border border-green-500/30 text-green-300 px-4 py-2.5 rounded-xl text-sm backdrop-blur-md">
+        <div className="fixed top-4 right-4 z-50 bg-green-500/20 border border-green-500/30 text-green-300 px-4 py-2.5 rounded-xl text-sm backdrop-blur-md flex items-center gap-2">
+          <CheckCircle2 size={14} />
           {toast}
         </div>
       )}
@@ -349,8 +467,11 @@ export function IntegrationsPage() {
       {/* Error banner */}
       {error && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-300 flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 text-xs">Dismiss</button>
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={14} />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 text-xs ml-4">Dismiss</button>
         </div>
       )}
 
@@ -389,11 +510,11 @@ export function IntegrationsPage() {
               <ProviderCard
                 key={p.provider}
                 provider={p}
-                onSetup={setWizardProvider}
+                health={healthMap[p.provider] || null}
+                onSetup={handleConnectOAuth}
                 onSync={handleSync}
-                onRunDemo={handleRunDemo}
                 onDisconnect={handleDisconnect}
-                demoRunning={runningDemo === p.provider}
+                syncing={syncing === p.provider}
               />
             ))}
           </div>
@@ -408,24 +529,24 @@ export function IntegrationsPage() {
               <ProviderCard
                 key={p.provider}
                 provider={p}
-                onSetup={setWizardProvider}
+                health={healthMap[p.provider] || null}
+                onSetup={handleConnectOAuth}
                 onSync={handleSync}
-                onRunDemo={handleRunDemo}
                 onDisconnect={handleDisconnect}
-                demoRunning={runningDemo === p.provider}
+                syncing={syncing === p.provider}
               />
             ))}
           </div>
         </div>
       )}
 
-      {/* Pipeline: Sync → Score */}
-      {enabledCount > 0 && (
+      {/* Scoring pipeline */}
+      {(enabledCount > 0 || totalAccounts > 0) && (
         <div className="mb-6 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
             <Zap size={14} className="text-[var(--color-accent)]" /> Scoring Pipeline
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]">
               <Users size={14} className="text-[var(--color-text-muted)]" />
               <span className="text-xs text-[var(--color-text-secondary)]">{totalAccounts} accounts</span>
@@ -437,7 +558,7 @@ export function IntegrationsPage() {
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40"
             >
               {scoring ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-              Score All Accounts
+              Rescore All
             </button>
             <ArrowRight size={14} className="text-[var(--color-text-muted)]" />
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]">
@@ -448,13 +569,36 @@ export function IntegrationsPage() {
         </div>
       )}
 
+      {/* Accounts table */}
+      {accounts.length > 0 && (
+        <div className="mb-6 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5">
+          <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
+            <Users size={14} className="text-[var(--color-accent)]" /> Synced Accounts
+            <span className="text-[10px] font-normal text-[var(--color-text-muted)] ml-1">({accounts.length})</span>
+          </h2>
+          <AccountsTable accounts={accounts} />
+        </div>
+      )}
+
       {/* Scores table */}
       {scores.length > 0 && (
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
-            <Zap size={14} className="text-[var(--color-accent)]" /> Latest Churn Scores
+            <Activity size={14} className="text-[var(--color-accent)]" /> Latest Churn Scores
+            <span className="text-[10px] font-normal text-[var(--color-text-muted)] ml-1">({scores.length})</span>
           </h2>
           <ScoresTable scores={scores} />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {enabledCount === 0 && accounts.length === 0 && scores.length === 0 && (
+        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-8 text-center">
+          <Plug size={32} className="mx-auto mb-3 text-[var(--color-text-muted)]" />
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">No integrations connected</h3>
+          <p className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto">
+            Connect HubSpot, Stripe, or another provider above to sync real customer data and score it against your churn model.
+          </p>
         </div>
       )}
     </div>
