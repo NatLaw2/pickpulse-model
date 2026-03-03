@@ -484,17 +484,24 @@ export interface SyncResponse {
 }
 
 export interface IntegrationAccount {
-  id: number;
+  id: string;
   external_id: string;
   source: string;
   name: string;
-  email: string | null;
-  plan: string | null;
+  domain?: string | null;
+  email?: string | null;
   arr: number | null;
-  seats: number | null;
-  industry: string | null;
-  company_size: string | null;
-  synced_at: string;
+  mrr?: number | null;
+  status?: string | null;
+  metadata?: {
+    plan?: string | null;
+    seats?: number | null;
+    industry?: string | null;
+    company_size?: string | null;
+    [key: string]: unknown;
+  };
+  created_at: string;
+  updated_at: string;
 }
 
 export interface IntegrationAccountsResponse {

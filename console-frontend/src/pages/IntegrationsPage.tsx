@@ -174,10 +174,10 @@ function AccountsTable({ accounts }: { accounts: IntegrationAccount[] }) {
           <tr className="border-b border-[var(--color-border)]">
             <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Name</th>
             <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Source</th>
-            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Plan</th>
+            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Status</th>
             <th className="text-right py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">ARR</th>
             <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Industry</th>
-            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Synced</th>
+            <th className="text-left py-2 px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">Last Updated</th>
           </tr>
         </thead>
         <tbody>
@@ -185,15 +185,15 @@ function AccountsTable({ accounts }: { accounts: IntegrationAccount[] }) {
             <tr key={a.external_id} className="border-b border-[var(--color-border)]/50 hover:bg-[rgba(255,255,255,0.02)]">
               <td className="py-2.5 px-3">
                 <div className="text-[var(--color-text-primary)] font-medium">{a.name || a.external_id}</div>
-                {a.email && <div className="text-[10px] text-[var(--color-text-muted)]">{a.email}</div>}
+                {a.domain && <div className="text-[10px] text-[var(--color-text-muted)]">{a.domain}</div>}
               </td>
               <td className="py-2.5 px-3 text-[var(--color-text-muted)] text-xs capitalize">{a.source}</td>
-              <td className="py-2.5 px-3 text-xs text-[var(--color-text-secondary)]">{a.plan || '—'}</td>
+              <td className="py-2.5 px-3 text-xs text-[var(--color-text-secondary)] capitalize">{a.status || '—'}</td>
               <td className="py-2.5 px-3 text-right font-mono text-[var(--color-text-primary)]">
                 {a.arr != null ? formatCurrency(a.arr) : '—'}
               </td>
-              <td className="py-2.5 px-3 text-xs text-[var(--color-text-secondary)]">{a.industry || '—'}</td>
-              <td className="py-2.5 px-3 text-xs text-[var(--color-text-muted)]">{timeAgo(a.synced_at)}</td>
+              <td className="py-2.5 px-3 text-xs text-[var(--color-text-secondary)]">{a.metadata?.industry || '—'}</td>
+              <td className="py-2.5 px-3 text-xs text-[var(--color-text-muted)]">{timeAgo(a.updated_at)}</td>
             </tr>
           ))}
         </tbody>
