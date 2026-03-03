@@ -88,8 +88,18 @@ def score_accounts() -> List[ChurnScore]:
 
     feature_df = prepare_features(df, module, fit=False, meta_path=meta_path)
 
-    # Get probabilities
-    probs = model.predict_proba(feature_df)[:, 1]
+    # Get probabilities — CalibratedClassifierCV can fail on very small
+    # batches ("bins must increase monotonically"), so fall back to the
+    # base model when that happens.
+    try:
+        probs = model.predict_proba(feature_df)[:, 1]
+    except ValueError:
+        base_path = os.path.join(module.artifact_dir, "base_model.joblib")
+        if os.path.exists(base_path):
+            base_model = joblib.load(base_path)
+            probs = base_model.predict_proba(feature_df)[:, 1]
+        else:
+            raise
     probs = probs.clip(module.calibration.prob_floor, module.calibration.prob_ceil)
 
     # Build scores
