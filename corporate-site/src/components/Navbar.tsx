@@ -38,6 +38,12 @@ export function Navbar() {
               {label}
             </NavLink>
           ))}
+          <a
+            href="https://demo.pickpulse.co"
+            className="px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors"
+          >
+            Sign In
+          </a>
           <Link
             to="/demo"
             className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
@@ -65,6 +71,13 @@ export function Navbar() {
               {label}
             </NavLink>
           ))}
+          <a
+            href="https://demo.pickpulse.co"
+            onClick={() => setOpen(false)}
+            className="block text-center px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-xl"
+          >
+            Sign In
+          </a>
           <Link
             to="/demo"
             onClick={() => setOpen(false)}
