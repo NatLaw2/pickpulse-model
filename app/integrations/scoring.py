@@ -94,18 +94,14 @@ def score_accounts() -> List[ChurnScore]:
         df, module, fit=False, feature_meta=feature_meta,
     )
 
-    # Get probabilities — CalibratedClassifierCV can fail on very small
-    # batches ("bins must increase monotonically"), so fall back to the
-    # base model when that happens.
-    try:
-        probs = model.predict_proba(X)[:, 1]
-    except ValueError:
-        base_path = os.path.join(module.artifact_dir, "base_model.joblib")
-        if os.path.exists(base_path):
-            base_model = joblib.load(base_path)
-            probs = base_model.predict_proba(X)[:, 1]
-        else:
-            raise
+    # CalibratedClassifierCV fails on very small batches with
+    # "bins must increase monotonically". For small batches, use the
+    # uncalibrated base model directly.
+    base_path = os.path.join(module.artifact_dir, "base_model.joblib")
+    if len(X) < 10 and os.path.exists(base_path):
+        model = joblib.load(base_path)
+
+    probs = model.predict_proba(X)[:, 1]
     probs = probs.clip(module.calibration.prob_floor, module.calibration.prob_ceil)
 
     # Build scores
