@@ -1092,9 +1092,8 @@ def trigger_live_scoring():
             "total_arr_at_risk": round(total_arr, 2),
         }
     except Exception as e:
-        tb = traceback.format_exc()
-        logger.error("Scoring failed:\n%s", tb)
-        raise HTTPException(status_code=500, detail=f"{e}\n\nTraceback:\n{tb}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/integrations/scores/latest")

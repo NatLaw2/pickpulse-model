@@ -76,11 +76,17 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     # ARR risk tier
     if "arr" in work.columns:
         q = work["arr"].quantile([0.25, 0.75])
-        work["arr_tier"] = pd.cut(
-            work["arr"],
-            bins=[-1, q[0.25], q[0.75], float("inf")],
-            labels=["low_value", "mid_value", "high_value"],
-        ).astype(str)
+        q25, q75 = q[0.25], q[0.75]
+        # pd.cut requires strictly increasing bins — when quantiles
+        # collapse (e.g. single-row or constant column), fall back.
+        if q25 < q75:
+            work["arr_tier"] = pd.cut(
+                work["arr"],
+                bins=[-1, q25, q75, float("inf")],
+                labels=["low_value", "mid_value", "high_value"],
+            ).astype(str)
+        else:
+            work["arr_tier"] = "mid_value"
 
     # Engagement score (composite)
     engagement_cols = ["monthly_logins", "seats"]
