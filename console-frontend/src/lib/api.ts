@@ -4,7 +4,8 @@ const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https
 const MOD = 'churn';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session }, error } = await supabase.auth.getSession();
+  console.log('[api] getAuthHeaders — session:', !!session, 'token:', session?.access_token ? session.access_token.substring(0, 20) + '...' : 'NONE', 'error:', error?.message ?? 'none');
   if (session?.access_token) {
     return { Authorization: `Bearer ${session.access_token}` };
   }
@@ -13,14 +14,22 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
   const authHeaders = await getAuthHeaders();
+  const hasToken = 'Authorization' in authHeaders;
+  console.log(`[api] ${opts?.method ?? 'GET'} ${path} — token attached: ${hasToken}`);
+
   let res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...authHeaders, ...opts?.headers },
     ...opts,
   });
 
+  console.log(`[api] ${path} — status: ${res.status}`);
+
   // If 401, try refreshing the session once
   if (res.status === 401) {
+    const errBody = await res.clone().text().catch(() => '');
+    console.warn(`[api] 401 on ${path} — body: ${errBody}. Attempting refresh...`);
     const { data: { session } } = await supabase.auth.refreshSession();
+    console.log('[api] refresh result — session:', !!session, 'token:', session?.access_token ? 'present' : 'NONE');
     if (session?.access_token) {
       res = await fetch(`${BASE}${path}`, {
         headers: {
@@ -30,17 +39,17 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
         },
         ...opts,
       });
+      console.log(`[api] retry ${path} — status: ${res.status}`);
     }
     if (res.status === 401) {
-      // Session expired — redirect to login
-      await supabase.auth.signOut();
-      window.location.href = '/login';
-      throw new Error('Session expired');
+      console.warn('[api] 401 after refresh — session may be invalid');
+      throw new Error('Unauthorized');
     }
   }
 
   if (!res.ok) {
     const body = await res.text();
+    console.error(`[api] ${path} error — ${res.status}: ${body}`);
     throw new Error(`${res.status}: ${body}`);
   }
   return res.json();

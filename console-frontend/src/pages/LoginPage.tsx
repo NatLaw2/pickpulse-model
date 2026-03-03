@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { useAuth } from '../lib/AuthContext';
+import { supabase } from '../lib/supabase';
 
 export function LoginPage() {
-  const { signIn, signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -13,17 +12,36 @@ export function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    console.log('[LoginPage] handleSubmit fired, isSignUp =', isSignUp);
     setError('');
     setLoading(true);
 
     try {
       if (isSignUp) {
-        await signUp(email, password);
+        const { error: err } = await supabase.auth.signUp({ email, password });
+        if (err) throw err;
         setSignUpSuccess(true);
       } else {
-        await signIn(email, password);
+        console.log('[LoginPage] calling signInWithPassword...');
+        const { data, error: err } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        console.log('[LoginPage] signIn response:', {
+          user: data?.user?.id,
+          session: !!data?.session,
+          error: err,
+        });
+        if (err) throw err;
+
+        // Verify session was stored
+        const { data: check } = await supabase.auth.getSession();
+        console.log('[LoginPage] post-login getSession:', !!check?.session);
+        console.log('[LoginPage] localStorage keys:', Object.keys(localStorage));
       }
     } catch (err: unknown) {
+      console.error('[LoginPage] auth error:', err);
       setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
       setLoading(false);
@@ -98,6 +116,7 @@ export function LoginPage() {
 
           <div className="mt-4 text-center">
             <button
+              type="button"
               onClick={() => {
                 setIsSignUp(!isSignUp);
                 setError('');

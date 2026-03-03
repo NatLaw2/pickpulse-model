@@ -133,6 +133,12 @@ def health():
     return {"ok": True, "service": "Churn Risk Engine"}
 
 
+@app.get("/api/auth/whoami")
+async def whoami(tenant_id: str = Depends(get_tenant_id)):
+    """Smoke-test: return the authenticated tenant info."""
+    return {"tenant_id": tenant_id}
+
+
 # -----------------------------------------------------------------------
 # Modules
 # -----------------------------------------------------------------------
