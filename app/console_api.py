@@ -43,6 +43,8 @@ try:
 except Exception:
     integration_service = None  # type: ignore[assignment]
 from .storage import repo as storage_repo
+from .outreach import router as outreach_router
+from .explain import router as explain_router
 
 app = FastAPI(title="Churn Risk Engine", version="1.0.0")
 
@@ -53,6 +55,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(outreach_router)
+app.include_router(explain_router)
 
 # ---------------------------------------------------------------------------
 # Persistent dataset state — survives server restarts
@@ -719,12 +724,23 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
     total_arr_at_risk = 0.0
     renewing_90d = 0
     high_risk_in_window = 0
+    # Recovery buckets by churn probability tier
+    high_saves = 0.0   # churn_risk_pct >= 70
+    medium_saves = 0.0  # 40 <= churn_risk_pct < 70
+    low_saves = 0.0     # churn_risk_pct < 40
     for p in predictions:
         arr_r = p.get("arr_at_risk", 0) or 0
         total_arr_at_risk += arr_r
+        pct = p.get("churn_risk_pct") or 0
+        if pct >= 70:
+            high_saves += arr_r
+        elif pct >= 40:
+            medium_saves += arr_r
+        else:
+            low_saves += arr_r
         if p.get("renewal_window_label") in ("<30d", "30-90d"):
             renewing_90d += 1
-            if (p.get("churn_risk_pct") or 0) >= 70:
+            if pct >= 70:
                 high_risk_in_window += 1
 
     # Top 10 at-risk accounts
@@ -752,6 +768,11 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
             "assumed_save_rate": save_rate,
             "renewing_90d": renewing_90d,
             "high_risk_in_window": high_risk_in_window,
+        },
+        "recovery_buckets": {
+            "high_confidence_saves": round(high_saves, 2),
+            "medium_confidence_saves": round(medium_saves, 2),
+            "low_confidence_saves": round(low_saves, 2),
         },
         "top_at_risk": top_10,
     }

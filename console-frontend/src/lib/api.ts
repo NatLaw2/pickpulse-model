@@ -191,6 +191,30 @@ export const api = {
   // Run demo: sync + score a connector in one call
   runDemo: (connectorName: string) =>
     request<RunDemoResponse>(`/integrations/${connectorName}/run-demo`, { method: 'POST' }),
+
+  // -----------------------------------------------------------------------
+  // AI Outreach Drafts
+  // -----------------------------------------------------------------------
+  draftOutreachEmail: (req: DraftEmailRequest) =>
+    request<DraftEmailResponse>('/outreach/draft-email', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+
+  // -----------------------------------------------------------------------
+  // Account Explain + Playbook
+  // -----------------------------------------------------------------------
+  explainAccount: (customerId: string) =>
+    request<ExplainResponse>(`/predictions/${encodeURIComponent(customerId)}/explain`),
+
+  downloadIcs: (customerId: string) =>
+    `${BASE}/predictions/${encodeURIComponent(customerId)}/ics`,
+
+  logPlaybookAction: (customerId: string, actionType: string) =>
+    request<{ status: string; action: string }>('/predictions/playbook/log', {
+      method: 'POST',
+      body: JSON.stringify({ customer_id: customerId, action_type: actionType }),
+    }),
 };
 
 // -----------------------------------------------------------------------
@@ -206,6 +230,11 @@ export interface DashboardResponse {
     assumed_save_rate: number;
     renewing_90d: number;
     high_risk_in_window: number;
+  };
+  recovery_buckets: {
+    high_confidence_saves: number;
+    medium_confidence_saves: number;
+    low_confidence_saves: number;
   };
   top_at_risk: ChurnPrediction[];
 }
@@ -357,6 +386,40 @@ export interface ChurnPrediction {
   recommended_action: string;
   tier: string;
   rank: number;
+}
+
+export interface DraftEmailRequest {
+  customer_id: string;
+  customer_name?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  churn_risk_pct: number;
+  arr: number;
+  arr_at_risk: number;
+  days_until_renewal: number;
+  recommended_action?: string | null;
+  risk_driver_summary?: string | null;
+  tier?: string | null;
+  tone: 'friendly' | 'direct' | 'executive';
+}
+
+export interface DraftEmailResponse {
+  subject: string;
+  body: string;
+  mailto_url: string;
+}
+
+export interface ExplainResponse {
+  customer_id: string;
+  churn_risk_pct: number;
+  arr: number;
+  arr_at_risk: number;
+  days_until_renewal: number;
+  renewal_window_label: string;
+  tier: string;
+  recommended_action: string;
+  risk_drivers: string[];
+  risk_driver_summary: string;
 }
 
 export interface PredictResponse {
