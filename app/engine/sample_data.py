@@ -166,7 +166,7 @@ _HIGH_RISK_HEROES: List[Dict[str, Any]] = [
     {"customer_id": "CloudBridge Analytics", "arr": 195000, "plan": "Enterprise", "seats": 65,
      "monthly_logins": 3, "support_tickets": 10, "nps_score": 2, "days_since_last_login": 68,
      "contract_months_remaining": 0, "days_until_renewal": 9, "auto_renew_flag": 0,
-     "renewal_status": "cancelled", "industry": "SaaS", "company_size": "201-1000"},
+     "renewal_status": "in_notice", "industry": "SaaS", "company_size": "201-1000"},
     {"customer_id": "Vanguard Retail Corp", "arr": 175000, "plan": "Enterprise", "seats": 55,
      "monthly_logins": 7, "support_tickets": 9, "nps_score": 3, "days_since_last_login": 40,
      "contract_months_remaining": 1, "days_until_renewal": 35, "auto_renew_flag": 0,
@@ -225,7 +225,7 @@ _ENTERPRISE_HEROES: List[Dict[str, Any]] = [
     {"customer_id": "CloudBridge Analytics", "arr": 210000, "plan": "Enterprise", "seats": 75,
      "monthly_logins": 5, "support_tickets": 10, "nps_score": 2, "days_since_last_login": 70,
      "contract_months_remaining": 0, "days_until_renewal": 8, "auto_renew_flag": 0,
-     "renewal_status": "cancelled", "industry": "SaaS", "company_size": "201-1000"},
+     "renewal_status": "in_notice", "industry": "SaaS", "company_size": "201-1000"},
     {"customer_id": "Vanguard Retail Corp", "arr": 190000, "plan": "Enterprise", "seats": 65,
      "monthly_logins": 9, "support_tickets": 6, "nps_score": 4, "days_since_last_login": 28,
      "contract_months_remaining": 2, "days_until_renewal": 38, "auto_renew_flag": 0,
@@ -388,13 +388,20 @@ def _generate_demo_accounts(
             "renewal_status": renewal_status,
         })
 
-    # Inject hero accounts — these are pre-churned (label=1) for dramatic demo effect
+    # Inject hero accounts — churned=0 so they remain "active" in the predict
+    # pipeline (churned=1 gets archived).  Their degraded signals ensure the
+    # model still scores them as high-risk after training on the bulk data.
     recent_date = base_date + timedelta(days=500)
     for hero in heroes:
+        # Ensure renewal_status is not "cancelled" (also causes archiving)
+        hero_renewal = hero.get("renewal_status", "in_notice")
+        if hero_renewal == "cancelled":
+            hero_renewal = "in_notice"
+
         row = {
             "customer_id": hero["customer_id"],
             "snapshot_date": recent_date.strftime("%Y-%m-%d"),
-            "churned": 1,  # heroes churn so the model learns these patterns
+            "churned": 0,
             "arr": hero["arr"],
             "plan": hero.get("plan", "Enterprise"),
             "seats": hero.get("seats", 40),
@@ -407,7 +414,7 @@ def _generate_demo_accounts(
             "company_size": hero.get("company_size", "201-1000"),
             "days_until_renewal": hero.get("days_until_renewal", 20),
             "auto_renew_flag": hero.get("auto_renew_flag", 0),
-            "renewal_status": hero.get("renewal_status", "in_notice"),
+            "renewal_status": hero_renewal,
         }
         rows.append(row)
 
