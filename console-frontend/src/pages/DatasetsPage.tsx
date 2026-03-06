@@ -1,32 +1,59 @@
 import { useCallback, useState } from 'react';
-import { Upload, Database, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Upload, Database, CheckCircle2, AlertCircle, Info, Briefcase, AlertTriangle, Building2 } from 'lucide-react';
 import { api, type UploadResponse } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 
+const DEMO_VARIANTS = [
+  {
+    key: 'balanced',
+    label: 'Balanced Demo',
+    description: 'Realistic mixed SaaS portfolio',
+    accounts: '~2,000 accounts',
+    icon: Briefcase,
+    accent: 'var(--color-accent)',
+  },
+  {
+    key: 'high_risk',
+    label: 'High-Risk Demo',
+    description: 'Curated urgent churn scenarios',
+    accounts: '~1,000 accounts',
+    icon: AlertTriangle,
+    accent: 'var(--color-danger)',
+  },
+  {
+    key: 'enterprise',
+    label: 'Enterprise Demo',
+    description: 'Large portfolio, higher ARR exposure',
+    accounts: '~4,000 accounts',
+    icon: Building2,
+    accent: 'var(--color-success)',
+  },
+] as const;
+
 export function DatasetsPage() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResponse | null>(null);
   const [error, setError] = useState('');
   const { dataset, refresh } = useDataset();
 
-  const loadSample = useCallback(async () => {
-    setLoading(true);
+  const loadSample = useCallback(async (variant: string) => {
+    setLoading(variant);
     setError('');
     try {
-      const res = await api.loadSample();
+      const res = await api.loadSample(variant);
       setResult(res);
       refresh();
     } catch (e: any) {
       setError(e.message);
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }, [refresh]);
 
   const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setLoading(true);
+    setLoading('upload');
     setError('');
     try {
       const res = await api.uploadDataset(file);
@@ -35,7 +62,7 @@ export function DatasetsPage() {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }, [refresh]);
 
@@ -55,7 +82,7 @@ export function DatasetsPage() {
             </span>
           )}
         </div>
-        <p className="text-sm text-[var(--color-text-secondary)] mt-1">Connect your account data or explore with our pre-built sample dataset</p>
+        <p className="text-sm text-[var(--color-text-secondary)] mt-1">Connect your account data or explore with our pre-built demo datasets</p>
       </div>
 
       {/* Current dataset indicator */}
@@ -75,34 +102,44 @@ export function DatasetsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-          <Database size={32} className="text-[var(--color-accent)] mb-3" />
-          <h3 className="font-semibold mb-2">Load Sample Dataset</h3>
-          <p className="text-xs text-[var(--color-text-secondary)] mb-4">
-            2,000 synthetic customer accounts with renewal data
-          </p>
-          <button
-            onClick={loadSample}
-            disabled={loading}
-            className="px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-sm font-medium hover:bg-[var(--color-accent-glow)] transition-colors disabled:opacity-50 shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
-          >
-            {loading ? 'Loading...' : 'Load Sample'}
-          </button>
-        </div>
-
-        <label className="bg-[var(--color-bg-card)] border border-dashed border-[var(--color-border-bright)] rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-[var(--color-accent)] transition-colors shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-          <Upload size={32} className="text-[var(--color-text-secondary)] mb-3" />
-          <h3 className="font-semibold mb-2">Upload CSV</h3>
-          <p className="text-xs text-[var(--color-text-secondary)] mb-4">
-            Your customer churn data with renewal fields
-          </p>
-          <input type="file" accept=".csv" className="hidden" onChange={handleUpload} />
-          <span className="px-5 py-2.5 bg-[rgba(255,255,255,0.06)] border border-[var(--color-border)] rounded-xl text-sm">
-            Choose File
-          </span>
-        </label>
+      {/* Demo Dataset Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        {DEMO_VARIANTS.map((variant) => {
+          const Icon = variant.icon;
+          const isLoading = loading === variant.key;
+          return (
+            <div
+              key={variant.key}
+              className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+            >
+              <Icon size={24} style={{ color: variant.accent }} className="mb-3" />
+              <h3 className="font-semibold text-sm mb-1">{variant.label}</h3>
+              <p className="text-[10px] text-[var(--color-text-muted)] mb-1">{variant.accounts}</p>
+              <p className="text-xs text-[var(--color-text-secondary)] mb-4">{variant.description}</p>
+              <button
+                onClick={() => loadSample(variant.key)}
+                disabled={loading !== null}
+                className="px-4 py-2 bg-[var(--color-accent)] text-white rounded-xl text-xs font-medium hover:bg-[var(--color-accent-glow)] transition-colors disabled:opacity-50 shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
+              >
+                {isLoading ? 'Loading...' : 'Load'}
+              </button>
+            </div>
+          );
+        })}
       </div>
+
+      {/* Upload CSV */}
+      <label className="block bg-[var(--color-bg-card)] border border-dashed border-[var(--color-border-bright)] rounded-2xl p-5 mb-8 text-center cursor-pointer hover:border-[var(--color-accent)] transition-colors shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <Upload size={24} className="mx-auto text-[var(--color-text-secondary)] mb-2" />
+        <h3 className="font-semibold text-sm mb-1">Upload Your Own CSV</h3>
+        <p className="text-xs text-[var(--color-text-secondary)] mb-3">
+          Customer churn data with renewal fields
+        </p>
+        <input type="file" accept=".csv" className="hidden" onChange={handleUpload} disabled={loading !== null} />
+        <span className="inline-block px-4 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--color-border)] rounded-xl text-xs">
+          {loading === 'upload' ? 'Uploading...' : 'Choose File'}
+        </span>
+      </label>
 
       {error && (
         <div className="bg-red-900/20 border border-red-800/40 rounded-2xl p-4 mb-6 flex items-start gap-3">

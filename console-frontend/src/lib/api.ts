@@ -79,7 +79,8 @@ export const api = {
   module: () => request<ModuleDetail>(`/modules/${MOD}`),
 
   // Datasets
-  loadSample: () => request<UploadResponse>(`/datasets/${MOD}/sample`, { method: 'POST' }),
+  loadSample: (variant?: string) =>
+    request<UploadResponse>(`/datasets/${MOD}/sample${variant ? `?variant=${variant}` : ''}`, { method: 'POST' }),
   uploadDataset: async (file: File) => {
     const form = new FormData();
     form.append('file', file);

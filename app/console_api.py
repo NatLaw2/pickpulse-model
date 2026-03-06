@@ -28,7 +28,7 @@ from .auth import get_tenant_id
 
 from .engine.config import MODULES, get_module, ModuleConfig
 from .engine.schema import validate_dataset, ValidationResult
-from .engine.sample_data import generate_churn_dataset
+from .engine.sample_data import generate_churn_dataset, DEMO_GENERATORS
 from .engine.train import train_model
 from .engine.evaluate import evaluate_model, generate_pdf_report
 from .engine.predict import predict, load_model
@@ -253,14 +253,27 @@ async def upload_dataset(module_name: str, file: UploadFile = File(...), tenant_
 
 
 @app.post("/api/datasets/{module_name}/sample")
-def load_sample_dataset(module_name: str, tenant_id: str = Depends(get_tenant_id)):
+def load_sample_dataset(
+    module_name: str,
+    variant: str = Query("balanced", pattern="^(balanced|high_risk|enterprise)$"),
+    tenant_id: str = Depends(get_tenant_id),
+):
     mod = get_module(module_name)
     os.makedirs(SAMPLE_DIR, exist_ok=True)
 
     if module_name != "churn":
         raise HTTPException(status_code=400, detail="Only churn module is available")
 
-    df = generate_churn_dataset()
+    generator = DEMO_GENERATORS.get(variant, DEMO_GENERATORS["balanced"])
+    df = generator()
+
+    variant_names = {
+        "balanced": "Balanced Demo",
+        "high_risk": "High-Risk Demo",
+        "enterprise": "Enterprise Demo",
+    }
+    display_name = variant_names.get(variant, "Balanced Demo")
+
     filepath = os.path.join(SAMPLE_DIR, f"{module_name}_sample.csv")
     df.to_csv(filepath, index=False)
 
@@ -268,7 +281,7 @@ def load_sample_dataset(module_name: str, tenant_id: str = Depends(get_tenant_id
 
     ds_info = {
         "path": filepath,
-        "name": f"{module_name}_sample.csv",
+        "name": display_name,
         "rows": len(df),
         "columns": len(df.columns),
         "is_demo": True,
