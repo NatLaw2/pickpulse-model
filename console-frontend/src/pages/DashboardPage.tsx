@@ -1,12 +1,13 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, Mail, Loader2 } from 'lucide-react';
-import { api, type DashboardResponse, type ChurnPrediction, type DraftEmailRequest } from '../lib/api';
+import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight } from 'lucide-react';
+import { api, type DashboardResponse } from '../lib/api';
 import { StatCard } from '../components/StatCard';
+import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { useDataset } from '../lib/DatasetContext';
+import { usePredictions } from '../lib/PredictionContext';
+import { riskColor } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
-
-type Tone = 'friendly' | 'direct' | 'executive';
 
 const FEATURE_LABELS: Record<string, string> = {
   days_since_last_login: 'Login Recency',
@@ -30,14 +31,10 @@ export function DashboardPage() {
   const [saveRate, setSaveRate] = useState(0.35);
   const navigate = useNavigate();
   const { dataset } = useDataset();
+  const { predictions } = usePredictions();
 
-  // AI Outreach state
-  const [draftingId, setDraftingId] = useState<string | null>(null);
-  const [emailPromptId, setEmailPromptId] = useState<string | null>(null);
-  const [emailInput, setEmailInput] = useState('');
-  const [selectedTone, setSelectedTone] = useState<Tone>('friendly');
-  const [draftError, setDraftError] = useState<string | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  // Drawer state
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const fetchDashboard = useCallback((rate: number) => {
     api.dashboard(rate).then(setData).catch(console.error);
@@ -46,144 +43,6 @@ export function DashboardPage() {
   useEffect(() => {
     fetchDashboard(saveRate);
   }, [fetchDashboard, saveRate]);
-
-  // Close overlay on outside click
-  useEffect(() => {
-    if (!emailPromptId) return;
-    const handleClick = (e: MouseEvent) => {
-      if (overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
-        setEmailPromptId(null);
-        setEmailInput('');
-        setDraftError(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [emailPromptId]);
-
-  const handleDraftEmail = async (row: ChurnPrediction, contactEmail: string | null) => {
-    setEmailPromptId(null);
-    setDraftingId(row.customer_id);
-    setDraftError(null);
-
-    try {
-      const req: DraftEmailRequest = {
-        customer_id: row.customer_id,
-        customer_name: row.customer_id,
-        contact_email: contactEmail || null,
-        churn_risk_pct: row.churn_risk_pct,
-        arr: row.arr,
-        arr_at_risk: row.arr_at_risk,
-        days_until_renewal: row.days_until_renewal,
-        recommended_action: row.recommended_action,
-        risk_driver_summary: null,
-        tier: row.tier,
-        tone: selectedTone,
-      };
-
-      const result = await api.draftOutreachEmail(req);
-
-      console.log('[outreach] outreach_email_generated', {
-        account_id: row.customer_id,
-        tier: row.tier,
-        arr: row.arr,
-        tone: selectedTone,
-        has_recipient: !!contactEmail,
-      });
-
-      window.location.href = result.mailto_url;
-    } catch (err: any) {
-      console.error('[outreach] draft failed:', err);
-      setDraftError(err?.message || 'Failed to generate email');
-    } finally {
-      setDraftingId(null);
-      setEmailInput('');
-    }
-  };
-
-  // Reusable outreach overlay component
-  const renderOutreachOverlay = (row: ChurnPrediction) => (
-    <>
-      {draftingId === row.customer_id ? (
-        <span className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] text-[var(--color-accent)]">
-          <Loader2 size={12} className="animate-spin" />
-          Generating...
-        </span>
-      ) : (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setEmailPromptId(emailPromptId === row.customer_id ? null : row.customer_id);
-            setEmailInput('');
-            setDraftError(null);
-          }}
-          disabled={draftingId !== null}
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold rounded-lg bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Mail size={10} />
-          Generate Outreach
-        </button>
-      )}
-
-      {emailPromptId === row.customer_id && draftingId === null && (
-        <div
-          ref={overlayRef}
-          className="absolute right-0 top-full mt-1 z-50 w-72 bg-white border border-[var(--color-border)] rounded-xl p-3 shadow-[0_4px_20px_rgba(0,0,0,0.12)]"
-        >
-          <div className="mb-2">
-            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
-              Recipient Email
-            </label>
-            <input
-              type="email"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              placeholder="contact@company.com"
-              className="w-full px-2.5 py-1.5 text-xs bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleDraftEmail(row, emailInput.trim() || null);
-              }}
-              autoFocus
-            />
-          </div>
-          <div className="mb-3">
-            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
-              Tone
-            </label>
-            <div className="flex gap-1">
-              {(['friendly', 'direct', 'executive'] as Tone[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setSelectedTone(t)}
-                  className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
-                    selectedTone === t
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]'
-                  }`}
-                >
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleDraftEmail(row, emailInput.trim() || null)}
-              className="flex-1 px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-glow)] transition-colors"
-            >
-              Generate
-            </button>
-            <button
-              onClick={() => handleDraftEmail(row, null)}
-              className="px-3 py-1.5 text-[10px] font-medium rounded-lg bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] transition-colors"
-            >
-              Skip Email
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
 
   const mod = data?.module;
   const kpis = data?.kpis;
@@ -197,6 +56,13 @@ export function DashboardPage() {
   const highPct = totalTierArr > 0 ? (buckets!.high_confidence_saves / totalTierArr) * 100 : 0;
   const medPct = totalTierArr > 0 ? (buckets!.medium_confidence_saves / totalTierArr) * 100 : 0;
   const lowPct = totalTierArr > 0 ? (buckets!.low_confidence_saves / totalTierArr) * 100 : 0;
+
+  // Find the selected prediction row — look in dashboard top_at_risk first, then predictions context
+  const selectedRow = selectedId
+    ? topRisk.find((r) => r.customer_id === selectedId)
+      ?? predictions?.predictions?.find((p) => p.customer_id === selectedId)
+      ?? null
+    : null;
 
   return (
     <div>
@@ -261,7 +127,7 @@ export function DashboardPage() {
 
           {/* Section 2: Risk Distribution Strip */}
           {totalTierArr > 0 && (
-            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
               <h3 className="text-sm font-semibold mb-4">ARR at Risk by Tier</h3>
 
               {/* Stacked bar */}
@@ -320,14 +186,8 @@ export function DashboardPage() {
           )}
 
           {/* Section 3: Top 10 Accounts To Save Now */}
-          <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+          <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
             <h3 className="text-sm font-semibold mb-4">Top 10 Accounts To Save Now</h3>
-
-            {draftError && (
-              <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-[var(--color-danger)]">
-                {draftError}
-              </div>
-            )}
 
             {topRisk.length > 0 ? (
               <div className="overflow-x-auto">
@@ -339,15 +199,24 @@ export function DashboardPage() {
                       <th className="py-2 pr-3 text-right">ARR</th>
                       <th className="py-2 pr-3 text-right">ARR at Risk</th>
                       <th className="py-2 pr-3">Renewal</th>
-                      <th className="py-2 text-center">Action</th>
+                      <th className="py-2 w-8"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {topRisk.map((row, i) => (
-                      <tr key={row.customer_id} className={`border-b border-[var(--color-border)]/50 ${i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''}`}>
+                      <tr
+                        key={row.customer_id}
+                        onClick={() => setSelectedId(row.customer_id)}
+                        className={`border-b border-[var(--color-border)]/50 hover:bg-[var(--color-accent-light)] transition-colors cursor-pointer ${
+                          i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''
+                        } ${selectedId === row.customer_id ? 'bg-[var(--color-accent)]/10' : ''}`}
+                      >
                         <td className="py-2.5 pr-3 font-medium text-xs">{row.customer_id}</td>
                         <td className="py-2.5 pr-3 text-right">
-                          <span className={`font-bold ${row.churn_risk_pct >= 70 ? 'text-[var(--color-danger)]' : row.churn_risk_pct >= 40 ? 'text-[var(--color-warning)]' : 'text-[var(--color-success)]'}`}>
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            style={{ background: `${riskColor(row.churn_risk_pct)}18`, color: riskColor(row.churn_risk_pct) }}
+                          >
                             {row.churn_risk_pct}%
                           </span>
                         </td>
@@ -364,8 +233,8 @@ export function DashboardPage() {
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 text-center relative">
-                          {renderOutreachOverlay(row)}
+                        <td className="py-2.5 text-right">
+                          <ChevronRight size={14} className="text-[var(--color-text-muted)]" />
                         </td>
                       </tr>
                     ))}
@@ -381,7 +250,7 @@ export function DashboardPage() {
 
           {/* Section 4: Revenue Recovery Simulation */}
           {kpis && kpis.total_arr_at_risk > 0 && (
-            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp size={16} className="text-[var(--color-success)]" />
                 <h3 className="text-sm font-semibold">Revenue Recovery Simulation</h3>
@@ -429,7 +298,7 @@ export function DashboardPage() {
 
           {/* Section 5: Portfolio Risk Drivers */}
           {riskDrivers.length > 0 && (
-            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
               <h3 className="text-sm font-semibold mb-4">Portfolio Risk Drivers</h3>
               <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                 The features most influencing churn predictions across your portfolio
@@ -466,6 +335,15 @@ export function DashboardPage() {
         <div className="text-center text-[var(--color-text-secondary)] py-20">
           Loading...
         </div>
+      )}
+
+      {/* Account Detail Drawer */}
+      {selectedId && selectedRow && (
+        <AccountDetailDrawer
+          customerId={selectedId}
+          prediction={selectedRow}
+          onClose={() => setSelectedId(null)}
+        />
       )}
     </div>
   );

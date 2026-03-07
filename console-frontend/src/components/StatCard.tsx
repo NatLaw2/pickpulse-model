@@ -15,10 +15,19 @@ export function StatCard({ label, value, sub, icon, accent, onClick, tooltip }: 
     <button
       onClick={onClick}
       title={tooltip}
-      className={`bg-white border border-[var(--color-border)] rounded-2xl p-6 text-left transition-all shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:border-[var(--color-border-bright)] ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
+      className={`bg-white border border-[var(--color-border)] rounded-2xl p-6 text-left card-hover shadow-[0_1px_3px_rgba(0,0,0,0.08)] relative overflow-hidden ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
     >
+      {/* Accent top line */}
+      {accent && (
+        <div
+          className="absolute top-0 left-0 right-0 h-[3px]"
+          style={{
+            background: `linear-gradient(90deg, ${accent}, ${accent}88 70%, transparent)`,
+          }}
+        />
+      )}
       <div className="flex items-center gap-2 mb-3">
-        {icon && <span className="text-[var(--color-text-muted)]">{icon}</span>}
+        {icon && <span style={accent ? { color: accent } : { color: 'var(--color-text-muted)' }}>{icon}</span>}
         <span className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-medium">{label}</span>
       </div>
       <div className="text-3xl font-bold tracking-tight" style={accent ? { color: accent } : {}}>

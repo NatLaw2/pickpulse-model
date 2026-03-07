@@ -108,6 +108,8 @@ export const api = {
   predict: (limit = 200, includeArchived = false) =>
     request<PredictResponse>(`/predict/${MOD}?limit=${limit}&include_archived=${includeArchived}`, { method: 'POST' }),
   exportPredictions: () => `${BASE}/predict/${MOD}/export`,
+  cachedPredictions: () =>
+    request<PredictResponse>(`/predict/${MOD}/cached`),
 
   // Account status
   updateAccountStatus: (customerId: string, status: string) =>
@@ -216,11 +218,53 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ customer_id: customerId, action_type: actionType }),
     }),
+
+  // -----------------------------------------------------------------------
+  // Notifications / Executive Summary
+  // -----------------------------------------------------------------------
+  sendExecutiveSummary: (req: ExecutiveSummaryRequest) =>
+    request<ExecutiveSummaryResponse>('/notifications/executive-summary', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+
+  getNotificationSettings: () =>
+    request<NotificationSettings>('/notifications/settings'),
+
+  updateNotificationSettings: (recipients: string[]) =>
+    request<NotificationSettings>('/notifications/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ recipients }),
+    }),
 };
 
 // -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
+
+export interface ExecutiveSummaryRequest {
+  recipients: string[];
+  total_arr_at_risk: number;
+  projected_recoverable_arr: number;
+  save_rate: number;
+  high_risk_in_window: number;
+  renewing_90d: number;
+  top_accounts: Record<string, unknown>[];
+  tier_counts: Record<string, number>;
+  risk_drivers: string[];
+}
+
+export interface ExecutiveSummaryResponse {
+  status: string;
+  recipients: string[];
+  subject: string;
+  html_body: string;
+  generated_at: string;
+}
+
+export interface NotificationSettings {
+  recipients: string[];
+}
 
 export interface DashboardResponse {
   module: DashboardModule;

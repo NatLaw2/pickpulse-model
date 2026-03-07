@@ -1,19 +1,41 @@
 import { useEffect, useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Loader2 } from 'lucide-react';
 import { api, type ApiDocsResponse, type ApiEndpoint } from '../lib/api';
 
 export function ApiDocsPage() {
   const [docs, setDocs] = useState<ApiDocsResponse | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
+  // Notification settings
+  const [recipients, setRecipients] = useState('');
+  const [recipientsSaved, setRecipientsSaved] = useState(false);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
+
   useEffect(() => {
     api.apiDocs().then(setDocs).catch(console.error);
+    api.getNotificationSettings()
+      .then((s) => setRecipients(s.recipients.join(', ')))
+      .catch(() => {});
   }, []);
 
   const copyToClipboard = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIdx(idx);
     setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  const saveRecipients = async () => {
+    setRecipientsLoading(true);
+    try {
+      const list = recipients.split(',').map((r) => r.trim()).filter(Boolean);
+      await api.updateNotificationSettings(list);
+      setRecipientsSaved(true);
+      setTimeout(() => setRecipientsSaved(false), 2000);
+    } catch (err) {
+      console.error('Failed to save recipients:', err);
+    } finally {
+      setRecipientsLoading(false);
+    }
   };
 
   const methodColor = (m: string) => {
@@ -31,6 +53,31 @@ export function ApiDocsPage() {
         <p className="text-sm text-[var(--color-text-secondary)] mt-1">
           REST endpoints for embedding churn intelligence into your existing tools and workflows
         </p>
+      </div>
+
+      {/* Notification Recipients */}
+      <div className="bg-white border border-[var(--color-border)] rounded-2xl p-5 mb-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
+        <h3 className="text-sm font-semibold mb-1">Notification Recipients</h3>
+        <p className="text-xs text-[var(--color-text-muted)] mb-3">
+          Recipients who receive the Executive ARR Risk Brief when predictions are generated
+        </p>
+        <div className="flex gap-2 items-center">
+          <input
+            type="text"
+            value={recipients}
+            onChange={(e) => setRecipients(e.target.value)}
+            placeholder="cfo@company.com, vp-cs@company.com"
+            className="flex-1 px-3 py-2 bg-white border border-[var(--color-border)] rounded-xl text-sm focus:outline-none focus:border-[var(--color-accent)]"
+          />
+          <button
+            onClick={saveRecipients}
+            disabled={recipientsLoading}
+            className="btn-primary px-4 py-2 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+          >
+            {recipientsLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+            {recipientsSaved ? 'Saved' : 'Save'}
+          </button>
+        </div>
       </div>
 
       {docs && (

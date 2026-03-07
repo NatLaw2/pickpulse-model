@@ -45,6 +45,7 @@ except Exception:
 from .storage import repo as storage_repo
 from .outreach import router as outreach_router
 from .explain import router as explain_router
+from .executive_summary import router as executive_summary_router
 
 app = FastAPI(title="Churn Risk Engine", version="1.0.0")
 
@@ -58,6 +59,7 @@ app.add_middleware(
 
 app.include_router(outreach_router)
 app.include_router(explain_router)
+app.include_router(executive_summary_router)
 
 # ---------------------------------------------------------------------------
 # Persistent dataset state — survives server restarts
@@ -514,6 +516,55 @@ def predict_module(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/predict/{module_name}/cached")
+def get_cached_predictions(
+    module_name: str,
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Return cached predictions without re-scoring."""
+    state = _get_state(tenant_id)
+    records = state["predictions"].get(module_name, [])
+    if not records:
+        raise HTTPException(status_code=404, detail="No cached predictions. Run predict first.")
+
+    tier_counts: dict[str, int] = {}
+    total_arr_at_risk = 0.0
+    renewing_90d = 0
+    high_risk_in_window = 0
+    active_count = 0
+    archived_count = 0
+    for p in records:
+        tier = p.get("tier", "Unknown")
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+        arr_r = p.get("arr_at_risk", 0) or 0
+        total_arr_at_risk += arr_r
+        status_val = p.get("account_status", "active")
+        if status_val == "active":
+            active_count += 1
+        else:
+            archived_count += 1
+        pct = p.get("churn_risk_pct", 0) or 0
+        wl = p.get("renewal_window_label", "")
+        if wl in ("<30d", "30-90d"):
+            renewing_90d += 1
+            if pct >= 70:
+                high_risk_in_window += 1
+
+    return {
+        "predictions": records,
+        "total": len(records),
+        "showing": len(records),
+        "active_count": active_count,
+        "archived_count": archived_count,
+        "tier_counts": tier_counts,
+        "summary": {
+            "total_arr_at_risk": round(total_arr_at_risk, 2),
+            "renewing_90d": renewing_90d,
+            "high_risk_in_window": high_risk_in_window,
+        },
+    }
 
 
 @app.get("/api/predict/{module_name}/export")

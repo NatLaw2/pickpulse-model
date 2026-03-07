@@ -34,6 +34,12 @@
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
+
+  /* Tint backgrounds for risk badges */
+  --color-danger-tint: rgba(239, 68, 68, 0.06);
+  --color-warning-tint: rgba(245, 158, 11, 0.06);
+  --color-success-tint: rgba(16, 185, 129, 0.06);
+  --color-accent-tint: rgba(123, 97, 255, 0.05);
 }
 
 body {
@@ -50,3 +56,36 @@ body {
 ::-webkit-scrollbar-track { background: var(--color-bg-primary); }
 ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
+
+/* Card hover micro-interaction */
+.card-hover {
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Gradient primary button */
+.btn-primary {
+  background: linear-gradient(135deg, #7B61FF, #6B4EFF);
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+}
+.btn-primary:hover {
+  box-shadow: 0 0 0 4px rgba(123, 97, 255, 0.15), 0 2px 8px rgba(123, 97, 255, 0.25);
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Toast slide-up animation */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,17 +1,18 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crosshair, Database, Download, Loader2, Search, X, ChevronUp, ChevronDown, Mail, Calendar, BookOpen, PhoneForwarded } from 'lucide-react';
-import { api, isNoDatasetError, isNoModelError, type PredictResponse, type ChurnPrediction, type ExplainResponse, type DraftEmailRequest } from '../lib/api';
+import { Crosshair, Database, Download, Loader2, Search, X, ChevronUp, ChevronDown, FileText } from 'lucide-react';
+import { api, isNoDatasetError, isNoModelError, type ChurnPrediction, type ExecutiveSummaryResponse } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
+import { usePredictions } from '../lib/PredictionContext';
+import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
+import { riskColor, riskLabel } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
 
 type SortKey = 'customer_id' | 'churn_risk_pct' | 'urgency_score' | 'renewal_window_label' | 'days_until_renewal' | 'arr' | 'arr_at_risk';
 type SortDir = 'asc' | 'desc';
-type Tone = 'friendly' | 'direct' | 'executive';
 
 export function PredictPage() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<PredictResponse | null>(null);
   const [error, setError] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState('');
@@ -19,6 +20,7 @@ export function PredictPage() {
   const [windowFilter, setWindowFilter] = useState('all');
   const navigate = useNavigate();
   const { dataset } = useDataset();
+  const { predictions: result, setPredictions, loadCached } = usePredictions();
 
   // Sorting state — default by ARR at Risk DESC
   const [sortKey, setSortKey] = useState<SortKey>('arr_at_risk');
@@ -26,25 +28,26 @@ export function PredictPage() {
 
   // Drawer state
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [explainData, setExplainData] = useState<ExplainResponse | null>(null);
-  const [explainLoading, setExplainLoading] = useState(false);
-  const [explainError, setExplainError] = useState<string | null>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
 
-  // Outreach overlay state (inside drawer)
-  const [draftingAction, setDraftingAction] = useState<string | null>(null);
-  const [emailPromptAction, setEmailPromptAction] = useState<string | null>(null);
-  const [emailInput, setEmailInput] = useState('');
-  const [selectedTone, setSelectedTone] = useState<Tone>('friendly');
-  const [draftError, setDraftError] = useState<string | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  // Executive summary state
+  const [summaryData, setSummaryData] = useState<ExecutiveSummaryResponse | null>(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryToast, setSummaryToast] = useState<string | null>(null);
+
+  // Auto-restore cached predictions on mount
+  useEffect(() => {
+    loadCached();
+  }, [loadCached]);
 
   const handlePredict = async () => {
     setLoading(true);
     setError('');
     try {
       const res = await api.predict(500, showArchived);
-      setResult(res);
+      setPredictions(res);
+
+      // Auto-trigger executive summary (non-blocking)
+      triggerExecutiveSummary(res);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -52,16 +55,60 @@ export function PredictPage() {
     }
   };
 
-  const riskColor = (pct: number) => {
-    if (pct >= 70) return 'var(--color-danger)';
-    if (pct >= 40) return 'var(--color-warning)';
-    return 'var(--color-success)';
-  };
+  const triggerExecutiveSummary = async (res: typeof result) => {
+    if (!res) return;
+    try {
+      // Get notification settings for recipients
+      let recipients: string[] = [];
+      try {
+        const settings = await api.getNotificationSettings();
+        recipients = settings.recipients;
+      } catch { /* no settings configured */ }
 
-  const riskLabel = (pct: number) => {
-    if (pct >= 70) return 'High';
-    if (pct >= 40) return 'Med';
-    return 'Low';
+      const topAccounts = [...res.predictions]
+        .sort((a, b) => (b.arr_at_risk || 0) - (a.arr_at_risk || 0))
+        .slice(0, 5)
+        .map((p) => ({
+          customer_id: p.customer_id,
+          churn_risk_pct: p.churn_risk_pct,
+          arr: p.arr,
+          arr_at_risk: p.arr_at_risk,
+          days_until_renewal: p.days_until_renewal,
+          tier: p.tier,
+        }));
+
+      // Extract risk driver names from tier counts (we don't have feature importance here,
+      // so we use high-level summary)
+      const riskDrivers: string[] = [];
+      const highCount = res.tier_counts['High Risk'] ?? 0;
+      const medCount = res.tier_counts['Medium Risk'] ?? 0;
+      if (highCount > 0) riskDrivers.push(`${highCount} accounts at High Risk`);
+      if (medCount > 0) riskDrivers.push(`${medCount} accounts at Medium Risk`);
+      if (res.summary.renewing_90d) riskDrivers.push(`${res.summary.renewing_90d} renewals within 90 days`);
+
+      const summaryRes = await api.sendExecutiveSummary({
+        recipients,
+        total_arr_at_risk: res.summary.total_arr_at_risk ?? 0,
+        projected_recoverable_arr: (res.summary.total_arr_at_risk ?? 0) * 0.35,
+        save_rate: 0.35,
+        high_risk_in_window: res.summary.high_risk_in_window ?? 0,
+        renewing_90d: res.summary.renewing_90d ?? 0,
+        top_accounts: topAccounts,
+        tier_counts: res.tier_counts,
+        risk_drivers: riskDrivers,
+      });
+
+      setSummaryData(summaryRes);
+
+      // Show toast
+      const recipientText = summaryRes.recipients.length > 0
+        ? `Executive ARR Risk Brief sent to ${summaryRes.recipients.join(', ')}`
+        : 'Executive ARR Risk Brief generated';
+      setSummaryToast(recipientText);
+      setTimeout(() => setSummaryToast(null), 8000);
+    } catch (err) {
+      console.error('[executive-summary] failed:', err);
+    }
   };
 
   // Determine empty states
@@ -114,200 +161,8 @@ export function PredictPage() {
       : <ChevronDown size={10} className="ml-1 inline-block text-[var(--color-accent)]" />;
   };
 
-  // Open drawer and fetch explain data
-  const openDrawer = useCallback(async (customerId: string) => {
-    setSelectedId(customerId);
-    setExplainData(null);
-    setExplainError(null);
-    setExplainLoading(true);
-    setDraftingAction(null);
-    setEmailPromptAction(null);
-    setDraftError(null);
-
-    try {
-      const data = await api.explainAccount(customerId);
-      setExplainData(data);
-    } catch (err: any) {
-      setExplainError(err?.message || 'Failed to load account details');
-    } finally {
-      setExplainLoading(false);
-    }
-  }, []);
-
-  const closeDrawer = () => {
-    setSelectedId(null);
-    setExplainData(null);
-    setExplainError(null);
-    setDraftingAction(null);
-    setEmailPromptAction(null);
-    setDraftError(null);
-  };
-
-  // Close drawer on outside click
-  useEffect(() => {
-    if (!selectedId) return;
-    const handleClick = (e: MouseEvent) => {
-      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
-        closeDrawer();
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [selectedId]);
-
-  // Close overlay on outside click
-  useEffect(() => {
-    if (!emailPromptAction) return;
-    const handleClick = (e: MouseEvent) => {
-      if (overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
-        setEmailPromptAction(null);
-        setEmailInput('');
-        setDraftError(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [emailPromptAction]);
-
   // Selected row data
   const selectedRow = selectedId ? (result?.predictions ?? []).find((p) => p.customer_id === selectedId) : null;
-
-  // Playbook actions
-  const handleDraftEmail = async (row: ChurnPrediction, contactEmail: string | null, actionType: string) => {
-    setEmailPromptAction(null);
-    setDraftingAction(actionType);
-    setDraftError(null);
-
-    try {
-      const req: DraftEmailRequest = {
-        customer_id: row.customer_id,
-        customer_name: row.customer_id,
-        contact_email: contactEmail || null,
-        churn_risk_pct: row.churn_risk_pct,
-        arr: row.arr,
-        arr_at_risk: row.arr_at_risk,
-        days_until_renewal: row.days_until_renewal,
-        recommended_action: row.recommended_action,
-        risk_driver_summary: explainData?.risk_driver_summary || null,
-        tier: row.tier,
-        tone: selectedTone,
-      };
-
-      const result = await api.draftOutreachEmail(req);
-
-      console.log('[playbook] outreach_email_generated', {
-        account_id: row.customer_id,
-        action_type: actionType,
-        tier: row.tier,
-        arr: row.arr,
-        tone: selectedTone,
-        has_recipient: !!contactEmail,
-      });
-
-      await api.logPlaybookAction(row.customer_id, actionType);
-      window.location.href = result.mailto_url;
-    } catch (err: any) {
-      console.error('[playbook] draft failed:', err);
-      setDraftError(err?.message || 'Failed to generate email');
-    } finally {
-      setDraftingAction(null);
-      setEmailInput('');
-    }
-  };
-
-  const handleScheduleReview = async (row: ChurnPrediction) => {
-    setDraftingAction('schedule_success_review');
-    try {
-      await api.logPlaybookAction(row.customer_id, 'schedule_success_review');
-      window.location.href = api.downloadIcs(row.customer_id);
-    } catch (err: any) {
-      setDraftError(err?.message || 'Failed to download calendar invite');
-    } finally {
-      setDraftingAction(null);
-    }
-  };
-
-  const handleEscalateToSales = async (row: ChurnPrediction) => {
-    setDraftingAction('escalate_to_sales');
-    try {
-      await api.logPlaybookAction(row.customer_id, 'escalate_to_sales');
-      const subject = encodeURIComponent(`Escalation: ${row.customer_id} — ${row.churn_risk_pct}% churn risk, ${formatCurrency(row.arr_at_risk)} ARR at risk`);
-      const body = encodeURIComponent(
-        `Account ${row.customer_id} has been flagged for sales escalation.\n\n` +
-        `Churn Risk: ${row.churn_risk_pct}%\n` +
-        `ARR: ${formatCurrency(row.arr)}\n` +
-        `ARR at Risk: ${formatCurrency(row.arr_at_risk)}\n` +
-        `Days Until Renewal: ${row.days_until_renewal}\n` +
-        `Recommended Action: ${row.recommended_action}\n` +
-        (explainData?.risk_driver_summary ? `\nRisk Drivers: ${explainData.risk_driver_summary}\n` : '') +
-        `\nPlease review and take appropriate action.`
-      );
-      window.location.href = `mailto:?subject=${subject}&body=${body}`;
-    } catch (err: any) {
-      setDraftError(err?.message || 'Failed to log escalation');
-    } finally {
-      setDraftingAction(null);
-    }
-  };
-
-  // Outreach overlay for drawer playbook actions
-  const renderEmailOverlay = (row: ChurnPrediction, actionType: string) => (
-    <div
-      ref={overlayRef}
-      className="mt-2 w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-xl p-3"
-    >
-      <div className="mb-2">
-        <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
-          Recipient Email
-        </label>
-        <input
-          type="email"
-          value={emailInput}
-          onChange={(e) => setEmailInput(e.target.value)}
-          placeholder="contact@company.com"
-          className="w-full px-2.5 py-1.5 text-xs bg-white border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleDraftEmail(row, emailInput.trim() || null, actionType);
-          }}
-          autoFocus
-        />
-      </div>
-      <div className="mb-3">
-        <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
-          Tone
-        </label>
-        <div className="flex gap-1">
-          {(['friendly', 'direct', 'executive'] as Tone[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setSelectedTone(t)}
-              className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
-                selectedTone === t
-                  ? 'bg-[var(--color-accent)] text-white'
-                  : 'bg-white border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-primary)]'
-              }`}
-            >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={() => handleDraftEmail(row, emailInput.trim() || null, actionType)}
-          className="flex-1 px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-glow)] transition-colors"
-        >
-          Generate
-        </button>
-        <button
-          onClick={() => handleDraftEmail(row, null, actionType)}
-          className="px-3 py-1.5 text-[10px] font-medium rounded-lg bg-white border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-primary)] transition-colors"
-        >
-          Skip Email
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="relative">
@@ -326,7 +181,7 @@ export function PredictPage() {
           </p>
           <button
             onClick={() => navigate('/data-sources')}
-            className="px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-sm font-medium hover:bg-[var(--color-accent-glow)] transition-all shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
+            className="btn-primary px-5 py-2.5 text-white rounded-xl text-sm font-medium"
           >
             Go to Datasets
           </button>
@@ -343,7 +198,7 @@ export function PredictPage() {
           </p>
           <button
             onClick={() => navigate('/model')}
-            className="px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-sm font-medium hover:bg-[var(--color-accent-glow)] transition-all shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
+            className="btn-primary px-5 py-2.5 text-white rounded-xl text-sm font-medium"
           >
             Go to Train
           </button>
@@ -356,20 +211,31 @@ export function PredictPage() {
           <button
             onClick={handlePredict}
             disabled={loading}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl font-medium hover:bg-[var(--color-accent-glow)] transition-all disabled:opacity-50 shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
+            className="btn-primary flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-medium disabled:opacity-50"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Crosshair size={16} />}
             {loading ? 'Scoring...' : 'Generate Predictions'}
           </button>
 
           {result && (
-            <a
-              href={api.exportPredictions()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-primary)] transition-colors"
-            >
-              <Download size={14} />
-              Export CSV
-            </a>
+            <>
+              <a
+                href={api.exportPredictions()}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-primary)] transition-colors"
+              >
+                <Download size={14} />
+                Export CSV
+              </a>
+              {summaryData && (
+                <button
+                  onClick={() => setShowSummaryModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/25 rounded-xl text-sm text-[var(--color-accent)] font-medium hover:bg-[var(--color-accent)]/15 transition-colors"
+                >
+                  <FileText size={14} />
+                  View Executive Brief
+                </button>
+              )}
+            </>
           )}
 
           <label className="flex items-center gap-2 ml-auto text-sm text-[var(--color-text-secondary)] cursor-pointer">
@@ -496,7 +362,7 @@ export function PredictPage() {
                     {sorted.map((row, i) => (
                       <tr
                         key={row.customer_id}
-                        onClick={() => openDrawer(row.customer_id)}
+                        onClick={() => setSelectedId(row.customer_id)}
                         className={`border-t border-[var(--color-border)] hover:bg-[var(--color-accent-light)] transition-colors cursor-pointer ${
                           i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''
                         } ${selectedId === row.customer_id ? 'bg-[var(--color-accent)]/10' : ''}`}
@@ -542,211 +408,78 @@ export function PredictPage() {
         </>
       )}
 
-      {/* Right-side Drawer */}
+      {/* Account Detail Drawer */}
       {selectedId && selectedRow && (
+        <AccountDetailDrawer
+          customerId={selectedId}
+          prediction={selectedRow}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
+
+      {/* Executive Summary Toast */}
+      {summaryToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 bg-white border border-[var(--color-border)] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] animate-[slideUp_0.3s_ease-out]">
+          <FileText size={16} className="text-[var(--color-accent)]" />
+          <span className="text-sm text-[var(--color-text-primary)]">{summaryToast}</span>
+          <button
+            onClick={() => { setSummaryToast(null); setShowSummaryModal(true); }}
+            className="text-sm font-semibold text-[var(--color-accent)] hover:underline ml-2"
+          >
+            View Brief
+          </button>
+          <button
+            onClick={() => setSummaryToast(null)}
+            className="p-1 rounded hover:bg-[var(--color-bg-primary)] ml-1"
+          >
+            <X size={14} className="text-[var(--color-text-muted)]" />
+          </button>
+        </div>
+      )}
+
+      {/* Executive Summary Preview Modal */}
+      {showSummaryModal && summaryData && (
         <div
-          ref={drawerRef}
-          className="fixed top-0 right-0 w-[400px] h-full bg-white border-l border-[var(--color-border)] shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-50 overflow-y-auto"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+          onClick={() => setShowSummaryModal(false)}
         >
-          {/* Drawer header */}
-          <div className="sticky top-0 bg-white border-b border-[var(--color-border)] px-5 py-4 flex items-center justify-between z-10">
-            <div>
-              <h3 className="text-sm font-bold">Why This Account Is At Risk</h3>
-              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{selectedRow.customer_id}</p>
-            </div>
-            <button
-              onClick={closeDrawer}
-              className="p-1.5 rounded-lg hover:bg-[var(--color-bg-primary)] transition-colors"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          <div className="px-5 py-5 space-y-6">
-            {/* Account Summary */}
-            <div>
-              <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-3">Account Summary</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
-                  <div className="text-[10px] text-[var(--color-text-muted)] mb-1">Churn Risk</div>
-                  <div className="text-lg font-bold" style={{ color: riskColor(selectedRow.churn_risk_pct) }}>
-                    {selectedRow.churn_risk_pct}%
-                  </div>
-                  <div className="text-[10px]" style={{ color: riskColor(selectedRow.churn_risk_pct) }}>
-                    {riskLabel(selectedRow.churn_risk_pct)} Risk
-                  </div>
-                </div>
-                <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
-                  <div className="text-[10px] text-[var(--color-text-muted)] mb-1">ARR at Risk</div>
-                  <div className="text-lg font-bold text-[var(--color-danger)]">
-                    {formatCurrency(selectedRow.arr_at_risk)}
-                  </div>
-                  <div className="text-[10px] text-[var(--color-text-muted)]">
-                    of {formatCurrency(selectedRow.arr)} ARR
-                  </div>
-                </div>
-                <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
-                  <div className="text-[10px] text-[var(--color-text-muted)] mb-1">Renewal</div>
-                  <div className="text-sm font-bold">{selectedRow.days_until_renewal} days</div>
-                  <div className={`text-[10px] ${
-                    selectedRow.renewal_window_label === '<30d' ? 'text-[var(--color-danger)]' :
-                    selectedRow.renewal_window_label === '30-90d' ? 'text-[var(--color-warning)]' :
-                    'text-[var(--color-text-muted)]'
-                  }`}>
-                    {selectedRow.renewal_window_label} window
-                  </div>
-                </div>
-                <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
-                  <div className="text-[10px] text-[var(--color-text-muted)] mb-1">Tier</div>
-                  <div className="text-sm font-bold">{selectedRow.tier}</div>
-                  <div className="text-[10px] text-[var(--color-text-muted)]">
-                    Auto-renew: {selectedRow.auto_renew_flag ? 'On' : 'Off'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Risk Drivers */}
-            <div>
-              <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-3">Risk Drivers</h4>
-              {explainLoading && (
-                <div className="flex items-center gap-2 py-4 text-xs text-[var(--color-text-muted)]">
-                  <Loader2 size={14} className="animate-spin" />
-                  Loading risk analysis...
-                </div>
-              )}
-              {explainError && (
-                <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-[var(--color-danger)]">
-                  {explainError}
-                </div>
-              )}
-              {explainData && (
-                <div className="space-y-2">
-                  {explainData.risk_drivers.map((driver, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-2 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs"
-                    >
-                      <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] flex-shrink-0" />
-                      <span className="text-[var(--color-text-primary)]">{driver}</span>
-                    </div>
-                  ))}
-                  {explainData.risk_driver_summary && (
-                    <p className="text-[10px] text-[var(--color-text-muted)] mt-2 italic px-1">
-                      {explainData.risk_driver_summary}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Recommended Action */}
-            {selectedRow.recommended_action && (
+          <div
+            className="bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.2)] max-w-[700px] w-full max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
               <div>
-                <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Recommended Action</h4>
-                <div className="px-3 py-2.5 bg-[var(--color-accent)]/8 border border-[var(--color-accent)]/20 rounded-xl text-xs text-[var(--color-accent)]">
-                  {selectedRow.recommended_action}
-                </div>
+                <h2 className="text-sm font-bold">Executive ARR Risk Brief</h2>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{summaryData.generated_at}</p>
               </div>
-            )}
-
-            {/* Customer Save Playbook */}
-            <div>
-              <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-3">Customer Save Playbook</h4>
-
-              {draftError && (
-                <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-[var(--color-danger)]">
-                  {draftError}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {/* Generate Outreach Email */}
-                <div>
-                  <button
-                    onClick={() => {
-                      setEmailPromptAction(emailPromptAction === 'generate_outreach' ? null : 'generate_outreach');
-                      setEmailInput('');
-                      setDraftError(null);
-                    }}
-                    disabled={draftingAction !== null}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {draftingAction === 'generate_outreach' ? (
-                      <Loader2 size={14} className="animate-spin text-[var(--color-accent)]" />
-                    ) : (
-                      <Mail size={14} className="text-[var(--color-accent)]" />
-                    )}
-                    <div className="text-left">
-                      <div className="font-semibold">Generate Outreach Email</div>
-                      <div className="text-[var(--color-text-muted)]">AI-drafted retention email via your email client</div>
-                    </div>
-                  </button>
-                  {emailPromptAction === 'generate_outreach' && !draftingAction && (
-                    renderEmailOverlay(selectedRow, 'generate_outreach')
-                  )}
-                </div>
-
-                {/* Schedule Success Review */}
-                <button
-                  onClick={() => handleScheduleReview(selectedRow)}
-                  disabled={draftingAction !== null}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {draftingAction === 'schedule_success_review' ? (
-                    <Loader2 size={14} className="animate-spin text-[var(--color-success)]" />
-                  ) : (
-                    <Calendar size={14} className="text-[var(--color-success)]" />
-                  )}
-                  <div className="text-left">
-                    <div className="font-semibold">Schedule Success Review</div>
-                    <div className="text-[var(--color-text-muted)]">Download .ics calendar invite for next business day</div>
-                  </div>
-                </button>
-
-                {/* Send Feature Training */}
-                <div>
-                  <button
-                    onClick={() => {
-                      setEmailPromptAction(emailPromptAction === 'send_feature_training' ? null : 'send_feature_training');
-                      setEmailInput('');
-                      setDraftError(null);
-                    }}
-                    disabled={draftingAction !== null}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {draftingAction === 'send_feature_training' ? (
-                      <Loader2 size={14} className="animate-spin text-[var(--color-warning)]" />
-                    ) : (
-                      <BookOpen size={14} className="text-[var(--color-warning)]" />
-                    )}
-                    <div className="text-left">
-                      <div className="font-semibold">Send Feature Training</div>
-                      <div className="text-[var(--color-text-muted)]">AI email highlighting underused product features</div>
-                    </div>
-                  </button>
-                  {emailPromptAction === 'send_feature_training' && !draftingAction && (
-                    renderEmailOverlay(selectedRow, 'send_feature_training')
-                  )}
-                </div>
-
-                {/* Escalate to Sales */}
-                <button
-                  onClick={() => handleEscalateToSales(selectedRow)}
-                  disabled={draftingAction !== null}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {draftingAction === 'escalate_to_sales' ? (
-                    <Loader2 size={14} className="animate-spin text-[var(--color-danger)]" />
-                  ) : (
-                    <PhoneForwarded size={14} className="text-[var(--color-danger)]" />
-                  )}
-                  <div className="text-left">
-                    <div className="font-semibold">Escalate to Sales</div>
-                    <div className="text-[var(--color-text-muted)]">Pre-filled internal escalation email with account context</div>
-                  </div>
-                </button>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="p-1.5 rounded-lg hover:bg-[var(--color-bg-primary)] transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {/* Email preview */}
+            <div className="flex-1 overflow-y-auto p-6 bg-[var(--color-bg-primary)]">
+              <div
+                className="bg-white rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.08)] overflow-hidden"
+                dangerouslySetInnerHTML={{ __html: summaryData.html_body }}
+              />
+            </div>
+            {/* Modal footer */}
+            <div className="flex items-center justify-between px-6 py-3 border-t border-[var(--color-border)] bg-white">
+              <div className="text-xs text-[var(--color-text-muted)]">
+                {summaryData.recipients.length > 0
+                  ? `Sent to: ${summaryData.recipients.join(', ')}`
+                  : 'No recipients configured — configure in API settings'}
               </div>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="px-4 py-2 text-xs font-medium bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border)] transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
