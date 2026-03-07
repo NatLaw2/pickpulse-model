@@ -144,7 +144,7 @@ export function IntegrationWizard({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+      <div className="bg-white border border-[var(--color-border)] rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[var(--color-border)]">
           <div>
@@ -166,7 +166,7 @@ export function IntegrationWizard({
             <div key={s.key} className="flex items-center gap-1">
               <div className={`
                 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold
-                ${i < stepIndex ? 'bg-green-500/20 text-green-400' :
+                ${i < stepIndex ? 'bg-emerald-50 text-[var(--color-success)]' :
                   i === stepIndex ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]' :
                   'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]'}
               `}>
@@ -185,9 +185,9 @@ export function IntegrationWizard({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
           {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-300 flex items-center justify-between">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-[var(--color-danger)] flex items-center justify-between">
               <span>{error}</span>
-              <button onClick={() => setError(null)} className="text-red-400 text-xs">Dismiss</button>
+              <button onClick={() => setError(null)} className="text-[var(--color-danger)] text-xs">Dismiss</button>
             </div>
           )}
 
@@ -278,8 +278,8 @@ function ConnectStep({
   if (connected) {
     return (
       <div className="text-center py-8">
-        <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-3">
-          <Check size={20} className="text-green-400" />
+        <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+          <Check size={20} className="text-[var(--color-success)]" />
         </div>
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">Connected</h3>
         <p className="text-xs text-[var(--color-text-muted)]">
@@ -508,8 +508,8 @@ function ConfirmStep({
   if (syncResult) {
     return (
       <div className="text-center py-6">
-        <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-3">
-          <Check size={20} className="text-green-400" />
+        <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+          <Check size={20} className="text-[var(--color-success)]" />
         </div>
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
           Sync Complete
@@ -518,7 +518,7 @@ function ConfirmStep({
           {syncResult.accounts_synced} accounts and {syncResult.signals_synced} signals synced.
         </p>
         {syncResult.errors?.length > 0 && (
-          <div className="text-xs text-red-400 mb-4">
+          <div className="text-xs text-[var(--color-danger)] mb-4">
             {syncResult.errors.join(', ')}
           </div>
         )}

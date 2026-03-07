@@ -15,7 +15,7 @@ export function StatCard({ label, value, sub, icon, accent, onClick, tooltip }: 
     <button
       onClick={onClick}
       title={tooltip}
-      className={`bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 text-left transition-all shadow-[0_10px_30px_rgba(0,0,0,0.35)] hover:border-[var(--color-border-bright)] hover:shadow-[0_10px_40px_rgba(0,0,0,0.45)] ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
+      className={`bg-white border border-[var(--color-border)] rounded-2xl p-6 text-left transition-all shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:border-[var(--color-border-bright)] ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
     >
       <div className="flex items-center gap-2 mb-3">
         {icon && <span className="text-[var(--color-text-muted)]">{icon}</span>}

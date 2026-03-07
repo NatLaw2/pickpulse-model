@@ -69,7 +69,7 @@ export function LoginPage() {
           </h2>
 
           {signUpSuccess ? (
-            <div className="text-sm text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg p-3">
+            <div className="text-sm text-[var(--color-success)] bg-emerald-50 border border-emerald-200 rounded-lg p-3">
               Check your email for a confirmation link, then sign in.
             </div>
           ) : (
@@ -99,7 +99,7 @@ export function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+                <div className="text-xs text-[var(--color-danger)] bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                   {error}
                 </div>
               )}

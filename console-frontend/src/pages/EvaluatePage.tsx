@@ -5,7 +5,7 @@ import { api, type EvalMetrics } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { formatCurrency } from '../lib/format';
 
-export function EvaluatePage() {
+export function EvaluatePage({ embedded }: { embedded?: boolean } = {}) {
   const [metrics, setMetrics] = useState<EvalMetrics | null>(null);
   const [error, setError] = useState('');
 
@@ -28,15 +28,17 @@ export function EvaluatePage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Model Performance</h1>
-        <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-          Discrimination, calibration, and business impact of the trained churn model
-        </p>
-      </div>
+      {!embedded && (
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold">Model Performance</h1>
+          <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+            Discrimination, calibration, and business impact of the trained churn model
+          </p>
+        </div>
+      )}
 
       {error && !metrics && (
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-10 text-center text-[var(--color-text-secondary)] shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-10 text-center text-[var(--color-text-secondary)] shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           No evaluation data available. Train a model first to see performance metrics.
         </div>
       )}
@@ -49,7 +51,7 @@ export function EvaluatePage() {
               label="AUC"
               value={metrics.auc?.toFixed(3) ?? '—'}
               sub={metrics.auc != null ? (metrics.auc > 0.8 ? 'Strong discrimination' : metrics.auc > 0.7 ? 'Good discrimination' : 'Fair discrimination') : undefined}
-              accent="var(--color-accent-glow)"
+              accent="var(--color-accent)"
               tooltip="Area Under the ROC Curve — measures how well the model separates churners from retainers. 1.0 = perfect separation, 0.5 = no better than random."
             />
             <StatCard
@@ -75,7 +77,7 @@ export function EvaluatePage() {
 
           {/* Business impact */}
           {metrics.business_impact && (
-            <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
               <div className="flex items-center gap-2 mb-4">
                 <h3 className="text-sm font-semibold">Business Impact</h3>
                 <span className="text-[var(--color-text-muted)]" title="Quantifies the revenue at risk and the model's ability to concentrate risk into actionable segments."><Info size={14} /></span>
@@ -108,18 +110,18 @@ export function EvaluatePage() {
           {/* Charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {calData && calData.length > 0 && (
-              <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+              <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
                 <h3 className="text-sm font-semibold mb-1">Calibration</h3>
                 <p className="text-xs text-[var(--color-text-muted)] mb-4">How closely predicted probabilities match observed churn rates</p>
                 <ResponsiveContainer width="100%" height={250}>
                   <LineChart data={calData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                    <XAxis dataKey="bin" tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.55)' }} />
-                    <YAxis tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.55)' }} domain={[0, 1]} />
-                    <Tooltip contentStyle={{ background: '#0F1729', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} />
-                    <ReferenceLine stroke="rgba(255,255,255,0.15)" strokeDasharray="3 3" segment={[{ x: calData[0]?.bin, y: 0 }, { x: calData[calData.length - 1]?.bin, y: 1 }]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.08)" />
+                    <XAxis dataKey="bin" tick={{ fontSize: 10, fill: '#9CA0B0' }} />
+                    <YAxis tick={{ fontSize: 10, fill: '#9CA0B0' }} domain={[0, 1]} />
+                    <Tooltip contentStyle={{ background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: 12, fontSize: 12 }} />
+                    <ReferenceLine stroke="rgba(0,0,0,0.1)" strokeDasharray="3 3" segment={[{ x: calData[0]?.bin, y: 0 }, { x: calData[calData.length - 1]?.bin, y: 1 }]} />
                     <Line type="monotone" dataKey="predicted" stroke="#7B61FF" strokeWidth={2} dot={{ r: 3 }} name="Predicted" />
-                    <Line type="monotone" dataKey="actual" stroke="#2DD4BF" strokeWidth={2} dot={{ r: 3 }} name="Actual" />
+                    <Line type="monotone" dataKey="actual" stroke="#10B981" strokeWidth={2} dot={{ r: 3 }} name="Actual" />
                     <Legend />
                   </LineChart>
                 </ResponsiveContainer>
@@ -127,15 +129,15 @@ export function EvaluatePage() {
             )}
 
             {liftData && liftData.length > 0 && (
-              <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+              <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
                 <h3 className="text-sm font-semibold mb-1">Lift by Decile</h3>
                 <p className="text-xs text-[var(--color-text-muted)] mb-4">How effectively the model concentrates churn risk into the top segments</p>
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={liftData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                    <XAxis dataKey="decile" tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.55)' }} />
-                    <YAxis tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.55)' }} />
-                    <Tooltip contentStyle={{ background: '#0F1729', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.08)" />
+                    <XAxis dataKey="decile" tick={{ fontSize: 10, fill: '#9CA0B0' }} />
+                    <YAxis tick={{ fontSize: 10, fill: '#9CA0B0' }} />
+                    <Tooltip contentStyle={{ background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: 12, fontSize: 12 }} />
                     <Bar dataKey="lift" fill="#7B61FF" radius={[6, 6, 0, 0]} name="Lift" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -145,13 +147,13 @@ export function EvaluatePage() {
 
           {/* Tier breakdown */}
           {metrics.tier_breakdown && Object.keys(metrics.tier_breakdown).length > 0 && (
-            <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
               <h3 className="text-sm font-semibold mb-4">Risk Tier Breakdown</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {Object.entries(metrics.tier_breakdown).map(([tier, info]) => {
                   const color = tier.includes('High') ? 'var(--color-danger)' : tier.includes('Medium') ? 'var(--color-warning)' : 'var(--color-success)';
                   return (
-                    <div key={tier} className="bg-[rgba(255,255,255,0.04)] rounded-xl p-5">
+                    <div key={tier} className="bg-[var(--color-bg-primary)] rounded-xl p-5">
                       <div className="text-xs uppercase tracking-wider mb-1" style={{ color }}>{tier}</div>
                       <div className="text-2xl font-bold">{info.count}</div>
                       <div className="text-xs text-[var(--color-text-secondary)] mt-2">
@@ -170,7 +172,7 @@ export function EvaluatePage() {
           )}
 
           {/* Advanced — collapsible */}
-          <details className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <details className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
             <summary className="text-sm font-semibold cursor-pointer">Detailed Metrics</summary>
             <div className="mt-4 space-y-6">
               {/* Additional metrics */}
@@ -195,11 +197,11 @@ export function EvaluatePage() {
                     <div className="text-xs text-[var(--color-text-muted)] py-2">Predicted Retained</div>
                     <div className="text-xs text-[var(--color-text-muted)] py-2">Predicted Churned</div>
                     <div className="text-xs text-[var(--color-text-muted)] px-3">Actually Retained</div>
-                    <div className="bg-[rgba(255,255,255,0.06)] rounded-xl p-3 font-mono">{metrics.confusion_matrix[0][0]}</div>
-                    <div className="bg-[rgba(255,255,255,0.06)] rounded-xl p-3 font-mono">{metrics.confusion_matrix[0][1]}</div>
+                    <div className="bg-[var(--color-bg-primary)] rounded-xl p-3 font-mono">{metrics.confusion_matrix[0][0]}</div>
+                    <div className="bg-[var(--color-bg-primary)] rounded-xl p-3 font-mono">{metrics.confusion_matrix[0][1]}</div>
                     <div className="text-xs text-[var(--color-text-muted)] px-3">Actually Churned</div>
-                    <div className="bg-[rgba(255,255,255,0.06)] rounded-xl p-3 font-mono">{metrics.confusion_matrix[1][0]}</div>
-                    <div className="bg-[rgba(255,255,255,0.06)] rounded-xl p-3 font-mono">{metrics.confusion_matrix[1][1]}</div>
+                    <div className="bg-[var(--color-bg-primary)] rounded-xl p-3 font-mono">{metrics.confusion_matrix[1][0]}</div>
+                    <div className="bg-[var(--color-bg-primary)] rounded-xl p-3 font-mono">{metrics.confusion_matrix[1][1]}</div>
                   </div>
                 </div>
               )}
@@ -222,7 +224,7 @@ export function EvaluatePage() {
                       </thead>
                       <tbody>
                         {metrics.lift_table.map((r, i) => (
-                          <tr key={r.decile} className={`border-b border-[var(--color-border)]/30 ${i % 2 === 1 ? 'bg-[rgba(255,255,255,0.03)]' : ''}`}>
+                          <tr key={r.decile} className={`border-b border-[var(--color-border)]/50 ${i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''}`}>
                             <td className="py-2 pr-3">{r.decile}</td>
                             <td className="py-2 pr-3 text-right">{r.n}</td>
                             <td className="py-2 pr-3 text-right">{(r.avg_prob * 100).toFixed(1)}%</td>

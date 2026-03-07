@@ -30,7 +30,7 @@ const DEMO_VARIANTS = [
   },
 ] as const;
 
-export function DatasetsPage() {
+export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
   const [loading, setLoading] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResponse | null>(null);
   const [error, setError] = useState('');
@@ -70,24 +70,26 @@ export function DatasetsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Datasets</h1>
-          {dataset?.is_demo && (
-            <span
-              className="px-2.5 py-1 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/25 rounded-lg text-[10px] font-bold tracking-widest uppercase text-[var(--color-warning)]"
-              title="Illustrative metrics from a sample dataset. Upload your own data for production-grade insights."
-            >
-              Sample Data
-            </span>
-          )}
+      {!embedded && (
+        <div className="mb-8">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">Data Sources</h1>
+            {dataset?.is_demo && (
+              <span
+                className="px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-[10px] font-bold tracking-widest uppercase text-[var(--color-warning)]"
+                title="Illustrative metrics from a sample dataset. Upload your own data for production-grade insights."
+              >
+                Sample Data
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-[var(--color-text-secondary)] mt-1">Connect your account data or explore with our pre-built demo datasets</p>
         </div>
-        <p className="text-sm text-[var(--color-text-secondary)] mt-1">Connect your account data or explore with our pre-built demo datasets</p>
-      </div>
+      )}
 
       {/* Current dataset indicator */}
       {dataset && (
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-4 mb-6 flex items-center gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-4 mb-6 flex items-center gap-4 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <Database size={18} className="text-[var(--color-success)] shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate">{dataset.name}</div>
@@ -110,7 +112,7 @@ export function DatasetsPage() {
           return (
             <div
               key={variant.key}
-              className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+              className="bg-white border border-[var(--color-border)] rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
             >
               <Icon size={24} style={{ color: variant.accent }} className="mb-3" />
               <h3 className="font-semibold text-sm mb-1">{variant.label}</h3>
@@ -129,27 +131,27 @@ export function DatasetsPage() {
       </div>
 
       {/* Upload CSV */}
-      <label className="block bg-[var(--color-bg-card)] border border-dashed border-[var(--color-border-bright)] rounded-2xl p-5 mb-8 text-center cursor-pointer hover:border-[var(--color-accent)] transition-colors shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+      <label className="block bg-white border border-dashed border-[var(--color-border)] rounded-2xl p-5 mb-8 text-center cursor-pointer hover:border-[var(--color-accent)] transition-colors shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
         <Upload size={24} className="mx-auto text-[var(--color-text-secondary)] mb-2" />
         <h3 className="font-semibold text-sm mb-1">Upload Your Own CSV</h3>
         <p className="text-xs text-[var(--color-text-secondary)] mb-3">
           Customer churn data with renewal fields
         </p>
         <input type="file" accept=".csv" className="hidden" onChange={handleUpload} disabled={loading !== null} />
-        <span className="inline-block px-4 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--color-border)] rounded-xl text-xs">
+        <span className="inline-block px-4 py-2 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-xl text-xs">
           {loading === 'upload' ? 'Uploading...' : 'Choose File'}
         </span>
       </label>
 
       {error && (
-        <div className="bg-red-900/20 border border-red-800/40 rounded-2xl p-4 mb-6 flex items-start gap-3">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
           <AlertCircle size={18} className="text-[var(--color-danger)] mt-0.5 shrink-0" />
-          <p className="text-sm text-red-300">{error}</p>
+          <p className="text-sm text-[var(--color-danger)]">{error}</p>
         </div>
       )}
 
       {v && (
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <div className="flex items-center gap-2 mb-4">
             {v.valid ? (
               <CheckCircle2 size={18} className="text-[var(--color-success)]" />
@@ -201,10 +203,10 @@ export function DatasetsPage() {
                 </thead>
                 <tbody>
                   {v.columns.map((c, i) => (
-                    <tr key={c.name} className={`border-b border-[var(--color-border)]/30 ${i % 2 === 1 ? 'bg-[rgba(255,255,255,0.03)]' : ''}`}>
+                    <tr key={c.name} className={`border-b border-[var(--color-border)]/50 ${i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''}`}>
                       <td className="py-2 pr-4 font-mono text-xs">{c.name}</td>
                       <td className="py-2 pr-4">
-                        <span className="px-2 py-0.5 bg-[rgba(255,255,255,0.06)] rounded-lg text-xs">{c.dtype}</span>
+                        <span className="px-2 py-0.5 bg-[var(--color-bg-primary)] rounded-lg text-xs">{c.dtype}</span>
                       </td>
                       <td className="py-2 pr-4 text-right">
                         {c.missing_count > 0 ? (
@@ -228,7 +230,7 @@ export function DatasetsPage() {
             <div className="mt-4 flex items-center gap-4 text-sm">
               <span className="text-[var(--color-text-secondary)]">Label Distribution:</span>
               {Object.entries(v.label_distribution).map(([k, n]) => (
-                <span key={k} className="px-2 py-1 bg-[rgba(255,255,255,0.06)] rounded-lg font-mono text-xs">
+                <span key={k} className="px-2 py-1 bg-[var(--color-bg-primary)] rounded-lg font-mono text-xs">
                   {k === '0' ? 'Retained' : 'Churned'}: {n}
                 </span>
               ))}

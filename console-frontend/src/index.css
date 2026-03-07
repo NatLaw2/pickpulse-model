@@ -1,27 +1,45 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-primary: #0B1220;
-  --color-bg-secondary: #0F1729;
-  --color-bg-card: rgba(255, 255, 255, 0.06);
-  --color-bg-card-hover: rgba(255, 255, 255, 0.09);
-  --color-border: rgba(255, 255, 255, 0.10);
+  /* Backgrounds — light content area */
+  --color-bg-primary: #F8F9FB;
+  --color-bg-secondary: #FFFFFF;
+  --color-bg-card: #FFFFFF;
+  --color-bg-card-hover: #F3F4F6;
+
+  /* Sidebar — stays dark */
+  --color-bg-sidebar: #1B1F2E;
+  --color-bg-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --color-bg-sidebar-active: rgba(123, 97, 255, 0.15);
+
+  /* Borders */
+  --color-border: #E5E7EB;
   --color-border-bright: rgba(123, 97, 255, 0.35);
-  --color-text-primary: rgba(255, 255, 255, 0.92);
-  --color-text-secondary: rgba(255, 255, 255, 0.70);
-  --color-text-muted: rgba(255, 255, 255, 0.55);
+
+  /* Text — dark on light */
+  --color-text-primary: #1A1D26;
+  --color-text-secondary: #5E6278;
+  --color-text-muted: #9CA0B0;
+
+  /* Sidebar text — light on dark */
+  --color-sidebar-text: rgba(255, 255, 255, 0.85);
+  --color-sidebar-text-muted: rgba(255, 255, 255, 0.55);
+
+  /* Accent — keep purple */
   --color-accent: #7B61FF;
-  --color-accent-glow: #9B85FF;
-  --color-success: #2DD4BF;
-  --color-warning: #FBBF24;
-  --color-danger: #FB7185;
+  --color-accent-glow: #6B4EFF;
+  --color-accent-light: rgba(123, 97, 255, 0.08);
+
+  /* Semantic */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
 }
 
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(180deg, #0B1220 0%, #0A0F1A 100%);
-  background-attachment: fixed;
+  background: var(--color-bg-primary);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   font-size: 15px;
@@ -30,5 +48,5 @@ body {
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--color-bg-primary); }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }

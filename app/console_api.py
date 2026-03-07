@@ -741,6 +741,7 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
     high_saves = 0.0   # churn_risk_pct >= 70
     medium_saves = 0.0  # 40 <= churn_risk_pct < 70
     low_saves = 0.0     # churn_risk_pct < 40
+    tier_counts: dict[str, int] = {}
     for p in predictions:
         arr_r = p.get("arr_at_risk", 0) or 0
         total_arr_at_risk += arr_r
@@ -755,6 +756,21 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
             renewing_90d += 1
             if pct >= 70:
                 high_risk_in_window += 1
+        tier = p.get("tier", "Unknown")
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+    # Top risk drivers from model feature importance
+    top_risk_drivers: list[dict] = []
+    if metadata and isinstance(metadata.get("feature_importance"), list):
+        sorted_fi = sorted(
+            metadata["feature_importance"],
+            key=lambda x: abs(x.get("importance", 0)),
+            reverse=True,
+        )[:5]
+        top_risk_drivers = [
+            {"feature": f["feature"], "importance": f["importance"]}
+            for f in sorted_fi
+        ]
 
     # Top 10 at-risk accounts
     top_10 = sorted(predictions, key=lambda x: x.get("arr_at_risk", 0) or 0, reverse=True)[:10]
@@ -788,6 +804,8 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
             "low_confidence_saves": round(low_saves, 2),
         },
         "top_at_risk": top_10,
+        "tier_counts": tier_counts,
+        "top_risk_drivers": top_risk_drivers,
     }
 
 

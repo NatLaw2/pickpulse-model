@@ -10,7 +10,7 @@ export function ReportsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <div className="flex items-center gap-3 mb-3">
             <FileText size={24} className="text-[var(--color-accent)]" />
             <h3 className="font-semibold">PDF Churn Risk Report</h3>
@@ -29,7 +29,7 @@ export function ReportsPage() {
           </a>
         </div>
 
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <div className="flex items-center gap-3 mb-3">
             <FileText size={24} className="text-[var(--color-success)]" />
             <h3 className="font-semibold">Scored Predictions CSV</h3>
@@ -40,7 +40,7 @@ export function ReportsPage() {
           </p>
           <a
             href={api.exportPredictions()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[rgba(255,255,255,0.06)] border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-card-hover)] transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-primary)] transition-colors"
           >
             <Download size={14} />
             Download CSV

@@ -238,6 +238,8 @@ export interface DashboardResponse {
     low_confidence_saves: number;
   };
   top_at_risk: ChurnPrediction[];
+  tier_counts: Record<string, number>;
+  top_risk_drivers: { feature: string; importance: number }[];
 }
 
 export interface DashboardModule {

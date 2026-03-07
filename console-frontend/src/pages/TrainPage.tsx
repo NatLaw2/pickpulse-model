@@ -4,7 +4,7 @@ import { Brain, CheckCircle2, Database, Loader2 } from 'lucide-react';
 import { api, isNoDatasetError, type TrainResponse } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 
-export function TrainPage() {
+export function TrainPage({ embedded }: { embedded?: boolean } = {}) {
   const [valFrac, setValFrac] = useState(0.2);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TrainResponse | null>(null);
@@ -32,21 +32,23 @@ export function TrainPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Train Model</h1>
-        <p className="text-sm text-[var(--color-text-secondary)] mt-1">Build a calibrated churn prediction model from your account data</p>
-      </div>
+      {!embedded && (
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold">Train Model</h1>
+          <p className="text-sm text-[var(--color-text-secondary)] mt-1">Build a calibrated churn prediction model from your account data</p>
+        </div>
+      )}
 
-      {/* No dataset guidance — neutral, not an error */}
+      {/* No dataset guidance */}
       {noDataset && (
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-8 mb-8 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-8 mb-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <Database size={32} className="mx-auto mb-3 text-[var(--color-text-muted)]" />
           <h3 className="font-semibold mb-2">No dataset loaded</h3>
           <p className="text-sm text-[var(--color-text-secondary)] mb-5 max-w-md mx-auto">
             Load a sample dataset or upload your own account data before training the model.
           </p>
           <button
-            onClick={() => navigate('/datasets')}
+            onClick={() => navigate('/data-sources')}
             className="px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-sm font-medium hover:bg-[var(--color-accent-glow)] transition-all shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
           >
             Go to Datasets
@@ -55,14 +57,14 @@ export function TrainPage() {
       )}
 
       {!noDataset && (
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <div className="flex items-center gap-6 mb-5">
             <div>
               <label className="text-xs text-[var(--color-text-secondary)] block mb-1" title="Percentage of data held out for unbiased performance evaluation after training.">Validation Holdout</label>
               <select
                 value={valFrac}
                 onChange={(e) => setValFrac(Number(e.target.value))}
-                className="bg-[rgba(255,255,255,0.06)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm"
+                className="bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm"
               >
                 <option value={0.1}>10%</option>
                 <option value={0.2}>20% (Recommended)</option>
@@ -92,14 +94,14 @@ export function TrainPage() {
       )}
 
       {realError && (
-        <div className="bg-red-900/20 border border-red-800/40 rounded-2xl p-4 mb-6">
-          <p className="text-sm text-red-300">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+          <p className="text-sm text-[var(--color-danger)]">{error}</p>
         </div>
       )}
 
       {meta && (
         <div className="space-y-6">
-          <div className="bg-[var(--color-bg-card)] border border-[var(--color-success)]/30 rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <div className="bg-white border border-emerald-200 rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
             <div className="flex items-center gap-2 mb-4">
               <CheckCircle2 size={18} className="text-[var(--color-success)]" />
               <h3 className="font-semibold">Training Complete</h3>
@@ -107,7 +109,7 @@ export function TrainPage() {
             <dl className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
               <div>
                 <dt className="text-[var(--color-text-muted)] text-xs mb-1">Version</dt>
-                <dd className="font-mono text-lg font-bold text-[var(--color-accent-glow)]">{meta.version}</dd>
+                <dd className="font-mono text-lg font-bold text-[var(--color-accent)]">{meta.version}</dd>
               </div>
               <div>
                 <dt className="text-[var(--color-text-muted)] text-xs mb-1">Model Type</dt>
@@ -125,7 +127,7 @@ export function TrainPage() {
           </div>
 
           {meta.val_metrics && (
-            <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
               <h3 className="font-semibold mb-4 text-sm">Validation Metrics</h3>
               <dl className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                 <div>
@@ -149,7 +151,7 @@ export function TrainPage() {
           )}
 
           {meta.feature_importance && (
-            <details className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+            <details className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
               <summary className="font-semibold text-sm cursor-pointer">
                 Feature Importance ({meta.feature_importance.length} features)
               </summary>
@@ -157,7 +159,7 @@ export function TrainPage() {
                 {meta.feature_importance.slice(0, 15).map((f: any) => (
                   <div key={f.feature} className="flex items-center gap-3 text-sm">
                     <span className="font-mono w-48 truncate text-[var(--color-text-secondary)] text-xs">{f.feature}</span>
-                    <div className="flex-1 h-2.5 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+                    <div className="flex-1 h-2.5 bg-[var(--color-bg-primary)] rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full"
                         style={{

@@ -254,7 +254,7 @@ export function PredictPage() {
   const renderEmailOverlay = (row: ChurnPrediction, actionType: string) => (
     <div
       ref={overlayRef}
-      className="mt-2 w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-xl p-3"
+      className="mt-2 w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-xl p-3"
     >
       <div className="mb-2">
         <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider block mb-1">
@@ -265,7 +265,7 @@ export function PredictPage() {
           value={emailInput}
           onChange={(e) => setEmailInput(e.target.value)}
           placeholder="contact@company.com"
-          className="w-full px-2.5 py-1.5 text-xs bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+          className="w-full px-2.5 py-1.5 text-xs bg-white border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleDraftEmail(row, emailInput.trim() || null, actionType);
           }}
@@ -284,7 +284,7 @@ export function PredictPage() {
               className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${
                 selectedTone === t
                   ? 'bg-[var(--color-accent)] text-white'
-                  : 'bg-[rgba(255,255,255,0.06)] text-[var(--color-text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'
+                  : 'bg-white border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-primary)]'
               }`}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -295,13 +295,13 @@ export function PredictPage() {
       <div className="flex gap-2">
         <button
           onClick={() => handleDraftEmail(row, emailInput.trim() || null, actionType)}
-          className="flex-1 px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent)]/80 transition-colors"
+          className="flex-1 px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-glow)] transition-colors"
         >
           Generate
         </button>
         <button
           onClick={() => handleDraftEmail(row, null, actionType)}
-          className="px-3 py-1.5 text-[10px] font-medium rounded-lg bg-[rgba(255,255,255,0.06)] text-[var(--color-text-secondary)] hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+          className="px-3 py-1.5 text-[10px] font-medium rounded-lg bg-white border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-primary)] transition-colors"
         >
           Skip Email
         </button>
@@ -312,20 +312,20 @@ export function PredictPage() {
   return (
     <div className="relative">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">Account Scoring</h1>
+        <h1 className="text-2xl font-bold">Accounts</h1>
         <p className="text-sm text-[var(--color-text-secondary)] mt-1">Score every account in the portfolio and surface prioritized churn risk predictions</p>
       </div>
 
       {/* No dataset — neutral guidance */}
       {noDataset && !result && (
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-8 mb-8 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-8 mb-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <Database size={32} className="mx-auto mb-3 text-[var(--color-text-muted)]" />
           <h3 className="font-semibold mb-2">No dataset loaded</h3>
           <p className="text-sm text-[var(--color-text-secondary)] mb-5 max-w-md mx-auto">
             Load a sample dataset or upload your own account data before generating predictions.
           </p>
           <button
-            onClick={() => navigate('/datasets')}
+            onClick={() => navigate('/data-sources')}
             className="px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-sm font-medium hover:bg-[var(--color-accent-glow)] transition-all shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
           >
             Go to Datasets
@@ -335,14 +335,14 @@ export function PredictPage() {
 
       {/* No model — neutral guidance */}
       {noModel && !result && (
-        <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl p-8 mb-8 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-8 mb-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <Database size={32} className="mx-auto mb-3 text-[var(--color-text-muted)]" />
           <h3 className="font-semibold mb-2">No trained model</h3>
           <p className="text-sm text-[var(--color-text-secondary)] mb-5 max-w-md mx-auto">
             Train a churn model on your dataset before generating predictions.
           </p>
           <button
-            onClick={() => navigate('/train')}
+            onClick={() => navigate('/model')}
             className="px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-sm font-medium hover:bg-[var(--color-accent-glow)] transition-all shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
           >
             Go to Train
@@ -365,7 +365,7 @@ export function PredictPage() {
           {result && (
             <a
               href={api.exportPredictions()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-card-hover)] transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-primary)] transition-colors"
             >
               <Download size={14} />
               Export CSV
@@ -386,8 +386,8 @@ export function PredictPage() {
 
       {/* Real errors only */}
       {realError && (
-        <div className="bg-red-900/20 border border-red-800/40 rounded-2xl p-4 mb-6">
-          <p className="text-sm text-red-300">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+          <p className="text-sm text-[var(--color-danger)]">{error}</p>
         </div>
       )}
 
@@ -398,17 +398,17 @@ export function PredictPage() {
             {Object.entries(result.tier_counts).map(([tier, count]) => {
               const color = tier.includes('High') ? 'var(--color-danger)' : tier.includes('Medium') ? 'var(--color-warning)' : 'var(--color-success)';
               return (
-                <div key={tier} className="px-4 py-2.5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-sm">
+                <div key={tier} className="px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm">
                   <span className="font-bold" style={{ color }}>{count}</span>
                   <span className="text-[var(--color-text-secondary)] ml-2">{tier}</span>
                 </div>
               );
             })}
-            <div className="px-4 py-2.5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-sm text-[var(--color-text-secondary)]">
+            <div className="px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm text-[var(--color-text-secondary)]">
               {result.active_count} active / {result.archived_count} archived
             </div>
             {result.summary.total_arr_at_risk != null && (
-              <div className="px-4 py-2.5 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-sm" title="ARR at Risk = ARR x churn probability">
+              <div className="px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm" title="ARR at Risk = ARR x churn probability">
                 <span className="font-bold text-[var(--color-danger)]">{formatCurrency(result.summary.total_arr_at_risk)}</span>
                 <span className="text-[var(--color-text-secondary)] ml-2">ARR at Risk</span>
               </div>
@@ -424,13 +424,13 @@ export function PredictPage() {
                 placeholder="Search customer..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 pr-3 py-2 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-sm w-48 focus:outline-none focus:border-[var(--color-accent)]"
+                className="pl-9 pr-3 py-2 bg-white border border-[var(--color-border)] rounded-xl text-sm w-48 focus:outline-none focus:border-[var(--color-accent)]"
               />
             </div>
             <select
               value={riskFilter}
               onChange={(e) => setRiskFilter(e.target.value)}
-              className="px-3 py-2 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-sm"
+              className="px-3 py-2 bg-white border border-[var(--color-border)] rounded-xl text-sm"
             >
               <option value="all">All Risk</option>
               <option value="high">High (70%+)</option>
@@ -440,7 +440,7 @@ export function PredictPage() {
             <select
               value={windowFilter}
               onChange={(e) => setWindowFilter(e.target.value)}
-              className="px-3 py-2 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-sm"
+              className="px-3 py-2 bg-white border border-[var(--color-border)] rounded-xl text-sm"
             >
               <option value="all">All Windows</option>
               <option value="<30d">&lt;30 days</option>
@@ -462,11 +462,11 @@ export function PredictPage() {
 
           {/* Predictions table */}
           <div className={`transition-all ${selectedId ? 'mr-[400px]' : ''}`}>
-            <div className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10">
-                    <tr className="text-left text-xs text-[var(--color-text-muted)] uppercase tracking-wider bg-[var(--color-bg-secondary)]">
+                    <tr className="text-left text-xs text-[var(--color-text-muted)] uppercase tracking-wider bg-[var(--color-bg-primary)]">
                       <th className="py-3 px-4 font-medium cursor-pointer group select-none" onClick={() => handleSort('customer_id')}>
                         Account <SortIcon col="customer_id" />
                       </th>
@@ -497,15 +497,15 @@ export function PredictPage() {
                       <tr
                         key={row.customer_id}
                         onClick={() => openDrawer(row.customer_id)}
-                        className={`border-t border-[var(--color-border)]/30 hover:bg-[rgba(123,97,255,0.08)] transition-colors cursor-pointer ${
-                          i % 2 === 1 ? 'bg-[rgba(255,255,255,0.03)]' : ''
-                        } ${selectedId === row.customer_id ? 'bg-[rgba(123,97,255,0.12)]' : ''}`}
+                        className={`border-t border-[var(--color-border)] hover:bg-[var(--color-accent-light)] transition-colors cursor-pointer ${
+                          i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''
+                        } ${selectedId === row.customer_id ? 'bg-[var(--color-accent)]/10' : ''}`}
                       >
-                        <td className="py-3 px-4 font-mono text-xs">{row.customer_id}</td>
+                        <td className="py-3 px-4 font-medium text-xs">{row.customer_id}</td>
                         <td className="py-3 px-4 text-right">
                           <span
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
-                            style={{ background: `${riskColor(row.churn_risk_pct)}20`, color: riskColor(row.churn_risk_pct) }}
+                            style={{ background: `${riskColor(row.churn_risk_pct)}18`, color: riskColor(row.churn_risk_pct) }}
                           >
                             {riskLabel(row.churn_risk_pct)} {row.churn_risk_pct}%
                           </span>
@@ -513,9 +513,9 @@ export function PredictPage() {
                         <td className="py-3 px-4 text-right font-mono text-xs">{row.urgency_score}</td>
                         <td className="py-3 px-4">
                           <span className={`text-xs px-2 py-0.5 rounded-lg ${
-                            row.renewal_window_label === '<30d' ? 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]' :
-                            row.renewal_window_label === '30-90d' ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]' :
-                            'bg-[rgba(255,255,255,0.06)] text-[var(--color-text-secondary)]'
+                            row.renewal_window_label === '<30d' ? 'bg-red-50 text-[var(--color-danger)]' :
+                            row.renewal_window_label === '30-90d' ? 'bg-amber-50 text-[var(--color-warning)]' :
+                            'bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)]'
                           }`}>
                             {row.renewal_window_label}
                           </span>
@@ -546,17 +546,17 @@ export function PredictPage() {
       {selectedId && selectedRow && (
         <div
           ref={drawerRef}
-          className="fixed top-0 right-0 w-[400px] h-full bg-[var(--color-bg-card)] border-l border-[var(--color-border)] shadow-[-10px_0_30px_rgba(0,0,0,0.4)] z-50 overflow-y-auto"
+          className="fixed top-0 right-0 w-[400px] h-full bg-white border-l border-[var(--color-border)] shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-50 overflow-y-auto"
         >
           {/* Drawer header */}
-          <div className="sticky top-0 bg-[var(--color-bg-card)] border-b border-[var(--color-border)] px-5 py-4 flex items-center justify-between z-10">
+          <div className="sticky top-0 bg-white border-b border-[var(--color-border)] px-5 py-4 flex items-center justify-between z-10">
             <div>
               <h3 className="text-sm font-bold">Why This Account Is At Risk</h3>
-              <p className="text-xs text-[var(--color-text-muted)] font-mono mt-0.5">{selectedRow.customer_id}</p>
+              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{selectedRow.customer_id}</p>
             </div>
             <button
               onClick={closeDrawer}
-              className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.08)] transition-colors"
+              className="p-1.5 rounded-lg hover:bg-[var(--color-bg-primary)] transition-colors"
             >
               <X size={16} />
             </button>
@@ -567,7 +567,7 @@ export function PredictPage() {
             <div>
               <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-3">Account Summary</h4>
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[var(--color-bg-secondary)] rounded-xl p-3">
+                <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
                   <div className="text-[10px] text-[var(--color-text-muted)] mb-1">Churn Risk</div>
                   <div className="text-lg font-bold" style={{ color: riskColor(selectedRow.churn_risk_pct) }}>
                     {selectedRow.churn_risk_pct}%
@@ -576,7 +576,7 @@ export function PredictPage() {
                     {riskLabel(selectedRow.churn_risk_pct)} Risk
                   </div>
                 </div>
-                <div className="bg-[var(--color-bg-secondary)] rounded-xl p-3">
+                <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
                   <div className="text-[10px] text-[var(--color-text-muted)] mb-1">ARR at Risk</div>
                   <div className="text-lg font-bold text-[var(--color-danger)]">
                     {formatCurrency(selectedRow.arr_at_risk)}
@@ -585,7 +585,7 @@ export function PredictPage() {
                     of {formatCurrency(selectedRow.arr)} ARR
                   </div>
                 </div>
-                <div className="bg-[var(--color-bg-secondary)] rounded-xl p-3">
+                <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
                   <div className="text-[10px] text-[var(--color-text-muted)] mb-1">Renewal</div>
                   <div className="text-sm font-bold">{selectedRow.days_until_renewal} days</div>
                   <div className={`text-[10px] ${
@@ -596,7 +596,7 @@ export function PredictPage() {
                     {selectedRow.renewal_window_label} window
                   </div>
                 </div>
-                <div className="bg-[var(--color-bg-secondary)] rounded-xl p-3">
+                <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
                   <div className="text-[10px] text-[var(--color-text-muted)] mb-1">Tier</div>
                   <div className="text-sm font-bold">{selectedRow.tier}</div>
                   <div className="text-[10px] text-[var(--color-text-muted)]">
@@ -616,7 +616,7 @@ export function PredictPage() {
                 </div>
               )}
               {explainError && (
-                <div className="px-3 py-2 bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/25 rounded-lg text-xs text-[var(--color-danger)]">
+                <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-[var(--color-danger)]">
                   {explainError}
                 </div>
               )}
@@ -625,7 +625,7 @@ export function PredictPage() {
                   {explainData.risk_drivers.map((driver, i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-2 px-3 py-2.5 bg-[var(--color-bg-secondary)] rounded-xl text-xs"
+                      className="flex items-start gap-2 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs"
                     >
                       <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] flex-shrink-0" />
                       <span className="text-[var(--color-text-primary)]">{driver}</span>
@@ -644,7 +644,7 @@ export function PredictPage() {
             {selectedRow.recommended_action && (
               <div>
                 <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Recommended Action</h4>
-                <div className="px-3 py-2.5 bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 rounded-xl text-xs text-[var(--color-accent-glow)]">
+                <div className="px-3 py-2.5 bg-[var(--color-accent)]/8 border border-[var(--color-accent)]/20 rounded-xl text-xs text-[var(--color-accent)]">
                   {selectedRow.recommended_action}
                 </div>
               </div>
@@ -655,7 +655,7 @@ export function PredictPage() {
               <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-3">Customer Save Playbook</h4>
 
               {draftError && (
-                <div className="mb-3 px-3 py-2 bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/25 rounded-lg text-xs text-[var(--color-danger)]">
+                <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-[var(--color-danger)]">
                   {draftError}
                 </div>
               )}
@@ -670,7 +670,7 @@ export function PredictPage() {
                       setDraftError(null);
                     }}
                     disabled={draftingAction !== null}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-secondary)] rounded-xl text-xs hover:bg-[rgba(255,255,255,0.08)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {draftingAction === 'generate_outreach' ? (
                       <Loader2 size={14} className="animate-spin text-[var(--color-accent)]" />
@@ -691,7 +691,7 @@ export function PredictPage() {
                 <button
                   onClick={() => handleScheduleReview(selectedRow)}
                   disabled={draftingAction !== null}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-secondary)] rounded-xl text-xs hover:bg-[rgba(255,255,255,0.08)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {draftingAction === 'schedule_success_review' ? (
                     <Loader2 size={14} className="animate-spin text-[var(--color-success)]" />
@@ -713,7 +713,7 @@ export function PredictPage() {
                       setDraftError(null);
                     }}
                     disabled={draftingAction !== null}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-secondary)] rounded-xl text-xs hover:bg-[rgba(255,255,255,0.08)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {draftingAction === 'send_feature_training' ? (
                       <Loader2 size={14} className="animate-spin text-[var(--color-warning)]" />
@@ -734,7 +734,7 @@ export function PredictPage() {
                 <button
                   onClick={() => handleEscalateToSales(selectedRow)}
                   disabled={draftingAction !== null}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-secondary)] rounded-xl text-xs hover:bg-[rgba(255,255,255,0.08)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs hover:bg-[var(--color-border)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {draftingAction === 'escalate_to_sales' ? (
                     <Loader2 size={14} className="animate-spin text-[var(--color-danger)]" />

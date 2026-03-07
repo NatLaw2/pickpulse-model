@@ -33,7 +33,7 @@ function timeAgo(iso: string | null): string {
 
 const CATEGORY_COLORS: Record<string, string> = {
   CRM: 'bg-blue-500/10 text-blue-400',
-  Billing: 'bg-green-500/10 text-green-400',
+  Billing: 'bg-green-500/10 text-[var(--color-success)]',
   Support: 'bg-orange-500/10 text-orange-400',
   Analytics: 'bg-purple-500/10 text-purple-400',
   Import: 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]',
@@ -62,8 +62,8 @@ function ProviderCard({
     pending: 'text-[var(--color-warning)]',
     connected: 'text-[var(--color-accent)]',
     syncing: 'text-[var(--color-warning)]',
-    healthy: 'text-green-400',
-    error: 'text-red-400',
+    healthy: 'text-[var(--color-success)]',
+    error: 'text-[var(--color-danger)]',
     disconnected: 'text-[var(--color-text-muted)]',
   };
 
@@ -148,7 +148,7 @@ function ProviderCard({
             </button>
             <button
               onClick={() => onDisconnect(provider.provider)}
-              className="flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg text-[var(--color-text-muted)] hover:text-red-400"
+              className="flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
               title="Disconnect"
             >
               <Unplug size={12} />
@@ -182,7 +182,7 @@ function AccountsTable({ accounts }: { accounts: IntegrationAccount[] }) {
         </thead>
         <tbody>
           {accounts.map((a) => (
-            <tr key={a.external_id} className="border-b border-[var(--color-border)]/50 hover:bg-[rgba(255,255,255,0.02)]">
+            <tr key={a.external_id} className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-bg-primary)]">
               <td className="py-2.5 px-3">
                 <div className="text-[var(--color-text-primary)] font-medium">{a.name || a.external_id}</div>
                 {a.domain && <div className="text-[10px] text-[var(--color-text-muted)]">{a.domain}</div>}
@@ -210,9 +210,9 @@ function ScoresTable({ scores }: { scores: IntegrationScore[] }) {
   if (scores.length === 0) return null;
 
   const tierColor = (tier: string) => {
-    if (tier === 'High Risk') return 'text-red-400';
+    if (tier === 'High Risk') return 'text-[var(--color-danger)]';
     if (tier === 'Medium Risk') return 'text-[var(--color-warning)]';
-    return 'text-green-400';
+    return 'text-[var(--color-success)]';
   };
 
   return (
@@ -230,7 +230,7 @@ function ScoresTable({ scores }: { scores: IntegrationScore[] }) {
         </thead>
         <tbody>
           {scores.map((s, i) => (
-            <tr key={i} className="border-b border-[var(--color-border)]/50 hover:bg-[rgba(255,255,255,0.02)]">
+            <tr key={i} className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-bg-primary)]">
               <td className="py-2.5 px-3">
                 <div className="text-[var(--color-text-primary)] font-medium">{s.name || s.external_id}</div>
                 {s.email && <div className="text-[10px] text-[var(--color-text-muted)]">{s.email}</div>}
@@ -258,7 +258,7 @@ function ScoresTable({ scores }: { scores: IntegrationScore[] }) {
 // Main page
 // ---------------------------------------------------------------------------
 
-export function IntegrationsPage() {
+export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [healthMap, setHealthMap] = useState<Record<string, HealthResponse>>({});
   const [accounts, setAccounts] = useState<IntegrationAccount[]>([]);
@@ -356,7 +356,7 @@ export function IntegrationsPage() {
   const handleConnectOAuth = async (provider: ProviderInfo) => {
     if (provider.auth_method === 'oauth') {
       try {
-        const redirectUri = `${window.location.origin}/integrations`;
+        const redirectUri = `${window.location.origin}/data-sources`;
         const res = await api.startOAuth(provider.provider, redirectUri);
         window.location.href = res.auth_url;
       } catch (e: any) {
@@ -438,7 +438,7 @@ export function IntegrationsPage() {
     <div className="max-w-5xl">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-green-500/20 border border-green-500/30 text-green-300 px-4 py-2.5 rounded-xl text-sm backdrop-blur-md flex items-center gap-2">
+        <div className="fixed top-4 right-4 z-50 bg-emerald-50 border border-emerald-200 text-[var(--color-success)] px-4 py-2.5 rounded-xl text-sm backdrop-blur-md flex items-center gap-2">
           <CheckCircle2 size={14} />
           {toast}
         </div>
@@ -457,21 +457,23 @@ export function IntegrationsPage() {
       )}
 
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Integrations</h1>
-        <p className="text-sm text-[var(--color-text-muted)] mt-1">
-          Connect your CRM, billing, support, and analytics tools to score real accounts against your churn model.
-        </p>
-      </div>
+      {!embedded && (
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Integrations</h1>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">
+            Connect your CRM, billing, support, and analytics tools to score real accounts against your churn model.
+          </p>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-300 flex items-center justify-between">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-[var(--color-danger)] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertTriangle size={14} />
             <span>{error}</span>
           </div>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 text-xs ml-4">Dismiss</button>
+          <button onClick={() => setError(null)} className="text-[var(--color-danger)] hover:text-[var(--color-danger)] text-xs ml-4">Dismiss</button>
         </div>
       )}
 
@@ -495,7 +497,7 @@ export function IntegrationsPage() {
           <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
             <Shield size={10} /> Encryption
           </div>
-          <div className="text-xs font-medium text-green-400 mt-1">AES-256-GCM</div>
+          <div className="text-xs font-medium text-[var(--color-success)] mt-1">AES-256-GCM</div>
         </div>
       </div>
 
