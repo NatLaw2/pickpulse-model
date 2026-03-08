@@ -17,6 +17,11 @@ router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 _notification_settings: Dict[str, List[str]] = {}
 
 
+def clear_tenant_settings(tenant_id: str) -> None:
+    """Remove notification settings for a tenant (used by demo reset)."""
+    _notification_settings.pop(tenant_id, None)
+
+
 class NotificationSettings(BaseModel):
     recipients: List[str]
 

@@ -71,6 +71,7 @@ DATASET_STATE_PATH = os.path.join(DATA_DIR, ".dataset_state.json")
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 SAMPLE_DIR = os.path.join(DATA_DIR, "sample")
 MODULE_NAME = "churn"
+DEMO_MODE = os.environ.get("DEMO_MODE", "").lower() in ("true", "1")
 
 # Ensure data directories exist at startup
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -132,6 +133,13 @@ def _get_dataset(module_name: str, tenant_id: str = _DEFAULT_TENANT) -> Optional
     return None
 
 
+def _tenant_output_dir(tenant_id: str) -> str:
+    """Return tenant-scoped output directory, creating it if needed."""
+    d = os.path.join("outputs", tenant_id)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 # -----------------------------------------------------------------------
 # Health
 # -----------------------------------------------------------------------
@@ -144,6 +152,63 @@ def health():
 async def whoami(tenant_id: str = Depends(get_tenant_id)):
     """Smoke-test: return the authenticated tenant info."""
     return {"tenant_id": tenant_id}
+
+
+# -----------------------------------------------------------------------
+# Demo Reset
+# -----------------------------------------------------------------------
+@app.post("/api/demo/reset")
+def reset_demo(tenant_id: str = Depends(get_tenant_id)):
+    """Reset the demo environment to a clean first-time state for the current tenant."""
+    if not DEMO_MODE:
+        raise HTTPException(status_code=403, detail="Demo reset is only available in DEMO_MODE.")
+
+    cleared: list[str] = []
+
+    # 1. Clear in-memory state (datasets, predictions, metrics, account statuses, train logs)
+    if tenant_id in _tenant_state:
+        _tenant_state.pop(tenant_id)
+        cleared.extend(["dataset", "predictions", "metrics"])
+
+    # 2. Clear persisted dataset registry (tenant-scoped keys only)
+    persisted = _load_persisted_datasets()
+    if any(k in persisted for k in MODULES):
+        for k in list(MODULES.keys()):
+            persisted.pop(k, None)
+        _save_persisted_datasets(persisted)
+        if "dataset" not in cleared:
+            cleared.append("dataset")
+
+    # 3. Delete tenant-scoped uploads (prefix: {tenant_id[:8]}_)
+    prefix = f"{tenant_id[:8]}_"
+    if os.path.exists(UPLOAD_DIR):
+        for fname in os.listdir(UPLOAD_DIR):
+            if fname.startswith(prefix):
+                try:
+                    os.remove(os.path.join(UPLOAD_DIR, fname))
+                except OSError:
+                    pass
+
+    # 4. Delete model artifacts (tenant-scoped directory)
+    for mod in MODULES.values():
+        artifact_dir = mod.get_artifact_dir(tenant_id)
+        if os.path.exists(artifact_dir):
+            shutil.rmtree(artifact_dir, ignore_errors=True)
+            if "model" not in cleared:
+                cleared.append("model")
+
+    # 5. Delete tenant-scoped outputs
+    tenant_out = os.path.join("outputs", tenant_id)
+    if os.path.exists(tenant_out):
+        shutil.rmtree(tenant_out, ignore_errors=True)
+        cleared.append("outputs")
+
+    # 6. Clear notification settings
+    from .executive_summary import clear_tenant_settings
+    clear_tenant_settings(tenant_id)
+    cleared.append("notifications")
+
+    return {"status": "reset", "tenant_id": tenant_id, "cleared": cleared}
 
 
 # -----------------------------------------------------------------------
@@ -216,7 +281,7 @@ async def upload_dataset(module_name: str, file: UploadFile = File(...), tenant_
     mod = get_module(module_name)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    filename = f"{module_name}_{uuid.uuid4().hex[:8]}.csv"
+    filename = f"{tenant_id[:8]}_{module_name}_{uuid.uuid4().hex[:8]}.csv"
     filepath = os.path.join(UPLOAD_DIR, filename)
 
     with open(filepath, "wb") as f:
@@ -384,7 +449,7 @@ def get_evaluation(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     metrics = state["metrics"].get(module_name)
 
     if not metrics:
-        report_path = os.path.join("outputs", f"{module_name}_evaluation.json")
+        report_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_evaluation.json")
         if os.path.exists(report_path):
             with open(report_path) as f:
                 metrics = json.load(f)
@@ -413,7 +478,7 @@ def generate_report(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     if not metrics:
         raise HTTPException(status_code=404, detail="No evaluation metrics. Train first.")
 
-    output_path = os.path.join("outputs", f"{module_name}_report.pdf")
+    output_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_report.pdf")
     result = generate_pdf_report(metrics, mod, output_path)
     if not result:
         raise HTTPException(status_code=500, detail="PDF generation failed (reportlab not installed).")
@@ -458,9 +523,8 @@ def predict_module(
             if mask.any():
                 scored.loc[mask, "account_status"] = status
 
-        # Save full scored output for export
-        os.makedirs("outputs", exist_ok=True)
-        scored.to_csv(os.path.join("outputs", f"{module_name}_scored.csv"), index=False)
+        # Save full scored output for export (tenant-scoped)
+        scored.to_csv(os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_scored.csv"), index=False)
 
         # Filter archived unless requested
         if not include_archived and "account_status" in scored.columns:
@@ -570,7 +634,7 @@ def get_cached_predictions(
 @app.get("/api/predict/{module_name}/export")
 def export_predictions(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
-    scored_path = os.path.join("outputs", f"{module_name}_scored.csv")
+    scored_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_scored.csv")
     if not os.path.exists(scored_path):
         raise HTTPException(status_code=404, detail="No scored predictions. Run predict first.")
 
@@ -777,7 +841,7 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
     state = _get_state(tenant_id)
     metrics = state["metrics"].get("churn")
     if not metrics:
-        eval_path = os.path.join("outputs", "churn_evaluation.json")
+        eval_path = os.path.join(_tenant_output_dir(tenant_id), "churn_evaluation.json")
         if os.path.exists(eval_path):
             with open(eval_path) as f:
                 metrics = json.load(f)

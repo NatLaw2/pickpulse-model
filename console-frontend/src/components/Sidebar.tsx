@@ -1,9 +1,13 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Database, Brain,
-  Crosshair, Code2, FileText, ShieldAlert, LogOut
+  Crosshair, Code2, FileText, ShieldAlert, LogOut,
+  RotateCcw, Loader2
 } from 'lucide-react';
+import { api } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
+import { usePredictions } from '../lib/PredictionContext';
 import { useAuth } from '../lib/AuthContext';
 
 const mainLinks = [
@@ -19,8 +23,32 @@ const configLinks = [
 ];
 
 export function Sidebar() {
-  const { dataset } = useDataset();
+  const { dataset, refresh } = useDataset();
+  const { clearPredictions } = usePredictions();
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const [resetting, setResetting] = useState(false);
+  const [resetToast, setResetToast] = useState(false);
+
+  const handleReset = async () => {
+    if (!window.confirm('Reset demo to a clean state? This removes all data, models, and predictions.')) return;
+
+    setResetting(true);
+    try {
+      await api.resetDemo();
+      clearPredictions();
+      refresh();
+      setResetToast(true);
+      setTimeout(() => setResetToast(false), 3000);
+      navigate('/data-sources');
+    } catch (err: any) {
+      console.error('[reset] failed:', err);
+      alert(err?.message || 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-56 bg-[var(--color-bg-sidebar)] flex flex-col z-30">
@@ -39,12 +67,30 @@ export function Sidebar() {
         </p>
       </div>
 
-      {/* Demo environment banner */}
-      <div className="mx-3 mt-3 px-3 py-1.5 bg-[var(--color-accent)]/8 border border-[var(--color-accent)]/20 rounded-lg text-center">
+      {/* Demo environment banner + reset button */}
+      <div className="mx-3 mt-3 px-3 py-1.5 bg-[var(--color-accent)]/8 border border-[var(--color-accent)]/20 rounded-lg flex items-center justify-between">
         <span className="text-[9px] font-semibold tracking-widest uppercase text-[var(--color-accent)]">
           Demo Environment
         </span>
+        <button
+          onClick={handleReset}
+          disabled={resetting}
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium text-[var(--color-sidebar-text-muted)] hover:text-white transition-colors disabled:opacity-50"
+          title="Reset demo to clean state"
+        >
+          {resetting ? <Loader2 size={10} className="animate-spin" /> : <RotateCcw size={10} />}
+          Reset
+        </button>
       </div>
+
+      {/* Reset success toast */}
+      {resetToast && (
+        <div className="mx-3 mt-2 px-3 py-2 bg-[var(--color-success)]/15 border border-[var(--color-success)]/25 rounded-lg text-center">
+          <span className="text-[10px] font-medium text-[var(--color-success)]">
+            Demo reset. Ready to load fresh data.
+          </span>
+        </div>
+      )}
 
       {/* Sample data badge */}
       {dataset?.is_demo && (

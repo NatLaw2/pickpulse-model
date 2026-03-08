@@ -236,6 +236,10 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ recipients }),
     }),
+
+  // Demo reset
+  resetDemo: () =>
+    request<DemoResetResponse>('/demo/reset', { method: 'POST' }),
 };
 
 // -----------------------------------------------------------------------
@@ -264,6 +268,12 @@ export interface ExecutiveSummaryResponse {
 
 export interface NotificationSettings {
   recipients: string[];
+}
+
+export interface DemoResetResponse {
+  status: string;
+  tenant_id: string;
+  cleared: string[];
 }
 
 export interface DashboardResponse {
