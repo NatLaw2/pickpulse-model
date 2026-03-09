@@ -206,6 +206,19 @@ export function PredictPage() {
         </div>
       )}
 
+      {/* Executive Brief — always visible when summaryData exists */}
+      {summaryData && (
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setShowSummaryModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/25 rounded-xl text-sm text-[var(--color-accent)] font-medium hover:bg-[var(--color-accent)]/15 transition-colors"
+          >
+            <FileText size={14} />
+            View Executive Brief
+          </button>
+        </div>
+      )}
+
       {/* Action bar — only show when we have a dataset */}
       {!noDataset && !noModel && (
         <div className="flex items-center gap-3 mb-6 flex-wrap">
@@ -225,15 +238,6 @@ export function PredictPage() {
             >
               <Download size={14} />
               Export CSV
-            </button>
-          )}
-          {summaryData && (
-            <button
-              onClick={() => setShowSummaryModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/25 rounded-xl text-sm text-[var(--color-accent)] font-medium hover:bg-[var(--color-accent)]/15 transition-colors"
-            >
-              <FileText size={14} />
-              View Executive Brief
             </button>
           )}
 

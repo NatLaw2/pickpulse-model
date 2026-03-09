@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy } from 'lucide-react';
+import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2 } from 'lucide-react';
 import { api, type DashboardResponse } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
@@ -145,13 +145,22 @@ export function DashboardPage() {
               ARR protection status and renewal pipeline health
             </p>
           </div>
-          {summaryData && (
+          {summaryData ? (
             <button
               onClick={() => setShowSummaryModal(true)}
               className="btn-primary flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium"
             >
               <FileText size={14} />
               View Executive Brief
+            </button>
+          ) : kpis && kpis.total_arr_at_risk > 0 && (
+            <button
+              onClick={() => data && generateExecutiveSummary(data)}
+              disabled={summaryLoading}
+              className="btn-primary flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+            >
+              {summaryLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              {summaryLoading ? 'Generating...' : 'Generate Executive Brief'}
             </button>
           )}
         </div>
