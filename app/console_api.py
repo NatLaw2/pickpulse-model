@@ -422,8 +422,16 @@ def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str 
             if len(val_df) >= 10:
                 metrics = evaluate_model(val_df, mod, tenant_id=tenant_id)
                 state["metrics"][module_name] = metrics
+                # Persist to disk so evaluate endpoint survives server restarts
+                eval_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_evaluation.json")
+                with open(eval_path, "w") as ef:
+                    json.dump(metrics, ef, indent=2)
         elif metadata.get("val_metrics"):
             state["metrics"][module_name] = metadata["val_metrics"]
+            # Persist fallback metrics too
+            eval_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_evaluation.json")
+            with open(eval_path, "w") as ef:
+                json.dump(metadata["val_metrics"], ef, indent=2)
 
         return {
             "status": "trained",

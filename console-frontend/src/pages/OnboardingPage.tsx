@@ -73,13 +73,13 @@ export function OnboardingPage() {
 
       {/* Actions */}
       <div className="mt-8 flex gap-3">
-        <a
-          href={api.downloadTemplate()}
+        <button
+          onClick={() => api.downloadTemplate().catch((e: any) => alert(e.message))}
           className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-primary)] transition-colors"
         >
           <Download size={14} />
           Download Data Template
-        </a>
+        </button>
       </div>
     </div>
   );

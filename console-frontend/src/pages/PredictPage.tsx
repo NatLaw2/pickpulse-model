@@ -219,13 +219,13 @@ export function PredictPage() {
 
           {result && (
             <>
-              <a
-                href={api.exportPredictions()}
+              <button
+                onClick={() => api.exportPredictions().catch((e: any) => alert(e.message))}
                 className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-primary)] transition-colors"
               >
                 <Download size={14} />
                 Export CSV
-              </a>
+              </button>
               {summaryData && (
                 <button
                   onClick={() => setShowSummaryModal(true)}

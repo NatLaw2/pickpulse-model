@@ -102,12 +102,43 @@ export const api = {
 
   // Evaluate
   evaluate: () => request<EvalMetrics>(`/evaluate/${MOD}`),
-  downloadReport: () => `${BASE}/evaluate/${MOD}/report`,
+  downloadReport: async () => {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${BASE}/evaluate/${MOD}/report`, {
+      method: 'POST',
+      headers: { ...authHeaders },
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'churn_risk_report.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   // Predict
   predict: (limit = 200, includeArchived = false) =>
     request<PredictResponse>(`/predict/${MOD}?limit=${limit}&include_archived=${includeArchived}`, { method: 'POST' }),
-  exportPredictions: () => `${BASE}/predict/${MOD}/export`,
+  exportPredictions: async () => {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${BASE}/predict/${MOD}/export`, {
+      headers: { ...authHeaders },
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'churn_predictions.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
   cachedPredictions: () =>
     request<PredictResponse>(`/predict/${MOD}/cached`),
 
@@ -126,7 +157,22 @@ export const api = {
     request<{ step_id: string; status: string }>(`/onboarding/${id}/complete`, { method: 'POST' }),
   resetStep: (id: string) =>
     request<{ step_id: string; status: string }>(`/onboarding/${id}/reset`, { method: 'POST' }),
-  downloadTemplate: () => `${BASE}/onboarding/template/${MOD}`,
+  downloadTemplate: async () => {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${BASE}/onboarding/template/${MOD}`, {
+      headers: { ...authHeaders },
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'churn_data_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   // -----------------------------------------------------------------------
   // Integrations (new platform)
@@ -210,8 +256,22 @@ export const api = {
   explainAccount: (customerId: string) =>
     request<ExplainResponse>(`/predictions/${encodeURIComponent(customerId)}/explain`),
 
-  downloadIcs: (customerId: string) =>
-    `${BASE}/predictions/${encodeURIComponent(customerId)}/ics`,
+  downloadIcs: async (customerId: string) => {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${BASE}/predictions/${encodeURIComponent(customerId)}/ics`, {
+      headers: { ...authHeaders },
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${customerId}_renewal.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   logPlaybookAction: (customerId: string, actionType: string) =>
     request<{ status: string; action: string }>('/predictions/playbook/log', {

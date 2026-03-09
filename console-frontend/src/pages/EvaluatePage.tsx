@@ -243,14 +243,13 @@ export function EvaluatePage({ embedded }: { embedded?: boolean } = {}) {
 
           {/* Download */}
           <div className="flex gap-3">
-            <a
-              href={api.downloadReport()}
-              target="_blank"
+            <button
+              onClick={() => api.downloadReport().catch((e: any) => alert(e.message))}
               className="flex items-center gap-2 px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-sm font-medium hover:bg-[var(--color-accent-glow)] transition-all shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
             >
               <FileText size={14} />
               Download PDF Report
-            </a>
+            </button>
           </div>
         </div>
       )}

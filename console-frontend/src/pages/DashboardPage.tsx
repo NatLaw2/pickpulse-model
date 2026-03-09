@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight } from 'lucide-react';
-import { api, type DashboardResponse } from '../lib/api';
+import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X } from 'lucide-react';
+import { api, type DashboardResponse, type ExecutiveSummaryResponse } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { useDataset } from '../lib/DatasetContext';
@@ -36,6 +36,11 @@ export function DashboardPage() {
   // Drawer state
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Executive summary state
+  const [summaryData, setSummaryData] = useState<ExecutiveSummaryResponse | null>(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
   const fetchDashboard = useCallback((rate: number) => {
     api.dashboard(rate).then(setData).catch(console.error);
   }, []);
@@ -43,6 +48,61 @@ export function DashboardPage() {
   useEffect(() => {
     fetchDashboard(saveRate);
   }, [fetchDashboard, saveRate]);
+
+  // Auto-generate executive summary when dashboard data loads with predictions
+  useEffect(() => {
+    if (!data || !data.kpis || data.kpis.total_arr_at_risk === 0 || summaryData) return;
+    generateExecutiveSummary(data);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  const generateExecutiveSummary = async (dashData: DashboardResponse) => {
+    setSummaryLoading(true);
+    try {
+      let recipients: string[] = [];
+      try {
+        const settings = await api.getNotificationSettings();
+        recipients = settings.recipients;
+      } catch { /* no settings configured */ }
+
+      const topAccounts = (dashData.top_at_risk ?? []).slice(0, 5).map((p) => ({
+        customer_id: p.customer_id,
+        churn_risk_pct: p.churn_risk_pct,
+        arr: p.arr,
+        arr_at_risk: p.arr_at_risk,
+        days_until_renewal: p.days_until_renewal,
+        tier: p.tier,
+      }));
+
+      const riskDriverNames = (dashData.top_risk_drivers ?? []).map(
+        (d) => featureLabel(d.feature)
+      );
+
+      const tierCountLabels: string[] = [];
+      const tc = dashData.tier_counts ?? {};
+      if (tc['High Risk']) tierCountLabels.push(`${tc['High Risk']} accounts at High Risk`);
+      if (tc['Medium Risk']) tierCountLabels.push(`${tc['Medium Risk']} accounts at Medium Risk`);
+      const driverSummary = [...riskDriverNames.slice(0, 3), ...tierCountLabels];
+
+      const res = await api.sendExecutiveSummary({
+        recipients,
+        total_arr_at_risk: dashData.kpis.total_arr_at_risk,
+        projected_recoverable_arr: dashData.kpis.projected_recoverable_arr,
+        save_rate: dashData.kpis.assumed_save_rate,
+        high_risk_in_window: dashData.kpis.high_risk_in_window,
+        renewing_90d: dashData.kpis.renewing_90d,
+        top_accounts: topAccounts,
+        tier_counts: dashData.tier_counts ?? {},
+        risk_drivers: driverSummary,
+      });
+
+      setSummaryData(res);
+    } catch (err) {
+      console.error('[executive-summary] failed:', err);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   const mod = data?.module;
   const kpis = data?.kpis;
@@ -82,6 +142,19 @@ export function DashboardPage() {
           ARR protection status and renewal pipeline health
         </p>
       </div>
+
+      {/* Executive Brief button */}
+      {summaryData && (
+        <div className="mb-6">
+          <button
+            onClick={() => setShowSummaryModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/25 rounded-xl text-sm text-[var(--color-accent)] font-medium hover:bg-[var(--color-accent)]/15 transition-colors"
+          >
+            <FileText size={14} />
+            View Executive Brief
+          </button>
+        </div>
+      )}
 
       {mod && (
         <>
@@ -344,6 +417,51 @@ export function DashboardPage() {
           prediction={selectedRow}
           onClose={() => setSelectedId(null)}
         />
+      )}
+
+      {/* Executive Summary Preview Modal */}
+      {showSummaryModal && summaryData && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+          onClick={() => setShowSummaryModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.2)] max-w-[700px] w-full max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
+              <div>
+                <h2 className="text-sm font-bold">Executive ARR Risk Brief</h2>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{summaryData.generated_at}</p>
+              </div>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="p-1.5 rounded-lg hover:bg-[var(--color-bg-primary)] transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 bg-[var(--color-bg-primary)]">
+              <div
+                className="bg-white rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.08)] overflow-hidden"
+                dangerouslySetInnerHTML={{ __html: summaryData.html_body }}
+              />
+            </div>
+            <div className="flex items-center justify-between px-6 py-3 border-t border-[var(--color-border)] bg-white">
+              <div className="text-xs text-[var(--color-text-muted)]">
+                {summaryData.recipients.length > 0
+                  ? `Sent to: ${summaryData.recipients.join(', ')}`
+                  : 'No recipients configured — configure in API settings'}
+              </div>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="px-4 py-2 text-xs font-medium bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border)] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

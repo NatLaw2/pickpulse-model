@@ -107,7 +107,7 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
     setDraftingAction('schedule_success_review');
     try {
       await api.logPlaybookAction(prediction.customer_id, 'schedule_success_review');
-      window.location.href = api.downloadIcs(prediction.customer_id);
+      await api.downloadIcs(prediction.customer_id);
     } catch (err: any) {
       setDraftError(err?.message || 'Failed to download calendar invite');
     } finally {
