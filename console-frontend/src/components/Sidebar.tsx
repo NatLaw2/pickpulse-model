@@ -38,6 +38,7 @@ export function Sidebar() {
     try {
       await api.resetDemo();
       clearPredictions();
+      try { sessionStorage.removeItem('pickpulse_executive_summary'); } catch { /* ignore */ }
       refresh();
       setResetToast(true);
       setTimeout(() => setResetToast(false), 3000);

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crosshair, Database, Download, Loader2, Search, X, ChevronUp, ChevronDown, FileText } from 'lucide-react';
-import { api, isNoDatasetError, isNoModelError, type ChurnPrediction, type ExecutiveSummaryResponse } from '../lib/api';
+import { Crosshair, Database, Download, Loader2, Search, X, ChevronUp, ChevronDown, FileText, Mail } from 'lucide-react';
+import { api, isNoDatasetError, isNoModelError, type ChurnPrediction } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
+import { useExecutiveSummary } from '../lib/useExecutiveSummary';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { riskColor, riskLabel } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
@@ -29,9 +30,8 @@ export function PredictPage() {
   // Drawer state
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Executive summary state
-  const [summaryData, setSummaryData] = useState<ExecutiveSummaryResponse | null>(null);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  // Executive summary (shared, persisted via sessionStorage)
+  const { summaryData, setSummaryData, showModal: showSummaryModal, setShowModal: setShowSummaryModal, buildMailtoUrl } = useExecutiveSummary();
   const [summaryToast, setSummaryToast] = useState<string | null>(null);
 
   // Auto-restore cached predictions on mount
@@ -474,12 +474,21 @@ export function PredictPage() {
                   ? `Sent to: ${summaryData.recipients.join(', ')}`
                   : 'No recipients configured — configure in API settings'}
               </div>
-              <button
-                onClick={() => setShowSummaryModal(false)}
-                className="px-4 py-2 text-xs font-medium bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border)] transition-colors"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <a
+                  href={buildMailtoUrl()}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[var(--color-accent)] text-white rounded-lg hover:bg-[var(--color-accent-glow)] transition-colors"
+                >
+                  <Mail size={13} />
+                  Send as Email
+                </a>
+                <button
+                  onClick={() => setShowSummaryModal(false)}
+                  className="px-4 py-2 text-xs font-medium bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border)] transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

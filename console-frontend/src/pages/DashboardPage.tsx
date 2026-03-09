@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X } from 'lucide-react';
-import { api, type DashboardResponse, type ExecutiveSummaryResponse } from '../lib/api';
+import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail } from 'lucide-react';
+import { api, type DashboardResponse } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
+import { useExecutiveSummary } from '../lib/useExecutiveSummary';
 import { riskColor } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
 
@@ -36,10 +37,8 @@ export function DashboardPage() {
   // Drawer state
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Executive summary state
-  const [summaryData, setSummaryData] = useState<ExecutiveSummaryResponse | null>(null);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [summaryLoading, setSummaryLoading] = useState(false);
+  // Executive summary (shared, persisted via sessionStorage)
+  const { summaryData, setSummaryData, showModal: showSummaryModal, setShowModal: setShowSummaryModal, loading: summaryLoading, setLoading: setSummaryLoading, buildMailtoUrl } = useExecutiveSummary();
 
   const fetchDashboard = useCallback((rate: number) => {
     api.dashboard(rate).then(setData).catch(console.error);
@@ -453,12 +452,21 @@ export function DashboardPage() {
                   ? `Sent to: ${summaryData.recipients.join(', ')}`
                   : 'No recipients configured — configure in API settings'}
               </div>
-              <button
-                onClick={() => setShowSummaryModal(false)}
-                className="px-4 py-2 text-xs font-medium bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border)] transition-colors"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <a
+                  href={buildMailtoUrl()}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[var(--color-accent)] text-white rounded-lg hover:bg-[var(--color-accent-glow)] transition-colors"
+                >
+                  <Mail size={13} />
+                  Send as Email
+                </a>
+                <button
+                  onClick={() => setShowSummaryModal(false)}
+                  className="px-4 py-2 text-xs font-medium bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border)] transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
