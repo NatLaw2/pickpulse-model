@@ -9,6 +9,7 @@ import { api } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
 import { useAuth } from '../lib/AuthContext';
+import { useExecutiveSummary } from '../lib/ExecutiveSummaryContext';
 
 const mainLinks = [
   { to: '/', icon: LayoutDashboard, label: 'Overview' },
@@ -26,6 +27,7 @@ export function Sidebar() {
   const { dataset, refresh } = useDataset();
   const { clearPredictions } = usePredictions();
   const { user, signOut } = useAuth();
+  const { clearSummary } = useExecutiveSummary();
   const navigate = useNavigate();
 
   const [resetting, setResetting] = useState(false);
@@ -38,7 +40,7 @@ export function Sidebar() {
     try {
       await api.resetDemo();
       clearPredictions();
-      try { sessionStorage.removeItem('pickpulse_executive_summary'); } catch { /* ignore */ }
+      clearSummary();
       refresh();
       setResetToast(true);
       setTimeout(() => setResetToast(false), 3000);

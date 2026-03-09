@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail } from 'lucide-react';
+import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy } from 'lucide-react';
 import { api, type DashboardResponse } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
-import { useExecutiveSummary } from '../lib/useExecutiveSummary';
+import { useExecutiveSummary } from '../lib/ExecutiveSummaryContext';
 import { riskColor } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
 
@@ -37,8 +37,10 @@ export function DashboardPage() {
   // Drawer state
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Executive summary (shared, persisted via sessionStorage)
-  const { summaryData, setSummaryData, showModal: showSummaryModal, setShowModal: setShowSummaryModal, loading: summaryLoading, setLoading: setSummaryLoading, buildMailtoUrl } = useExecutiveSummary();
+  // Executive summary (shared context, persisted via sessionStorage)
+  const { summaryData, setSummaryData, showModal: showSummaryModal, setShowModal: setShowSummaryModal, buildMailtoUrl, getPlainText } = useExecutiveSummary();
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const fetchDashboard = useCallback((rate: number) => {
     api.dashboard(rate).then(setData).catch(console.error);
@@ -126,34 +128,34 @@ export function DashboardPage() {
   return (
     <div>
       <div className="mb-8">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Overview</h1>
-          {dataset?.is_demo && (
-            <span
-              className="px-2.5 py-1 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/25 rounded-lg text-[10px] font-bold tracking-widest uppercase text-[var(--color-warning)]"
-              title="Illustrative metrics generated from a sample dataset. Upload your own data for production-grade insights."
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">Overview</h1>
+              {dataset?.is_demo && (
+                <span
+                  className="px-2.5 py-1 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/25 rounded-lg text-[10px] font-bold tracking-widest uppercase text-[var(--color-warning)]"
+                  title="Illustrative metrics generated from a sample dataset. Upload your own data for production-grade insights."
+                >
+                  Sample Data
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+              ARR protection status and renewal pipeline health
+            </p>
+          </div>
+          {summaryData && (
+            <button
+              onClick={() => setShowSummaryModal(true)}
+              className="btn-primary flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium"
             >
-              Sample Data
-            </span>
+              <FileText size={14} />
+              View Executive Brief
+            </button>
           )}
         </div>
-        <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-          ARR protection status and renewal pipeline health
-        </p>
       </div>
-
-      {/* Executive Brief button */}
-      {summaryData && (
-        <div className="mb-6">
-          <button
-            onClick={() => setShowSummaryModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/25 rounded-xl text-sm text-[var(--color-accent)] font-medium hover:bg-[var(--color-accent)]/15 transition-colors"
-          >
-            <FileText size={14} />
-            View Executive Brief
-          </button>
-        </div>
-      )}
 
       {mod && (
         <>
@@ -446,23 +448,34 @@ export function DashboardPage() {
                 dangerouslySetInnerHTML={{ __html: summaryData.html_body }}
               />
             </div>
-            <div className="flex items-center justify-between px-6 py-3 border-t border-[var(--color-border)] bg-white">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--color-border)] bg-white">
               <div className="text-xs text-[var(--color-text-muted)]">
                 {summaryData.recipients.length > 0
-                  ? `Sent to: ${summaryData.recipients.join(', ')}`
+                  ? `Recipients: ${summaryData.recipients.join(', ')}`
                   : 'No recipients configured — configure in API settings'}
               </div>
               <div className="flex items-center gap-2">
                 <a
                   href={buildMailtoUrl()}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[var(--color-accent)] text-white rounded-lg hover:bg-[var(--color-accent-glow)] transition-colors"
+                  className="btn-primary flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium"
                 >
-                  <Mail size={13} />
-                  Send as Email
+                  <Mail size={14} />
+                  Send Executive Brief
                 </a>
                 <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(getPlainText());
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-primary)] transition-colors"
+                >
+                  <Copy size={14} />
+                  {copied ? 'Copied!' : 'Copy Summary'}
+                </button>
+                <button
                   onClick={() => setShowSummaryModal(false)}
-                  className="px-4 py-2 text-xs font-medium bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border)] transition-colors"
+                  className="px-4 py-2.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
                 >
                   Close
                 </button>

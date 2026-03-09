@@ -8,6 +8,7 @@ import { ApiDocsPage } from './pages/ApiDocsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { DatasetProvider } from './lib/DatasetContext';
 import { PredictionProvider } from './lib/PredictionContext';
+import { ExecutiveSummaryProvider } from './lib/ExecutiveSummaryContext';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 
@@ -31,19 +32,21 @@ function AppShell() {
   return (
     <DatasetProvider>
       <PredictionProvider>
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 ml-56 p-8">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/predict" element={<PredictPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/data-sources" element={<DataSourcesPage />} />
-              <Route path="/model" element={<ModelPage />} />
-              <Route path="/api-docs" element={<ApiDocsPage />} />
-            </Routes>
-          </main>
-        </div>
+        <ExecutiveSummaryProvider>
+          <div className="flex min-h-screen">
+            <Sidebar />
+            <main className="flex-1 ml-56 p-8">
+              <Routes>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/predict" element={<PredictPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/data-sources" element={<DataSourcesPage />} />
+                <Route path="/model" element={<ModelPage />} />
+                <Route path="/api-docs" element={<ApiDocsPage />} />
+              </Routes>
+            </main>
+          </div>
+        </ExecutiveSummaryProvider>
       </PredictionProvider>
     </DatasetProvider>
   );
