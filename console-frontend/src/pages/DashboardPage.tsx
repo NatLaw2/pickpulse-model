@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2 } from 'lucide-react';
 import { api, type DashboardResponse } from '../lib/api';
 import { StatCard } from '../components/StatCard';
+import { RevenueImpactCard } from '../components/RevenueImpactCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
@@ -207,6 +208,9 @@ export function DashboardPage() {
               onClick={() => navigate('/predict')}
             />
           </div>
+
+          {/* Revenue Impact Tracker — hero-level platform metric */}
+          <RevenueImpactCard />
 
           {/* Section 2: Risk Distribution Strip */}
           {totalTierArr > 0 && (

@@ -74,6 +74,9 @@ export const api = {
   dashboard: (saveRate?: number) =>
     request<DashboardResponse>(`/dashboard${saveRate != null ? `?save_rate=${saveRate}` : ''}`),
 
+  revenueImpact: () =>
+    request<RevenueImpactResponse>('/dashboard/revenue-impact'),
+
   // Modules
   modules: () => request<ModuleInfo[]>('/modules'),
   module: () => request<ModuleDetail>(`/modules/${MOD}`),
@@ -774,4 +777,15 @@ export interface RunDemoResponse {
   total_arr_at_risk: number;
   sync_errors: string[];
   score_error: string | null;
+}
+
+export interface RevenueImpactResponse {
+  total_revenue_impact: number;
+  confirmed_saves: number;
+  risk_reduction: number;
+  accounts_impacted: number;
+  is_demo: boolean;
+  illustrative: boolean;
+  label: string;
+  subtext: string;
 }

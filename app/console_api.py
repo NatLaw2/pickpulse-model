@@ -46,6 +46,7 @@ from .storage import repo as storage_repo
 from .outreach import router as outreach_router
 from .explain import router as explain_router
 from .executive_summary import router as executive_summary_router
+from .revenue_impact import compute_revenue_impact
 
 app = FastAPI(title="Churn Risk Engine", version="1.0.0")
 
@@ -930,6 +931,21 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
         "tier_counts": tier_counts,
         "top_risk_drivers": top_risk_drivers,
     }
+
+
+# -----------------------------------------------------------------------
+# Revenue Impact Tracker — platform-level executive metric
+# -----------------------------------------------------------------------
+@app.get("/api/dashboard/revenue-impact")
+def revenue_impact_summary(tenant_id: str = Depends(get_tenant_id)):
+    """Return platform-level revenue impact metrics for the executive hero section."""
+    state = _get_state(tenant_id)
+    predictions = state["predictions"].get("churn", [])
+    account_statuses = state.get("account_statuses", {})
+    ds = _get_dataset("churn", tenant_id=tenant_id)
+    is_demo = bool((ds or {}).get("is_demo", False)) or DEMO_MODE
+
+    return compute_revenue_impact(predictions, account_statuses, is_demo)
 
 
 # -----------------------------------------------------------------------
