@@ -47,6 +47,7 @@ from .outreach import router as outreach_router
 from .explain import router as explain_router
 from .executive_summary import router as executive_summary_router
 from .revenue_impact import compute_revenue_impact
+from .expansion_demo import router as expansion_demo_router
 
 app = FastAPI(title="Churn Risk Engine", version="1.0.0")
 
@@ -61,6 +62,7 @@ app.add_middleware(
 app.include_router(outreach_router)
 app.include_router(explain_router)
 app.include_router(executive_summary_router)
+app.include_router(expansion_demo_router)
 
 # ---------------------------------------------------------------------------
 # Persistent dataset state — survives server restarts

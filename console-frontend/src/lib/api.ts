@@ -77,6 +77,9 @@ export const api = {
   revenueImpact: () =>
     request<RevenueImpactResponse>('/dashboard/revenue-impact'),
 
+  expansionDemo: () =>
+    request<ExpansionDemoResponse>('/expansion-demo/data'),
+
   // Modules
   modules: () => request<ModuleInfo[]>('/modules'),
   module: () => request<ModuleDetail>(`/modules/${MOD}`),
@@ -788,4 +791,71 @@ export interface RevenueImpactResponse {
   illustrative: boolean;
   label: string;
   subtext: string;
+}
+
+// ---------------------------------------------------------------------------
+// Expansion Demo (sandbox prototype) types
+// ---------------------------------------------------------------------------
+
+export interface SandboxChurnAccount {
+  customer_id: string;
+  account_name: string;
+  arr: number;
+  churn_risk_pct: number;
+  arr_at_risk: number;
+  days_until_renewal: number;
+  renewal_window_label: string;
+  tier: string;
+}
+
+export interface ExpansionAccount {
+  account_name: string;
+  current_arr: number;
+  expansion_probability: number;
+  potential_expansion_arr: number;
+  expansion_signal: string;
+  active_users_change: number;
+  feature_adoption_change: number;
+  churn_risk: number;
+  tier: string;
+}
+
+export interface MatrixPoint {
+  account_name: string;
+  expansion_probability: number;
+  churn_risk: number;
+  potential_expansion_arr: number;
+  tier: string;
+}
+
+export interface ExpansionDemoResponse {
+  arr_risk: {
+    kpis: {
+      total_arr_at_risk: number;
+      projected_recoverable_arr: number;
+      assumed_save_rate: number;
+      renewing_90d: number;
+      high_risk_in_window: number;
+    };
+    recovery_buckets: {
+      high_confidence_saves: number;
+      medium_confidence_saves: number;
+      low_confidence_saves: number;
+    };
+    top_at_risk: SandboxChurnAccount[];
+    tier_counts: Record<string, number>;
+    top_risk_drivers: { feature: string; importance: number }[];
+  };
+  expansion: {
+    kpis: {
+      total_expansion_potential: number;
+      high_expansion_accounts: number;
+      avg_expansion_probability: number;
+      expansion_likely_90d: number;
+    };
+    tier_arr: Record<string, number>;
+    tier_counts: Record<string, number>;
+    top_opportunities: ExpansionAccount[];
+    matrix_points: MatrixPoint[];
+  };
 }

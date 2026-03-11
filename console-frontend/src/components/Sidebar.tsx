@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Database, Brain,
   Crosshair, Code2, FileText, ShieldAlert, LogOut,
-  RotateCcw, Loader2
+  RotateCcw, Loader2, FlaskConical,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
@@ -166,6 +166,30 @@ export function Sidebar() {
           ))}
         </div>
       </nav>
+      {/* Labs — visually separated from production nav */}
+      <div className="px-2 pb-2">
+        <div className="border-t border-[rgba(255,255,255,0.08)] pt-3 mt-1">
+          <div className="mb-1.5 px-3">
+            <span className="text-[9px] font-semibold tracking-widest uppercase text-[rgba(255,255,255,0.25)]">
+              Labs
+            </span>
+          </div>
+          <NavLink
+            to="/expansion-demo"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all ${
+                isActive
+                  ? 'bg-[var(--color-bg-sidebar-active)] text-[var(--color-accent)] font-medium'
+                  : 'text-[rgba(255,255,255,0.35)] hover:text-[rgba(255,255,255,0.6)] hover:bg-[var(--color-bg-sidebar-hover)]'
+              }`
+            }
+          >
+            <FlaskConical size={14} />
+            Expansion (Beta)
+          </NavLink>
+        </div>
+      </div>
+
       <div className="px-4 py-3 border-t border-[rgba(255,255,255,0.1)]">
         {user && (
           <div className="flex items-center justify-between">

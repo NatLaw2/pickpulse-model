@@ -6,6 +6,7 @@ import { ModelPage } from './pages/ModelPage';
 import { PredictPage } from './pages/PredictPage';
 import { ApiDocsPage } from './pages/ApiDocsPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { ExpansionDemoPage } from './pages/ExpansionDemoPage';
 import { DatasetProvider } from './lib/DatasetContext';
 import { PredictionProvider } from './lib/PredictionContext';
 import { ExecutiveSummaryProvider } from './lib/ExecutiveSummaryContext';
@@ -43,6 +44,7 @@ function AppShell() {
                 <Route path="/data-sources" element={<DataSourcesPage />} />
                 <Route path="/model" element={<ModelPage />} />
                 <Route path="/api-docs" element={<ApiDocsPage />} />
+                <Route path="/expansion-demo" element={<ExpansionDemoPage />} />
               </Routes>
             </main>
           </div>
