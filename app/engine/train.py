@@ -67,6 +67,17 @@ def train_model(
     print(f"[train] Features: {len(feature_names)} columns")
     print(f"[train] Label distribution: {dict(zip(*np.unique(y, return_counts=True)))}")
 
+    unique_classes = np.unique(y)
+    if len(unique_classes) < 2:
+        return {
+            "error": "single_class_label",
+            "message": (
+                f"Label column '{module.label_column}' has only one unique value "
+                f"({unique_classes.tolist()}). The dataset must contain both churned and "
+                "retained accounts to train a classifier."
+            ),
+        }
+
     # Time-based split
     split_idx = int(n * (1 - val_frac))
     if split_idx < 30 or (n - split_idx) < 10:

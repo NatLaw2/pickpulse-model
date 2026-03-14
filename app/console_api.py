@@ -281,45 +281,144 @@ def get_module_detail(module_name: str, tenant_id: str = Depends(get_tenant_id))
 # -----------------------------------------------------------------------
 @app.post("/api/datasets/{module_name}/upload")
 async def upload_dataset(module_name: str, file: UploadFile = File(...), tenant_id: str = Depends(get_tenant_id)):
-    mod = get_module(module_name)
+    """
+    Stage 1 of the upload flow: store the raw CSV and return mapping suggestions.
+    The dataset is NOT registered until confirm-mapping is called.
+    """
+    get_module(module_name)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    filename = f"{tenant_id[:8]}_{module_name}_{uuid.uuid4().hex[:8]}.csv"
-    filepath = os.path.join(UPLOAD_DIR, filename)
+    raw_filename = f"{tenant_id[:8]}_{module_name}_{uuid.uuid4().hex[:8]}_raw.csv"
+    raw_filepath = os.path.join(UPLOAD_DIR, raw_filename)
 
-    with open(filepath, "wb") as f:
+    with open(raw_filepath, "wb") as f:
         content = await file.read()
         f.write(content)
 
     try:
-        df = pd.read_csv(filepath)
+        df = pd.read_csv(raw_filepath)
     except Exception as e:
-        os.remove(filepath)
+        os.remove(raw_filepath)
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
 
-    adapter = _get_adapter(module_name)
-    if adapter:
-        df = adapter.normalize_columns(df)
-        df.to_csv(filepath, index=False)
+    from .engine.schema_mapping import suggest_mapping, mapping_suggestion_to_dict
+    suggestion = suggest_mapping(df)
 
-    validation = validate_dataset(df, mod)
+    # 5-row sample for the UI preview
+    sample_rows = df.head(5).where(pd.notna(df.head(5)), None).to_dict(orient="records")
 
+    return {
+        "status": "staged",
+        "raw_path": raw_filepath,
+        "filename": file.filename or raw_filename,
+        "n_rows": len(df),
+        "n_columns": len(df.columns),
+        "source_columns": list(df.columns),
+        "sample_rows": sample_rows,
+        "mapping_suggestion": mapping_suggestion_to_dict(suggestion),
+    }
+
+
+@app.post("/api/datasets/{module_name}/confirm-mapping")
+async def confirm_mapping(
+    module_name: str,
+    body: dict,
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """
+    Stage 2 of the upload flow: accept confirmed mapping, normalize, and register the dataset.
+    Body: { raw_path: str, confirmed_mappings: { canonical: source_or_null } }
+    """
+    mod = get_module(module_name)
+
+    raw_path: str = body.get("raw_path", "")
+    confirmed_mappings: dict = body.get("confirmed_mappings", {})
+
+    # Security: ensure raw_path is within UPLOAD_DIR
+    upload_dir_abs = os.path.abspath(UPLOAD_DIR)
+    raw_path_abs = os.path.abspath(raw_path)
+    if not raw_path_abs.startswith(upload_dir_abs + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid raw_path.")
+    if not os.path.exists(raw_path_abs):
+        raise HTTPException(status_code=400, detail="Raw file not found. Re-upload the CSV.")
+
+    try:
+        raw_df = pd.read_csv(raw_path_abs)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read uploaded file: {e}")
+
+    from .engine.normalizer import normalize, compute_readiness, readiness_to_dict
+
+    norm_result = normalize(raw_df, confirmed_mappings)
+    canonical_df = norm_result.canonical_df
+
+    # Store the normalized CSV — this becomes the registered dataset path
+    norm_filename = os.path.basename(raw_path_abs).replace("_raw.csv", ".csv")
+    norm_filepath = os.path.join(UPLOAD_DIR, norm_filename)
+    canonical_df.to_csv(norm_filepath, index=False)
+
+    # Store the confirmed mapping in the artifact directory for reuse at predict time
+    artifact_dir = mod.get_artifact_dir(tenant_id)
+    os.makedirs(artifact_dir, exist_ok=True)
+    mapping_path = os.path.join(artifact_dir, "mapping.json")
+    with open(mapping_path, "w") as mf:
+        json.dump({
+            "confirmed_mappings": confirmed_mappings,
+            "derived_columns": norm_result.derived_columns,
+            "coercion_log": norm_result.coercion_log,
+        }, mf, indent=2)
+
+    # Register the normalized dataset
+    loaded_at = datetime.now(timezone.utc).isoformat()
+    original_filename = body.get("filename", norm_filename)
     ds_info = {
-        "path": filepath,
-        "name": file.filename,
-        "rows": len(df),
-        "columns": len(df.columns),
+        "path": norm_filepath,
+        "name": original_filename,
+        "rows": len(canonical_df),
+        "columns": len(canonical_df.columns),
         "is_demo": False,
-        "loaded_at": datetime.now(timezone.utc).isoformat(),
+        "loaded_at": loaded_at,
     }
     _register_dataset(module_name, ds_info, tenant_id=tenant_id)
 
+    # Compute readiness report
+    readiness = compute_readiness(
+        canonical_df=canonical_df,
+        derived_columns=norm_result.derived_columns,
+        warnings=norm_result.warnings,
+        n_rows=len(canonical_df),
+        filename=original_filename,
+        loaded_at=loaded_at,
+    )
+    # Embed dataset_info into the readiness report
+    readiness.dataset_info = ds_info
+
     return {
-        "status": "uploaded",
-        "file": filename,
-        "validation": _validation_to_dict(validation),
+        "status": "confirmed",
+        "readiness": readiness_to_dict(readiness),
+        "coercion_log": norm_result.coercion_log,
         "dataset_info": ds_info,
     }
+
+
+@app.get("/api/datasets/{module_name}/canonical-schema")
+def get_canonical_schema(module_name: str):
+    """Return the canonical schema definition for the mapping UI."""
+    get_module(module_name)
+    from .engine.schema_mapping import CANONICAL_SCHEMA, ALIAS_MAP
+    fields = []
+    for name, fd in CANONICAL_SCHEMA.items():
+        fields.append({
+            "name": name,
+            "required_for_training": fd.required_for_training,
+            "required_for_analysis": fd.required_for_analysis,
+            "label_column": fd.label_column,
+            "display_only": fd.display_only,
+            "derivable_from": fd.derivable_from,
+            "description": fd.description,
+            "aliases_preview": ALIAS_MAP.get(name, [])[:4],
+        })
+    return {"fields": fields}
 
 
 @app.post("/api/datasets/{module_name}/sample")
@@ -349,13 +448,26 @@ def load_sample_dataset(
 
     validation = validate_dataset(df, mod)
 
+    # Store a trivial identity mapping for sample data so predict-time
+    # normalization always has a mapping.json to load.
+    artifact_dir = mod.get_artifact_dir(tenant_id)
+    os.makedirs(artifact_dir, exist_ok=True)
+    trivial_mapping = {col: col for col in df.columns}
+    with open(os.path.join(artifact_dir, "mapping.json"), "w") as mf:
+        json.dump({
+            "confirmed_mappings": trivial_mapping,
+            "derived_columns": [],
+            "coercion_log": ["Sample data: identity mapping (canonical column names)"],
+        }, mf, indent=2)
+
+    loaded_at = datetime.now(timezone.utc).isoformat()
     ds_info = {
         "path": filepath,
         "name": display_name,
         "rows": len(df),
         "columns": len(df.columns),
         "is_demo": True,
-        "loaded_at": datetime.now(timezone.utc).isoformat(),
+        "loaded_at": loaded_at,
     }
     _register_dataset(module_name, ds_info, tenant_id=tenant_id)
 
@@ -405,6 +517,15 @@ def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str 
         if adapter:
             df = adapter.normalize_columns(df)
             df = adapter.add_derived_features(df)
+
+        # Block training if required columns are missing
+        from .engine.schema import validate_dataset
+        validation = validate_dataset(df, mod)
+        if not validation.valid:
+            raise HTTPException(
+                status_code=400,
+                detail="; ".join(validation.errors) or "Dataset failed validation. Check required columns.",
+            )
 
         metadata = train_model(df, mod, val_frac=val_frac, tenant_id=tenant_id)
 

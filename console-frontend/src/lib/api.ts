@@ -50,7 +50,12 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
   if (!res.ok) {
     const body = await res.text();
     console.error(`[api] ${path} error — ${res.status}: ${body}`);
-    throw new Error(`${res.status}: ${body}`);
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed?.detail) message = parsed.detail;
+    } catch { /* not JSON — use raw body */ }
+    throw new Error(`${res.status}: ${message}`);
   }
   return res.json();
 }
@@ -87,6 +92,13 @@ export const api = {
   // Datasets
   loadSample: (variant?: string) =>
     request<UploadResponse>(`/datasets/${MOD}/sample${variant ? `?variant=${variant}` : ''}`, { method: 'POST' }),
+  canonicalSchema: () =>
+    request<{ fields: CanonicalSchemaField[] }>(`/datasets/${MOD}/canonical-schema`),
+  confirmMapping: (rawPath: string, filename: string, confirmedMappings: Record<string, string | null>) =>
+    request<ConfirmMappingResponse>(`/datasets/${MOD}/confirm-mapping`, {
+      method: 'POST',
+      body: JSON.stringify({ raw_path: rawPath, filename, confirmed_mappings: confirmedMappings }),
+    }),
   uploadDataset: async (file: File) => {
     const form = new FormData();
     form.append('file', file);
@@ -96,8 +108,13 @@ export const api = {
       body: form,
       headers: authHeaders,
     });
-    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-    return res.json() as Promise<UploadResponse>;
+    if (!res.ok) {
+      const body = await res.text();
+      let message = body;
+      try { const p = JSON.parse(body); if (p?.detail) message = p.detail; } catch { /* */ }
+      throw new Error(`${res.status}: ${message}`);
+    }
+    return res.json() as Promise<StagedUploadResponse>;
   },
   validate: () => request<ValidationInfo>(`/datasets/${MOD}/validate`),
   currentDataset: () => request<DatasetInfo>(`/datasets/${MOD}/current`),
@@ -425,6 +442,62 @@ export interface UploadResponse {
   status: string;
   validation: ValidationInfo;
   dataset_info: DatasetInfo;
+}
+
+// --- Schema mapping types ---
+
+export interface MappingSuggestion {
+  suggested: Record<string, string | null>;       // canonical → source_col or null
+  confidence: Record<string, string>;             // canonical → HIGH|MEDIUM|LOW|NONE
+  method: Record<string, string>;                 // canonical → exact|alias|heuristic|none
+  unmapped_source_cols: string[];
+  missing_required_for_training: string[];
+  missing_required_for_analysis: string[];
+  source_columns: string[];
+}
+
+export interface StagedUploadResponse {
+  status: 'staged';
+  raw_path: string;
+  filename: string;
+  n_rows: number;
+  n_columns: number;
+  source_columns: string[];
+  sample_rows: Array<Record<string, unknown>>;
+  mapping_suggestion: MappingSuggestion;
+}
+
+export interface ReadinessReport {
+  mode: 'TRAINING_READY' | 'TRAINING_DEGRADED' | 'ANALYSIS_READY' | 'PARTIAL' | 'BLOCKED';
+  mode_reason: string;
+  required_mapped: Record<string, boolean>;
+  recommended_mapped: Record<string, boolean>;
+  derived_fields: string[];
+  usable_feature_count: number;
+  label_distribution: Record<string, number> | null;
+  split_strategy: 'time_based' | 'random' | 'n/a';
+  warnings: string[];
+  improvements: string[];
+  normalized_preview: Array<Record<string, unknown>>;
+  dataset_info: DatasetInfo;
+}
+
+export interface ConfirmMappingResponse {
+  status: 'confirmed';
+  readiness: ReadinessReport;
+  coercion_log: string[];
+  dataset_info: DatasetInfo;
+}
+
+export interface CanonicalSchemaField {
+  name: string;
+  required_for_training: boolean;
+  required_for_analysis: boolean;
+  label_column: boolean;
+  display_only: boolean;
+  derivable_from: string[];
+  description: string;
+  aliases_preview: string[];
 }
 
 export interface TrainResponse {
