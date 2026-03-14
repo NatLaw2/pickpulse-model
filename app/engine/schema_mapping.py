@@ -1,4 +1,29 @@
-"""Schema mapping engine — alias-based column detection for flexible CSV ingestion."""
+"""
+Schema mapping engine — alias-based column detection for flexible CSV ingestion.
+
+Detection runs in two passes to prevent heuristics from stealing columns
+that a later alias lookup would claim:
+
+  Pass 1 (all canonicals): Tier 1a exact → Tier 1b normalised → Tier 2 CRM alias
+  Pass 2 (unmatched only): Tier 3 value-distribution heuristics
+
+Confidence policy
+-----------------
+  HIGH   — source column name exactly equals the canonical name (or its
+            normalised form).
+  MEDIUM — source column name matches a curated alias from the global or
+            CRM-specific packs (non-ambiguous).
+  LOW    — heuristic-only match OR alias marked requires_confirmation.
+  NONE   — no match found.
+
+requires_confirmation=True means the match is known to be ambiguous in
+the CRM context (e.g. Salesforce StageName, HubSpot dealstage).  These
+are always downgraded to LOW and the UI will never auto-populate them;
+the user must explicitly choose the mapping.
+
+This deliberately prevents the class of bug where a field like
+exec_sponsor_present (binary 0/1) is silently pre-selected as churned.
+"""
 from __future__ import annotations
 
 import re
@@ -6,6 +31,13 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
+
+from .crm_aliases import (
+    MERGED_ALIAS_MAP,
+    REQUIRES_CONFIRMATION_NORMS,
+    CHURN_POSITIVE_VALUES,
+    CHURN_NEGATIVE_VALUES,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -126,119 +158,11 @@ CANONICAL_SCHEMA: Dict[str, CanonicalField] = {
 
 
 # ---------------------------------------------------------------------------
-# Alias map — Tier 2 detection (curated synonyms per canonical field)
+# ALIAS_MAP — derived from the CRM pack system (single source of truth).
+# Kept as a module-level constant so existing importers that reference
+# ALIAS_MAP directly (e.g. the API canonical-schema endpoint) keep working.
 # ---------------------------------------------------------------------------
-ALIAS_MAP: Dict[str, List[str]] = {
-    "account_id": [
-        "account_id", "accountid", "customer_id", "customerid",
-        "client_id", "clientid", "org_id", "orgid", "company_id",
-        "companyid", "tenant_id", "tenantid", "account_number",
-        "cust_id", "custid", "subscriber_id", "subscriberid",
-        "entity_id", "entityid", "uuid", "uid",
-    ],
-    "snapshot_date": [
-        "snapshot_date", "snapshotdate", "record_date", "recorddate",
-        "as_of_date", "asofdate", "report_date", "reportdate",
-        "period_date", "perioddate", "cohort_date", "cohortdate",
-        "eval_date", "observation_date", "data_date", "extract_date",
-        "month_date", "period", "date", "month",
-    ],
-    "churned": [
-        "churned", "churn", "is_churned", "ischurned",
-        "canceled", "cancelled", "is_canceled", "iscanceled",
-        "is_cancelled", "iscancelled", "churn_flag", "churned_flag",
-        "did_churn", "attrited", "lost", "terminated",
-        "contract_ended", "inactive",
-    ],
-    "arr": [
-        "arr", "arr_usd", "annual_recurring_revenue",
-        "annual_revenue", "arr_value", "contract_value",
-        "acv", "annual_contract_value", "total_arr",
-        "yearly_revenue",
-    ],
-    "mrr": [
-        "mrr", "mrr_usd", "monthly_recurring_revenue",
-        "monthly_revenue", "monthly_contract_value",
-        "monthly_value",
-    ],
-    "renewal_date": [
-        "renewal_date", "renewaldate", "contract_end",
-        "contract_end_date", "contractenddate", "expiry_date",
-        "expirydate", "expiration_date", "expirationdate",
-        "next_renewal", "subscription_end", "subscription_end_date",
-        "end_date", "enddate", "contract_expiry",
-    ],
-    "days_until_renewal": [
-        "days_until_renewal", "daysuntilrenewal", "days_to_renewal",
-        "daystorenewal", "renewal_days", "renewaldays",
-        "days_remaining", "daysremaining", "days_to_contract_end",
-        "days_to_expiry", "contract_days_remaining",
-    ],
-    "contract_start_date": [
-        "contract_start_date", "contractstartdate", "start_date",
-        "startdate", "contract_start", "account_start_date",
-        "created_date", "createddate", "inception_date",
-        "onboard_date", "signup_date",
-    ],
-    "seats_purchased": [
-        "seats_purchased", "seatspurchased", "seats",
-        "licenses", "license_count", "licensecount",
-        "total_seats", "totalseats", "contracted_seats",
-        "users_purchased",
-    ],
-    "seats_active_30d": [
-        "seats_active_30d", "active_seats_30d", "active_users_30d",
-        "mau", "mau_30", "active_seats", "active_users",
-        "users_active_30d", "monthly_active_users",
-        "active_licenses_30d",
-    ],
-    "login_days_30d": [
-        "login_days_30d", "logindays30d", "logins_last_30",
-        "logins_30d", "active_days_30", "login_count_30d",
-        "sessions_30d", "dau_30", "monthly_logins",
-        "logins", "login_count", "sessions",
-    ],
-    "support_tickets_30d": [
-        "support_tickets_30d", "tickets_30d", "support_tickets",
-        "ticket_count_30d", "ticket_count", "tickets",
-        "cases_30d", "support_cases", "cases",
-        "incidents_30d", "support_incidents",
-    ],
-    "nps_score": [
-        "nps_score", "npsscore", "nps", "satisfaction",
-        "csat", "csat_score", "net_promoter_score",
-        "satisfaction_score",
-    ],
-    "plan_type": [
-        "plan_type", "plantype", "plan", "tier", "subscription",
-        "plan_name", "planname", "product", "product_tier",
-        "subscription_tier", "package", "plan_tier",
-    ],
-    "auto_renew_flag": [
-        "auto_renew_flag", "autorenewflag", "auto_renew",
-        "autorenew", "auto_renewal", "autorenewal",
-        "auto_renew_enabled", "is_auto_renew",
-    ],
-    "company_name": [
-        "company_name", "companyname", "account_name",
-        "accountname", "customer_name", "customername",
-        "client_name", "clientname", "organization",
-        "org_name", "orgname",
-    ],
-    "csm_owner": [
-        "csm_owner", "csmowner", "csm", "account_owner",
-        "accountowner", "customer_success_manager",
-        "csm_name", "assigned_csm",
-    ],
-    "industry": [
-        "industry", "vertical", "sector", "market",
-        "industry_name", "business_type",
-    ],
-    "region": [
-        "region", "geography", "geo", "country",
-        "territory", "market_region",
-    ],
-}
+ALIAS_MAP: Dict[str, List[str]] = MERGED_ALIAS_MAP
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +172,8 @@ ALIAS_MAP: Dict[str, List[str]] = {
 class MappingSuggestion:
     suggested: Dict[str, Optional[str]]          # canonical → source_col or None
     confidence: Dict[str, str]                   # canonical → HIGH|MEDIUM|LOW|NONE
-    method: Dict[str, str]                       # canonical → exact|alias|heuristic|none
+    method: Dict[str, str]                       # canonical → exact|alias|alias|confirm|heuristic|none
+    requires_confirmation: Dict[str, bool]       # canonical → True if user must confirm
     unmapped_source_cols: List[str]              # source cols not claimed by any canonical
     missing_required_for_training: List[str]     # required canonical fields not found
     missing_required_for_analysis: List[str]     # analysis-required fields not found
@@ -259,7 +184,7 @@ class MappingSuggestion:
 # Core functions
 # ---------------------------------------------------------------------------
 def _norm(name: str) -> str:
-    """Strip non-alphanumeric and lowercase for Tier 1b matching."""
+    """Strip non-alphanumeric and lowercase for normalised matching."""
     return re.sub(r"[^a-z0-9]", "", name.lower().strip())
 
 
@@ -267,10 +192,10 @@ def suggest_mapping(df: pd.DataFrame) -> MappingSuggestion:
     """
     Suggest canonical → source column mappings.
 
-    Two-pass approach to prevent heuristics from stealing columns that
-    a later alias lookup would claim:
+    Two-pass approach prevents heuristics from stealing columns that a
+    later alias lookup would claim:
 
-    Pass 1 (all canonicals): Tier 1a exact + Tier 1b normalized + Tier 2 alias
+    Pass 1 (all canonicals): Tier 1a exact + Tier 1b normalised + Tier 2 alias
     Pass 2 (unmatched only): Tier 3 value-distribution heuristics
     """
     source_columns = list(df.columns)
@@ -281,6 +206,7 @@ def suggest_mapping(df: pd.DataFrame) -> MappingSuggestion:
     suggested: Dict[str, Optional[str]] = {}
     confidence: Dict[str, str] = {}
     method: Dict[str, str] = {}
+    requires_confirmation: Dict[str, bool] = {}
 
     # ------------------------------------------------------------------
     # Pass 1: alias-based matching for all canonical fields
@@ -289,23 +215,35 @@ def suggest_mapping(df: pd.DataFrame) -> MappingSuggestion:
         match: Optional[str] = None
         conf = NONE
         meth = "none"
+        needs_confirm = False
+        matched_alias: Optional[str] = None
 
         for alias in aliases:
             # Tier 1a: exact lowercase match
             candidate = lower_to_src.get(alias.lower())
             if candidate and candidate not in claimed:
                 match = candidate
-                conf = HIGH if alias == canonical else MEDIUM
-                meth = "exact" if alias == canonical else "alias"
+                matched_alias = alias
+                conf = HIGH if alias.lower() == canonical.lower() else MEDIUM
+                meth = "exact" if alias.lower() == canonical.lower() else "alias"
                 break
 
-            # Tier 1b: normalized match
+            # Tier 1b: normalised match
             candidate = norm_to_src.get(_norm(alias))
             if candidate and candidate not in claimed:
                 match = candidate
+                matched_alias = alias
                 conf = HIGH if _norm(alias) == _norm(canonical) else MEDIUM
                 meth = "exact" if _norm(alias) == _norm(canonical) else "alias"
                 break
+
+        # Check if the matched alias requires user confirmation
+        if match and matched_alias:
+            rc_norms = REQUIRES_CONFIRMATION_NORMS.get(canonical, frozenset())
+            if _norm(matched_alias) in rc_norms:
+                needs_confirm = True
+                conf = LOW          # force LOW → UI won't auto-populate
+                meth = "alias|confirm"
 
         if match:
             claimed.add(match)
@@ -313,6 +251,7 @@ def suggest_mapping(df: pd.DataFrame) -> MappingSuggestion:
         suggested[canonical] = match
         confidence[canonical] = conf
         method[canonical] = meth
+        requires_confirmation[canonical] = needs_confirm
 
     # ------------------------------------------------------------------
     # Pass 2: heuristic detection only for canonicals still unmatched
@@ -320,13 +259,15 @@ def suggest_mapping(df: pd.DataFrame) -> MappingSuggestion:
     for canonical in ALIAS_MAP:
         if suggested.get(canonical) is not None:
             continue  # already matched in Pass 1
+
         result = _heuristic_match(canonical, df, claimed)
         if result:
-            match, conf, meth = result
+            match, conf, meth, needs_confirm = result
             claimed.add(match)
             suggested[canonical] = match
             confidence[canonical] = conf
             method[canonical] = meth
+            requires_confirmation[canonical] = needs_confirm
 
     unmapped = [c for c in source_columns if c not in claimed]
 
@@ -343,6 +284,7 @@ def suggest_mapping(df: pd.DataFrame) -> MappingSuggestion:
         suggested=suggested,
         confidence=confidence,
         method=method,
+        requires_confirmation=requires_confirmation,
         unmapped_source_cols=unmapped,
         missing_required_for_training=missing_training,
         missing_required_for_analysis=missing_analysis,
@@ -354,13 +296,27 @@ def _heuristic_match(
     canonical: str,
     df: pd.DataFrame,
     claimed: set,
-) -> Optional[Tuple[str, str, str]]:
-    """Tier 3: infer column semantics from value distribution."""
+) -> Optional[Tuple[str, str, str, bool]]:
+    """
+    Tier 3: infer column semantics from value distribution.
+
+    Returns (source_col, confidence, method, requires_confirmation) or None.
+
+    Policy:
+    - All heuristic matches are LOW confidence.
+    - Binary flag matches for 'churned' do NOT require confirmation (they are
+      already LOW — the existing UI behaviour prevents auto-population).
+    - Value-vocabulary matches (e.g. a column with "Closed Lost" / "Closed Won"
+      values) DO require confirmation because the column may not be a true label.
+    """
     unclaimed = [c for c in df.columns if c not in claimed]
     if not unclaimed:
         return None
 
     if canonical == "churned":
+        # ------------------------------------------------------------------
+        # Tier 3a: binary value-set detection (original behaviour, preserved)
+        # ------------------------------------------------------------------
         binary_value_sets = [
             {"0", "1"}, {"0.0", "1.0"}, {"true", "false"},
             {"yes", "no"}, {"churned", "retained"}, {"active", "inactive"},
@@ -374,7 +330,29 @@ def _heuristic_match(
             unique_vals = set(series.astype(str).str.lower().str.strip().unique())
             for bs in binary_value_sets:
                 if unique_vals <= bs and len(unique_vals) >= 2:
-                    return (col, LOW, "heuristic")
+                    # Binary flag detected — LOW confidence, no confirmation
+                    # required (already handled by LOW preventing auto-populate)
+                    return (col, LOW, "heuristic", False)
+
+        # ------------------------------------------------------------------
+        # Tier 3b: churn vocabulary detection
+        # A column whose values overlap with known churn-positive AND
+        # churn-negative vocabulary is a plausible churn indicator, but the
+        # match is inferred from values — not from field name — so it always
+        # requires_confirmation.
+        # ------------------------------------------------------------------
+        for col in unclaimed:
+            series = df[col].dropna()
+            if len(series) == 0:
+                continue
+            # Skip purely numeric columns — churn vocabulary is text-based.
+            if pd.api.types.is_numeric_dtype(series):
+                continue
+            unique_lower = {v.lower().strip() for v in series.astype(str).unique()}
+            has_positive = bool(unique_lower & CHURN_POSITIVE_VALUES)
+            has_negative = bool(unique_lower & CHURN_NEGATIVE_VALUES)
+            if has_positive and has_negative:
+                return (col, LOW, "heuristic|values", True)
 
     elif canonical == "snapshot_date":
         for col in unclaimed:
@@ -388,7 +366,7 @@ def _heuristic_match(
             try:
                 sample = series.head(20)
                 pd.to_datetime(sample, errors="raise")
-                return (col, LOW, "heuristic")
+                return (col, LOW, "heuristic", False)
             except (ValueError, TypeError):
                 pass
 
@@ -397,14 +375,14 @@ def _heuristic_match(
             series = df[col].dropna()
             if pd.api.types.is_numeric_dtype(series):
                 if series.min() >= 0 and series.median() > 500:
-                    return (col, LOW, "heuristic")
+                    return (col, LOW, "heuristic", False)
 
     elif canonical == "account_id":
         for col in unclaimed:
             series = df[col].dropna()
             # Nearly all unique → likely an ID column
             if len(series) > 0 and series.nunique() >= len(series) * 0.9:
-                return (col, LOW, "heuristic")
+                return (col, LOW, "heuristic", False)
 
     return None
 
@@ -415,6 +393,7 @@ def mapping_suggestion_to_dict(s: MappingSuggestion) -> dict:
         "suggested": s.suggested,
         "confidence": s.confidence,
         "method": s.method,
+        "requires_confirmation": s.requires_confirmation,
         "unmapped_source_cols": s.unmapped_source_cols,
         "missing_required_for_training": s.missing_required_for_training,
         "missing_required_for_analysis": s.missing_required_for_analysis,

@@ -450,7 +450,8 @@ export interface UploadResponse {
 export interface MappingSuggestion {
   suggested: Record<string, string | null>;       // canonical → source_col or null
   confidence: Record<string, string>;             // canonical → HIGH|MEDIUM|LOW|NONE
-  method: Record<string, string>;                 // canonical → exact|alias|heuristic|none
+  method: Record<string, string>;                 // canonical → exact|alias|alias|confirm|heuristic|none
+  requires_confirmation: Record<string, boolean>; // canonical → true if user must explicitly confirm
   unmapped_source_cols: string[];
   missing_required_for_training: string[];
   missing_required_for_analysis: string[];

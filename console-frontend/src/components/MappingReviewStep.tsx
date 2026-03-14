@@ -56,12 +56,16 @@ export function MappingReviewStep({ rawPath, filename, sourceColumns, suggestion
   const [error, setError] = useState('');
 
   // Initialise mappings from the suggestion.
-  // LOW confidence = heuristic guess — don't pre-populate, require explicit user selection.
+  // Do NOT pre-populate when:
+  //   - confidence is LOW (heuristic guess or ambiguous CRM field), or
+  //   - requires_confirmation is true (known-ambiguous CRM field like
+  //     StageName, dealstage, statecode — user must explicitly choose).
   useEffect(() => {
     const initial: Record<string, string | null> = {};
     for (const [canonical, col] of Object.entries(suggestion.suggested)) {
       const conf = suggestion.confidence[canonical];
-      initial[canonical] = conf === 'LOW' ? null : (col ?? null);
+      const needsConfirm = suggestion.requires_confirmation?.[canonical] ?? false;
+      initial[canonical] = (conf === 'LOW' || needsConfirm) ? null : (col ?? null);
     }
     setMappings(initial);
   }, [suggestion]);

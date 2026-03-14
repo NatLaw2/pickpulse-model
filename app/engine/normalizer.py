@@ -11,17 +11,51 @@ from .schema_mapping import CANONICAL_SCHEMA
 
 
 # ---------------------------------------------------------------------------
-# Truthy / falsy sets for binary coercion
+# Truthy / falsy sets for binary coercion of the churned column.
+#
+# These are applied AFTER the user has confirmed a mapping, so values
+# like "Closed Lost" (from a Salesforce StageName column) can be
+# correctly coerced to 1.  The sets are a union of:
+#   - Universal boolean representations (1/0, true/false, yes/no)
+#   - Global churn vocabulary from the CRM alias packs
+#   - CRM-specific churn values (Salesforce, HubSpot, Dynamics, Pipedrive)
 # ---------------------------------------------------------------------------
 _TRUTHY = {
+    # Universal
     "1", "1.0", "true", "yes", "y", "t",
-    "churned", "canceled", "cancelled", "terminated",
-    "inactive", "lost", "left", "attrited",
+    # Direct churn labels
+    "churned", "churn",
+    # Cancellation variants
+    "canceled", "cancelled",
+    # Termination / loss
+    "terminated", "lost", "left", "attrited", "deactivated",
+    # Inactivity
+    "inactive",
+    # Non-renewal
+    "non-renewed", "non_renewed", "nonrenewed", "non renewed",
+    # CRM-specific: Salesforce StageName values
+    "closed lost", "closed_lost", "closedlost",
+    # CRM-specific: HubSpot dealstage / lifecyclestage
+    "closedlost", "inactive_customer",
+    # CRM-specific: Dynamics textual status
+    "terminated",
+    # Pipedrive
+    "lost",
 }
 _FALSY = {
+    # Universal
     "0", "0.0", "false", "no", "n", "f",
-    "retained", "active", "renewing", "renewed",
-    "healthy", "current",
+    # Retention labels
+    "retained", "active", "renewing", "renewed", "healthy", "current",
+    # CRM-specific: Salesforce StageName values
+    "closed won", "closed_won", "closedwon",
+    "active renewal",
+    # Generic won/open
+    "won", "open",
+    # HubSpot lifecyclestage
+    "customer", "evangelist", "opportunity",
+    # Text "current customer"
+    "current customer", "current_customer",
 }
 
 
