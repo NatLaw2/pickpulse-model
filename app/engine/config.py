@@ -88,7 +88,7 @@ CHURN_MODULE = ModuleConfig(
     positive_label="1",
     positive_display="Churned",
     negative_display="Retained",
-    required_columns=["customer_id", "snapshot_date", "churned"],
+    required_columns=["customer_id", "churned"],
     optional_columns=[
         "arr", "plan", "seats", "monthly_logins", "support_tickets",
         "nps_score", "days_since_last_login", "contract_months_remaining",

@@ -55,9 +55,15 @@ export function MappingReviewStep({ rawPath, filename, sourceColumns, suggestion
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
 
-  // Initialise mappings from the suggestion
+  // Initialise mappings from the suggestion.
+  // LOW confidence = heuristic guess — don't pre-populate, require explicit user selection.
   useEffect(() => {
-    setMappings({ ...suggestion.suggested });
+    const initial: Record<string, string | null> = {};
+    for (const [canonical, col] of Object.entries(suggestion.suggested)) {
+      const conf = suggestion.confidence[canonical];
+      initial[canonical] = conf === 'LOW' ? null : (col ?? null);
+    }
+    setMappings(initial);
   }, [suggestion]);
 
   // Load schema field metadata
