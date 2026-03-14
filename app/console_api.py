@@ -368,20 +368,10 @@ async def confirm_mapping(
             "coercion_log": norm_result.coercion_log,
         }, mf, indent=2)
 
-    # Register the normalized dataset
+    # Compute readiness before registering so we can persist the mode
     loaded_at = datetime.now(timezone.utc).isoformat()
     original_filename = body.get("filename", norm_filename)
-    ds_info = {
-        "path": norm_filepath,
-        "name": original_filename,
-        "rows": len(canonical_df),
-        "columns": len(canonical_df.columns),
-        "is_demo": False,
-        "loaded_at": loaded_at,
-    }
-    _register_dataset(module_name, ds_info, tenant_id=tenant_id)
 
-    # Compute readiness report
     readiness = compute_readiness(
         canonical_df=canonical_df,
         derived_columns=norm_result.derived_columns,
@@ -390,6 +380,20 @@ async def confirm_mapping(
         filename=original_filename,
         loaded_at=loaded_at,
     )
+
+    # Register the normalized dataset — include readiness_mode so the Train
+    # page can check whether training is possible without re-normalizing.
+    ds_info = {
+        "path": norm_filepath,
+        "name": original_filename,
+        "rows": len(canonical_df),
+        "columns": len(canonical_df.columns),
+        "is_demo": False,
+        "loaded_at": loaded_at,
+        "readiness_mode": readiness.mode,
+    }
+    _register_dataset(module_name, ds_info, tenant_id=tenant_id)
+
     # Embed dataset_info into the readiness report
     readiness.dataset_info = ds_info
 
@@ -468,6 +472,7 @@ def load_sample_dataset(
         "columns": len(df.columns),
         "is_demo": True,
         "loaded_at": loaded_at,
+        "readiness_mode": "TRAINING_READY",
     }
     _register_dataset(module_name, ds_info, tenant_id=tenant_id)
 

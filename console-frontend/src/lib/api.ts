@@ -415,6 +415,7 @@ export interface DatasetInfo {
   columns: number;
   is_demo: boolean;
   loaded_at: string;
+  readiness_mode?: 'TRAINING_READY' | 'TRAINING_DEGRADED' | 'ANALYSIS_READY' | 'PARTIAL' | 'BLOCKED';
 }
 
 export interface ValidationInfo {

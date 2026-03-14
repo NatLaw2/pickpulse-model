@@ -28,6 +28,8 @@ export function TrainPage({ embedded }: { embedded?: boolean } = {}) {
 
   const noDataset = !dataset || (error && isNoDatasetError(error));
   const realError = error && !isNoDatasetError(error);
+  const trainingBlocked = dataset && dataset.readiness_mode != null &&
+    dataset.readiness_mode !== 'TRAINING_READY' && dataset.readiness_mode !== 'TRAINING_DEGRADED';
   const meta: TrainMetadata | undefined = result?.metadata;
 
   return (
@@ -56,7 +58,26 @@ export function TrainPage({ embedded }: { embedded?: boolean } = {}) {
         </div>
       )}
 
-      {!noDataset && (
+      {/* Training not available — no churn label */}
+      {!noDataset && trainingBlocked && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 mb-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+          <AlertTriangle size={32} className="mx-auto mb-3 text-amber-500" />
+          <h3 className="font-semibold mb-2">Training requires a churn label</h3>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-5 max-w-md mx-auto">
+            Your dataset is loaded in <strong>{dataset?.readiness_mode?.replace('_', ' ')}</strong> mode
+            because no <code className="font-mono text-xs">churned</code> column was mapped.
+            Return to Data Sources to re-upload with a churn outcome column, or map an existing column to <code className="font-mono text-xs">churned</code>.
+          </p>
+          <button
+            onClick={() => navigate('/data-sources')}
+            className="px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-xl text-sm font-medium hover:bg-[var(--color-accent-glow)] transition-all shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
+          >
+            Go to Data Sources
+          </button>
+        </div>
+      )}
+
+      {!noDataset && !trainingBlocked && (
         <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <div className="flex items-center gap-6 mb-5">
             <div>
