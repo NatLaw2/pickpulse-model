@@ -296,7 +296,7 @@ export function ExpansionDemoPage() {
                 <tbody>
                   {arrRisk.top_at_risk.map((row, i) => (
                     <tr
-                      key={row.customer_id}
+                      key={row.account_id}
                       className={`border-b border-[var(--color-border)]/50 ${i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''}`}
                     >
                       <td className="py-2.5 pr-3 font-medium text-xs">{row.account_name}</td>

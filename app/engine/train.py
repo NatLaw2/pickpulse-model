@@ -47,13 +47,21 @@ def train_model(
 
     # Sort by timestamp for time-based split
     ts_col = module.timestamp_column
+    training_warnings: list[str] = []
     if ts_col in df.columns:
+        split_strategy = "time_based"
         df = df.copy()
         df["_ts_parsed"] = pd.to_datetime(df[ts_col], errors="coerce")
         df = df.sort_values("_ts_parsed").reset_index(drop=True)
         df = df.drop(columns=["_ts_parsed"])
     else:
-        print(f"[train] Warning: timestamp column '{ts_col}' not found. Using row order.")
+        split_strategy = "random"
+        msg = (
+            f"No {ts_col} column found. Using random split. "
+            "Metrics may be optimistic — add a snapshot date for time-based evaluation."
+        )
+        training_warnings.append(msg)
+        print(f"[train] Warning: {msg}")
 
     n = len(df)
     print(f"[train] Dataset: {n} rows")
@@ -189,6 +197,8 @@ def train_model(
         "version": version_str,
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "model_type": model_type,
+        "split_strategy": split_strategy,
+        "training_warnings": training_warnings,
         "n_features": len(feature_names),
         "features": feature_names,
         "n_train": len(y_train),

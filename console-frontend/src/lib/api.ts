@@ -166,9 +166,9 @@ export const api = {
     request<PredictResponse>(`/predict/${MOD}/cached`),
 
   // Account status
-  updateAccountStatus: (customerId: string, status: string) =>
-    request<{ customer_id: string; status: string }>(
-      `/accounts/${customerId}/status?status=${status}`, { method: 'POST' }
+  updateAccountStatus: (accountId: string, status: string) =>
+    request<{ account_id: string; status: string }>(
+      `/accounts/${accountId}/status?status=${status}`, { method: 'POST' }
     ),
 
   // API docs
@@ -296,10 +296,10 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  logPlaybookAction: (customerId: string, actionType: string) =>
+  logPlaybookAction: (accountId: string, actionType: string) =>
     request<{ status: string; action: string }>('/predictions/playbook/log', {
       method: 'POST',
-      body: JSON.stringify({ customer_id: customerId, action_type: actionType }),
+      body: JSON.stringify({ account_id: accountId, action_type: actionType }),
     }),
 
   // -----------------------------------------------------------------------
@@ -500,9 +500,21 @@ export interface CanonicalSchemaField {
   aliases_preview: string[];
 }
 
+export interface TrainMetadata {
+  version: string;
+  model_type: string;
+  split_strategy: 'time_based' | 'random';
+  training_warnings: string[];
+  n_train: number;
+  n_val: number;
+  val_metrics: EvalMetrics | null;
+  feature_importance: { feature: string; importance: number }[];
+  [key: string]: any;
+}
+
 export interface TrainResponse {
   status: string;
-  metadata: any;
+  metadata: TrainMetadata;
   metrics: EvalMetrics | null;
 }
 
@@ -571,7 +583,7 @@ export interface FeatureImportance {
 }
 
 export interface ChurnPrediction {
-  customer_id: string;
+  account_id: string;
   churn_risk_pct: number;
   urgency_score: number;
   renewal_window_label: string;
@@ -585,7 +597,7 @@ export interface ChurnPrediction {
 }
 
 export interface DraftEmailRequest {
-  customer_id: string;
+  account_id: string;
   customer_name?: string | null;
   contact_name?: string | null;
   contact_email?: string | null;
@@ -606,7 +618,7 @@ export interface DraftEmailResponse {
 }
 
 export interface ExplainResponse {
-  customer_id: string;
+  account_id: string;
   churn_risk_pct: number;
   arr: number;
   arr_at_risk: number;
@@ -871,7 +883,7 @@ export interface RevenueImpactResponse {
 // ---------------------------------------------------------------------------
 
 export interface SandboxChurnAccount {
-  customer_id: string;
+  account_id: string;
   account_name: string;
   arr: number;
   churn_risk_pct: number;

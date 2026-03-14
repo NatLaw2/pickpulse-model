@@ -777,8 +777,8 @@ def export_predictions(module_name: str, tenant_id: str = Depends(get_tenant_id)
 # -----------------------------------------------------------------------
 # Account status management
 # -----------------------------------------------------------------------
-@app.post("/api/accounts/{customer_id}/status")
-def update_account_status(customer_id: str, status: str = Query(...), tenant_id: str = Depends(get_tenant_id)):
+@app.post("/api/accounts/{account_id}/status")
+def update_account_status(account_id: str, status: str = Query(...), tenant_id: str = Depends(get_tenant_id)):
     """Update account lifecycle status.
 
     Valid statuses: active, at_risk, save_in_progress, renewed, churned,
@@ -789,8 +789,8 @@ def update_account_status(customer_id: str, status: str = Query(...), tenant_id:
     if status not in valid:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid}")
 
-    _get_state(tenant_id)["account_statuses"][customer_id] = status
-    return {"customer_id": customer_id, "status": status}
+    _get_state(tenant_id)["account_statuses"][account_id] = status
+    return {"account_id": account_id, "status": status}
 
 
 @app.get("/api/accounts")
@@ -803,7 +803,7 @@ def list_accounts(status: Optional[str] = Query(None), tenant_id: str = Depends(
         filtered = []
         for p in predictions:
             acct_status = state["account_statuses"].get(
-                p.get("customer_id"), p.get("account_status", "active")
+                p.get("account_id"), p.get("account_status", "active")
             )
             if acct_status == status:
                 filtered.append({**p, "account_status": acct_status})
@@ -827,7 +827,7 @@ def api_docs_meta(tenant_id: str = Depends(get_tenant_id)):
                 "curl": 'curl -X POST http://localhost:8000/api/predict/churn',
                 "response_example": {
                     "predictions": [
-                        {"customer_id": "CUST-20042", "churn_risk_pct": 82.3,
+                        {"account_id": "CUST-20042", "churn_risk_pct": 82.3,
                          "urgency_score": 91.5, "arr": 85000, "arr_at_risk": 69955,
                          "renewal_window_label": "<30d", "tier": "High Risk",
                          "recommended_action": "Executive save plan + renewal call this week"},
@@ -887,7 +887,7 @@ def api_docs_meta(tenant_id: str = Depends(get_tenant_id)):
             },
             {
                 "method": "POST",
-                "path": "/api/accounts/{customer_id}/status",
+                "path": "/api/accounts/{account_id}/status",
                 "description": "Update account lifecycle status",
                 "curl": 'curl -X POST "http://localhost:8000/api/accounts/CUST-20042/status?status=save_in_progress"',
             },

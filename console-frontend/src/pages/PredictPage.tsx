@@ -9,7 +9,7 @@ import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { riskColor, riskLabel } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
 
-type SortKey = 'customer_id' | 'churn_risk_pct' | 'urgency_score' | 'renewal_window_label' | 'days_until_renewal' | 'arr' | 'arr_at_risk';
+type SortKey = 'account_id' | 'churn_risk_pct' | 'urgency_score' | 'renewal_window_label' | 'days_until_renewal' | 'arr' | 'arr_at_risk';
 type SortDir = 'asc' | 'desc';
 
 export function PredictPage() {
@@ -70,7 +70,7 @@ export function PredictPage() {
         .sort((a, b) => (b.arr_at_risk || 0) - (a.arr_at_risk || 0))
         .slice(0, 5)
         .map((p) => ({
-          customer_id: p.customer_id,
+          account_id: p.account_id,
           churn_risk_pct: p.churn_risk_pct,
           arr: p.arr,
           arr_at_risk: p.arr_at_risk,
@@ -121,7 +121,7 @@ export function PredictPage() {
   let filtered: ChurnPrediction[] = result?.predictions ?? [];
   if (search) {
     const q = search.toLowerCase();
-    filtered = filtered.filter((r) => r.customer_id?.toLowerCase().includes(q));
+    filtered = filtered.filter((r) => r.account_id?.toLowerCase().includes(q));
   }
   if (riskFilter !== 'all') {
     filtered = filtered.filter((r) => {
@@ -151,7 +151,7 @@ export function PredictPage() {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      setSortDir(key === 'customer_id' ? 'asc' : 'desc');
+      setSortDir(key === 'account_id' ? 'asc' : 'desc');
     }
   };
 
@@ -163,7 +163,7 @@ export function PredictPage() {
   };
 
   // Selected row data
-  const selectedRow = selectedId ? (result?.predictions ?? []).find((p) => p.customer_id === selectedId) : null;
+  const selectedRow = selectedId ? (result?.predictions ?? []).find((p) => p.account_id === selectedId) : null;
 
   return (
     <div className="relative">
@@ -336,8 +336,8 @@ export function PredictPage() {
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10">
                     <tr className="text-left text-xs text-[var(--color-text-muted)] uppercase tracking-wider bg-[var(--color-bg-primary)]">
-                      <th className="py-3 px-4 font-medium cursor-pointer group select-none" onClick={() => handleSort('customer_id')}>
-                        Account <SortIcon col="customer_id" />
+                      <th className="py-3 px-4 font-medium cursor-pointer group select-none" onClick={() => handleSort('account_id')}>
+                        Account <SortIcon col="account_id" />
                       </th>
                       <th className="py-3 px-4 font-medium text-right cursor-pointer group select-none" onClick={() => handleSort('churn_risk_pct')}>
                         Churn Risk <SortIcon col="churn_risk_pct" />
@@ -364,13 +364,13 @@ export function PredictPage() {
                   <tbody>
                     {sorted.map((row, i) => (
                       <tr
-                        key={row.customer_id}
-                        onClick={() => setSelectedId(row.customer_id)}
+                        key={row.account_id}
+                        onClick={() => setSelectedId(row.account_id)}
                         className={`border-t border-[var(--color-border)] hover:bg-[var(--color-accent-light)] transition-colors cursor-pointer ${
                           i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''
-                        } ${selectedId === row.customer_id ? 'bg-[var(--color-accent)]/10' : ''}`}
+                        } ${selectedId === row.account_id ? 'bg-[var(--color-accent)]/10' : ''}`}
                       >
-                        <td className="py-3 px-4 font-medium text-xs">{row.customer_id}</td>
+                        <td className="py-3 px-4 font-medium text-xs">{row.account_id}</td>
                         <td className="py-3 px-4 text-right">
                           <span
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"

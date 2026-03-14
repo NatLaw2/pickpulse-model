@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, CheckCircle2, Database, Loader2 } from 'lucide-react';
-import { api, isNoDatasetError, type TrainResponse } from '../lib/api';
+import { AlertTriangle, Brain, CheckCircle2, Database, Loader2 } from 'lucide-react';
+import { api, isNoDatasetError, type TrainResponse, type TrainMetadata } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 
 export function TrainPage({ embedded }: { embedded?: boolean } = {}) {
@@ -28,7 +28,7 @@ export function TrainPage({ embedded }: { embedded?: boolean } = {}) {
 
   const noDataset = !dataset || (error && isNoDatasetError(error));
   const realError = error && !isNoDatasetError(error);
-  const meta = result?.metadata;
+  const meta: TrainMetadata | undefined = result?.metadata;
 
   return (
     <div>
@@ -105,7 +105,20 @@ export function TrainPage({ embedded }: { embedded?: boolean } = {}) {
             <div className="flex items-center gap-2 mb-4">
               <CheckCircle2 size={18} className="text-[var(--color-success)]" />
               <h3 className="font-semibold">Training Complete</h3>
+              {meta.split_strategy === 'random' && (
+                <span className="ml-auto flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                  <AlertTriangle size={12} />
+                  Random split — metrics may be optimistic
+                </span>
+              )}
             </div>
+            {meta.split_strategy === 'random' && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                No <code className="font-mono">snapshot_date</code> column was found in your dataset.
+                A random train/validation split was used instead of time-based. Validation metrics may be
+                slightly optimistic. For production-grade evaluation, include a date column.
+              </p>
+            )}
             <dl className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
               <div>
                 <dt className="text-[var(--color-text-muted)] text-xs mb-1">Version</dt>

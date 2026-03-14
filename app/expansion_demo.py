@@ -107,7 +107,7 @@ def _arr_risk_account(rng: random.Random, idx: int) -> dict[str, Any]:
     else:
         tier = "Low Risk"
     return {
-        "customer_id": f"ACCT-{1000 + idx}",
+        "account_id": f"ACCT-{1000 + idx}",
         "account_name": _ACCOUNT_NAMES[idx % len(_ACCOUNT_NAMES)],
         "arr": arr,
         "churn_risk_pct": churn_risk_pct,

@@ -80,8 +80,8 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
     setDraftError(null);
     try {
       const req: DraftEmailRequest = {
-        customer_id: prediction.customer_id,
-        customer_name: prediction.customer_id,
+        account_id: prediction.account_id,
+        customer_name: prediction.account_id,
         contact_email: contactEmail || null,
         churn_risk_pct: prediction.churn_risk_pct,
         arr: prediction.arr,
@@ -93,7 +93,7 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
         tone: selectedTone,
       };
       const result = await api.draftOutreachEmail(req);
-      await api.logPlaybookAction(prediction.customer_id, actionType);
+      await api.logPlaybookAction(prediction.account_id, actionType);
       window.location.href = result.mailto_url;
     } catch (err: any) {
       setDraftError(err?.message || 'Failed to generate email');
@@ -106,8 +106,8 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
   const handleScheduleReview = async () => {
     setDraftingAction('schedule_success_review');
     try {
-      await api.logPlaybookAction(prediction.customer_id, 'schedule_success_review');
-      await api.downloadIcs(prediction.customer_id);
+      await api.logPlaybookAction(prediction.account_id, 'schedule_success_review');
+      await api.downloadIcs(prediction.account_id);
     } catch (err: any) {
       setDraftError(err?.message || 'Failed to download calendar invite');
     } finally {
@@ -118,12 +118,12 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
   const handleEscalateToSales = async () => {
     setDraftingAction('escalate_to_sales');
     try {
-      await api.logPlaybookAction(prediction.customer_id, 'escalate_to_sales');
+      await api.logPlaybookAction(prediction.account_id, 'escalate_to_sales');
       const subject = encodeURIComponent(
-        `Escalation: ${prediction.customer_id} — ${prediction.churn_risk_pct}% churn risk, ${formatCurrency(prediction.arr_at_risk)} ARR at risk`
+        `Escalation: ${prediction.account_id} — ${prediction.churn_risk_pct}% churn risk, ${formatCurrency(prediction.arr_at_risk)} ARR at risk`
       );
       const body = encodeURIComponent(
-        `Account ${prediction.customer_id} has been flagged for sales escalation.\n\n` +
+        `Account ${prediction.account_id} has been flagged for sales escalation.\n\n` +
         `Churn Risk: ${prediction.churn_risk_pct}%\n` +
         `ARR: ${formatCurrency(prediction.arr)}\n` +
         `ARR at Risk: ${formatCurrency(prediction.arr_at_risk)}\n` +
@@ -207,7 +207,7 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
       <div className="sticky top-0 bg-white border-b border-[var(--color-border)] px-5 py-4 flex items-center justify-between z-10">
         <div>
           <h3 className="text-sm font-bold">Why This Account Is At Risk</h3>
-          <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{prediction.customer_id}</p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{prediction.account_id}</p>
         </div>
         <button
           onClick={onClose}

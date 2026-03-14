@@ -33,7 +33,7 @@ def _build_scoring_dataframe(tenant_id: str = repo.DEFAULT_TENANT) -> pd.DataFra
     for acct in accounts:
         sig = repo.latest_signals(acct["external_id"], tenant_id=tenant_id)
         row: Dict[str, Any] = {
-            "customer_id": acct["external_id"],
+            "account_id": acct["external_id"],
             "snapshot_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "arr": acct.get("arr"),
             "plan": acct.get("plan"),
@@ -122,7 +122,7 @@ def score_accounts(tenant_id: str = repo.DEFAULT_TENANT) -> List[ChurnScore]:
         action = compute_recommended_action(prob * 100, renewal_label, dsl)
 
         scores.append(ChurnScore(
-            external_id=row["customer_id"],
+            external_id=row["account_id"],
             scored_at=now,
             churn_probability=round(prob, 4),
             tier=tier,

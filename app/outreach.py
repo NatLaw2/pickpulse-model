@@ -58,7 +58,7 @@ def _check_rate_limit(user_id: str) -> None:
 # Request / Response models
 # ---------------------------------------------------------------------------
 class DraftEmailRequest(BaseModel):
-    customer_id: str = Field(..., max_length=200)
+    account_id: str = Field(..., max_length=200)
     customer_name: Optional[str] = Field(None, max_length=200)
     contact_name: Optional[str] = Field(None, max_length=200)
     contact_email: Optional[str] = Field(None, max_length=200)
@@ -71,7 +71,7 @@ class DraftEmailRequest(BaseModel):
     tier: Optional[str] = Field(None, max_length=50)
     tone: str = "friendly"
 
-    @field_validator("customer_id", "customer_name", "contact_name",
+    @field_validator("account_id", "customer_name", "contact_name",
                      "contact_email", "recommended_action",
                      "risk_driver_summary", "tier", "tone", mode="before")
     @classmethod
@@ -121,9 +121,9 @@ Do not include any other text, markdown, or explanation."""
 
 def _build_user_prompt(req: DraftEmailRequest) -> str:
     """Build the user prompt from the request fields."""
-    contact = req.contact_name or req.customer_name or req.customer_id
+    contact = req.contact_name or req.customer_name or req.account_id
     lines = [
-        f"Account: {req.customer_name or req.customer_id}",
+        f"Account: {req.customer_name or req.account_id}",
         f"Contact name: {contact}",
         f"ARR: ${req.arr:,.0f}",
         f"Days until renewal: {req.days_until_renewal}",
@@ -229,7 +229,7 @@ async def draft_outreach_email(
         "outreach_email_generated",
         extra={
             "user_id": user_id,
-            "account_id": req.customer_id,
+            "account_id": req.account_id,
             "churn_risk_pct": req.churn_risk_pct,
             "arr": req.arr,
             "has_recipient_email": req.contact_email is not None,

@@ -14,7 +14,7 @@ def get_config() -> ModuleConfig:
 
 
 COLUMN_ALIASES: Dict[str, List[str]] = {
-    "customer_id": ["customer_id", "account_id", "client_id", "user_id", "id"],
+    "account_id": ["account_id", "customer_id", "client_id", "user_id", "id"],
     "snapshot_date": ["snapshot_date", "date", "observation_date", "period", "month"],
     "churned": ["churned", "churn", "is_churned", "label", "outcome", "status"],
     "arr": ["arr", "annual_revenue", "mrr", "revenue", "acv", "contract_value"],

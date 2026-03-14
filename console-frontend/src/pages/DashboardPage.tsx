@@ -68,7 +68,7 @@ export function DashboardPage() {
       } catch { /* no settings configured */ }
 
       const topAccounts = (dashData.top_at_risk ?? []).slice(0, 5).map((p) => ({
-        customer_id: p.customer_id,
+        account_id: p.account_id,
         churn_risk_pct: p.churn_risk_pct,
         arr: p.arr,
         arr_at_risk: p.arr_at_risk,
@@ -121,8 +121,8 @@ export function DashboardPage() {
 
   // Find the selected prediction row — look in dashboard top_at_risk first, then predictions context
   const selectedRow = selectedId
-    ? topRisk.find((r) => r.customer_id === selectedId)
-      ?? predictions?.predictions?.find((p) => p.customer_id === selectedId)
+    ? topRisk.find((r) => r.account_id === selectedId)
+      ?? predictions?.predictions?.find((p) => p.account_id === selectedId)
       ?? null
     : null;
 
@@ -292,13 +292,13 @@ export function DashboardPage() {
                   <tbody>
                     {topRisk.map((row, i) => (
                       <tr
-                        key={row.customer_id}
-                        onClick={() => setSelectedId(row.customer_id)}
+                        key={row.account_id}
+                        onClick={() => setSelectedId(row.account_id)}
                         className={`border-b border-[var(--color-border)]/50 hover:bg-[var(--color-accent-light)] transition-colors cursor-pointer ${
                           i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''
-                        } ${selectedId === row.customer_id ? 'bg-[var(--color-accent)]/10' : ''}`}
+                        } ${selectedId === row.account_id ? 'bg-[var(--color-accent)]/10' : ''}`}
                       >
-                        <td className="py-2.5 pr-3 font-medium text-xs">{row.customer_id}</td>
+                        <td className="py-2.5 pr-3 font-medium text-xs">{row.account_id}</td>
                         <td className="py-2.5 pr-3 text-right">
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold"

@@ -53,10 +53,10 @@ def compute_revenue_impact(predictions: list, account_statuses: dict, is_demo: b
     """
     SAVE_STATUSES = {"renewed", "archived_renewed"}
 
-    # Build arr_at_risk and ARR lookups keyed by customer_id.
+    # Build arr_at_risk and ARR lookups keyed by account_id.
     arr_by_customer: dict[str, float] = {}
     for p in predictions:
-        cid = p.get("customer_id")
+        cid = p.get("account_id")
         if cid:
             arr_by_customer[cid] = float(p.get("arr", 0) or 0)
 
@@ -86,7 +86,7 @@ def compute_revenue_impact(predictions: list, account_statuses: dict, is_demo: b
             churn_risk_pct = p.get("churn_risk_pct") or 0
             renewal_label = p.get("renewal_window_label", "")
             arr_risk = float(p.get("arr_at_risk", 0) or 0)
-            cid = p.get("customer_id")
+            cid = p.get("account_id")
 
             if (
                 churn_risk_pct >= _MED_RISK_LOWER
@@ -103,7 +103,7 @@ def compute_revenue_impact(predictions: list, account_statuses: dict, is_demo: b
         for p in predictions:
             churn_risk_pct = p.get("churn_risk_pct") or 0
             arr_risk = float(p.get("arr_at_risk", 0) or 0)
-            cid = p.get("customer_id")
+            cid = p.get("account_id")
 
             if (
                 _MED_RISK_LOWER <= churn_risk_pct < _MED_RISK_UPPER

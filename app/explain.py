@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/predictions", tags=["explain"])
 # Response models
 # ---------------------------------------------------------------------------
 class ExplainResponse(BaseModel):
-    customer_id: str
+    account_id: str
     churn_risk_pct: float
     arr: float
     arr_at_risk: float
@@ -128,9 +128,9 @@ def build_risk_driver_summary(drivers: list[str]) -> str:
 # ---------------------------------------------------------------------------
 # Explain endpoint
 # ---------------------------------------------------------------------------
-@router.get("/{customer_id}/explain", response_model=ExplainResponse)
+@router.get("/{account_id}/explain", response_model=ExplainResponse)
 def explain_account(
-    customer_id: str,
+    account_id: str,
     tenant_id: str = Depends(get_tenant_id),
 ):
     """Return risk details and heuristic drivers for a single account."""
@@ -143,14 +143,14 @@ def explain_account(
     # Find the prediction row
     row = None
     for p in predictions:
-        if p.get("customer_id") == customer_id:
+        if p.get("account_id") == account_id:
             row = p
             break
 
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No prediction found for account '{customer_id}'. Run predictions first.",
+            detail=f"No prediction found for account '{account_id}'. Run predictions first.",
         )
 
     # Also try to get the full scored CSV for richer feature data
@@ -159,7 +159,7 @@ def explain_account(
     if os.path.exists(scored_path):
         try:
             scored_df = pd.read_csv(scored_path)
-            match = scored_df[scored_df["customer_id"] == customer_id]
+            match = scored_df[scored_df["account_id"] == account_id]
             if not match.empty:
                 full_row = match.iloc[0].to_dict()
                 # Merge in any prediction-only fields
@@ -171,7 +171,7 @@ def explain_account(
     summary = build_risk_driver_summary(drivers)
 
     return ExplainResponse(
-        customer_id=customer_id,
+        account_id=account_id,
         churn_risk_pct=float(row.get("churn_risk_pct", 0)),
         arr=float(row.get("arr", 0)),
         arr_at_risk=float(row.get("arr_at_risk", 0)),
@@ -221,20 +221,20 @@ def _next_business_day_10am_utc() -> datetime:
     return datetime.combine(d, time(10, 0), tzinfo=timezone.utc)
 
 
-@router.get("/{customer_id}/ics")
+@router.get("/{account_id}/ics")
 def download_ics(
-    customer_id: str,
+    account_id: str,
     tenant_id: str = Depends(get_tenant_id),
 ):
     """Download an .ics calendar invite for a Success Review meeting."""
     start = _next_business_day_10am_utc()
-    ics_content = generate_ics(customer_id, start)
+    ics_content = generate_ics(account_id, start)
 
     logger.info(
         "playbook_action_executed",
         extra={
             "user_id": tenant_id,
-            "customer_id": customer_id,
+            "account_id": account_id,
             "action_type": "schedule_success_review",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
@@ -244,7 +244,7 @@ def download_ics(
         content=ics_content,
         media_type="text/calendar",
         headers={
-            "Content-Disposition": f'attachment; filename="success_review_{customer_id}.ics"',
+            "Content-Disposition": f'attachment; filename="success_review_{account_id}.ics"',
         },
     )
 
@@ -253,7 +253,7 @@ def download_ics(
 # Playbook action logging endpoint
 # ---------------------------------------------------------------------------
 class PlaybookActionRequest(BaseModel):
-    customer_id: str
+    account_id: str
     action_type: str  # "generate_outreach" | "send_feature_training" | "escalate_to_sales"
 
 
@@ -267,7 +267,7 @@ def log_playbook_action(
         "playbook_action_executed",
         extra={
             "user_id": user_id,
-            "customer_id": req.customer_id,
+            "account_id": req.account_id,
             "action_type": req.action_type,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
