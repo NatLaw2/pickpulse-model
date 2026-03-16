@@ -121,7 +121,9 @@ export const api = {
 
   // Train
   train: (valFrac = 0.2) =>
-    request<TrainResponse>(`/train/${MOD}?val_frac=${valFrac}`, { method: 'POST' }),
+    request<TrainJobAccepted>(`/train/${MOD}?val_frac=${valFrac}`, { method: 'POST' }),
+  trainStatus: (jobId: string) =>
+    request<TrainJobStatus>(`/train/${MOD}/status/${jobId}`),
 
   // Evaluate
   evaluate: () => request<EvalMetrics>(`/evaluate/${MOD}`),
@@ -518,6 +520,23 @@ export interface TrainResponse {
   status: string;
   metadata: TrainMetadata;
   metrics: EvalMetrics | null;
+}
+
+/** Returned by POST /api/train when the job is accepted (202). */
+export interface TrainJobAccepted {
+  job_id: string;
+  status: 'pending';
+}
+
+/** Returned by GET /api/train/{module}/status/{job_id}. */
+export interface TrainJobStatus {
+  job_id: string;
+  status: 'pending' | 'running' | 'complete' | 'failed';
+  version_str: string | null;
+  metrics: EvalMetrics | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
 }
 
 export interface EvalMetrics {
