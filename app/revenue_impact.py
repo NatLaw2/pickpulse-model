@@ -117,12 +117,23 @@ def compute_revenue_impact(predictions: list, account_statuses: dict, is_demo: b
     total_revenue_impact = confirmed_saves + risk_reduction
     accounts_impacted = len(confirmed_ids | risk_reduced_ids)
 
+    # pending_history: real tenant with predictions loaded but no confirmed saves or
+    # risk reduction yet. Distinct from illustrative (demo) and from having no predictions
+    # at all. The frontend renders an explanatory empty state rather than a metric card.
+    pending_history = (
+        not is_demo
+        and not illustrative
+        and confirmed_saves == 0.0
+        and risk_reduction == 0.0
+        and len(predictions) > 0
+    )
+
     if illustrative:
         label = "Estimated ARR Protected"
         subtext = "Based on synthetic data and model-driven assumptions"
     else:
-        label = "Revenue Impact"
-        subtext = "Based on confirmed renewals and measured risk reduction"
+        label = "Confirmed ARR Retained"
+        subtext = "Accounts marked renewed by your team, confirmed against prediction data"
 
     return {
         "total_revenue_impact": round(total_revenue_impact, 2),
@@ -131,6 +142,7 @@ def compute_revenue_impact(predictions: list, account_statuses: dict, is_demo: b
         "accounts_impacted": accounts_impacted,
         "is_demo": is_demo,
         "illustrative": illustrative,
+        "pending_history": pending_history,
         "label": label,
         "subtext": subtext,
     }

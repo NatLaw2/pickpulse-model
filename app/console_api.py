@@ -10,6 +10,19 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
+
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if _SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=0.1,
+        environment=os.environ.get("ENVIRONMENT", "production"),
+    )
+
 logger = logging.getLogger("pickpulse.api")
 from pydantic import BaseModel as PydanticBaseModel
 
@@ -24,7 +37,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from .auth import get_tenant_id
+from .auth import get_tenant_id, _decode_token
 
 from .engine.config import MODULES, get_module, ModuleConfig
 from .engine.schema import validate_dataset, ValidationResult
@@ -63,6 +76,35 @@ app.include_router(outreach_router)
 app.include_router(explain_router)
 app.include_router(executive_summary_router)
 app.include_router(expansion_demo_router)
+
+
+# ---------------------------------------------------------------------------
+# Sentry tenant context middleware
+# Attaches the authenticated tenant_id to every Sentry event so errors can
+# be correlated with specific tenants in the Sentry dashboard.
+# ---------------------------------------------------------------------------
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+
+
+class _SentryTenantMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        # Best-effort: extract tenant from Authorization header without re-running full
+        # auth flow. If it fails, Sentry events still capture but lack tenant tag.
+        try:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                payload = _decode_token(auth_header[7:])
+                tenant_id = payload.get("sub", "unknown")
+                sentry_sdk.set_tag("tenant_id", tenant_id)
+        except Exception:
+            pass
+        return await call_next(request)
+
+
+if _SENTRY_DSN:
+    app.add_middleware(_SentryTenantMiddleware)
+
 
 # ---------------------------------------------------------------------------
 # Persistent dataset state — survives server restarts

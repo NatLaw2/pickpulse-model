@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Clock } from 'lucide-react';
 import { api, type RevenueImpactResponse } from '../lib/api';
 import { formatCurrency } from '../lib/format';
 
@@ -14,10 +14,29 @@ export function RevenueImpactCard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading || !data || data.total_revenue_impact === 0) return null;
+  if (loading || !data) return null;
+
+  // Real tenant with predictions loaded but no confirmed history yet — show pending state.
+  if (data.pending_history) {
+    return (
+      <div className="bg-white border border-[var(--color-border)] rounded-2xl px-6 py-4 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)] flex items-start gap-3">
+        <Clock size={14} className="text-[var(--color-text-muted)] mt-0.5 shrink-0" />
+        <div>
+          <p className="text-xs font-medium text-[var(--color-text-secondary)]">Confirmed ARR Retained</p>
+          <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+            This metric populates once accounts marked as actioned are tracked through renewal.
+            Mark at-risk accounts as renewed in the Accounts view to begin tracking.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // No data at all (no predictions loaded, real tenant) — show nothing.
+  if (!data.illustrative && data.total_revenue_impact === 0) return null;
 
   // Sub-metric labels differ between illustrative (demo) and real-data modes.
-  const savesLabel = data.illustrative ? 'Estimated Renewal Retention' : 'Confirmed Saves';
+  const savesLabel = data.illustrative ? 'Estimated Renewal Retention' : 'Confirmed Renewals';
   const reductionLabel = data.illustrative ? 'Estimated Risk Reduction' : 'Risk Reduction';
 
   return (

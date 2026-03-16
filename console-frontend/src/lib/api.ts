@@ -876,6 +876,9 @@ export interface RevenueImpactResponse {
   accounts_impacted: number;
   is_demo: boolean;
   illustrative: boolean;
+  /** True when real tenant has predictions but no confirmed saves or risk reduction yet.
+   *  Frontend renders an explanatory empty state rather than a metric card. */
+  pending_history: boolean;
   label: string;
   subtext: string;
 }
