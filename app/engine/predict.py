@@ -13,9 +13,21 @@ from .config import ModuleConfig
 from .features import prepare_features
 
 
-def load_model(module: ModuleConfig, tenant_id: str | None = None) -> Dict[str, Any]:
-    """Load trained model and feature metadata for a module."""
-    artifact_dir = module.get_artifact_dir(tenant_id)
+def load_model(
+    module: ModuleConfig,
+    tenant_id: str | None = None,
+    artifact_dir: str | None = None,
+) -> Dict[str, Any]:
+    """Load trained model and feature metadata for a module.
+
+    Args:
+        artifact_dir: Explicit path to the artifact directory. When provided,
+            overrides the path derived from tenant_id (used for versioned models
+            trained in PR 3A+). Callers should prefer passing this directly
+            rather than relying on the module+tenant_id derivation.
+    """
+    if artifact_dir is None:
+        artifact_dir = module.get_artifact_dir(tenant_id)
     model_path = os.path.join(artifact_dir, "model.joblib")
     meta_path = os.path.join(artifact_dir, "feature_meta.json")
     metadata_path = os.path.join(artifact_dir, "metadata.json")

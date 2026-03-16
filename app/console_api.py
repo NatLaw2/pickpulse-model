@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import shutil
+import threading
 import traceback
 import uuid
 from datetime import datetime, timezone
@@ -45,6 +46,7 @@ from .engine.sample_data import generate_churn_dataset, DEMO_GENERATORS
 from .engine.train import train_model
 from .engine.evaluate import evaluate_model, generate_pdf_report
 from .engine.predict import predict, load_model
+from .engine import store
 
 # Integration layer
 from .integrations.models import ConnectorConfig, ConnectorStatus
@@ -106,6 +108,12 @@ if _SENTRY_DSN:
     app.add_middleware(_SentryTenantMiddleware)
 
 
+@app.on_event("startup")
+async def _startup():
+    """Clean up jobs that were running when the previous process was killed."""
+    store.fail_stale_model_runs(older_than_minutes=60)
+
+
 # ---------------------------------------------------------------------------
 # Persistent dataset state — survives server restarts
 # On Render, DATA_DIR points to a persistent disk mount (e.g. /data).
@@ -136,57 +144,16 @@ def _load_persisted_datasets() -> Dict[str, Any]:
 
 
 def _save_persisted_datasets(datasets: Dict[str, Any]) -> None:
-    """Save dataset registry to disk."""
+    """Save dataset registry to disk (kept for backward-compat flush on first run)."""
     os.makedirs(os.path.dirname(DATASET_STATE_PATH) or ".", exist_ok=True)
     with open(DATASET_STATE_PATH, "w") as f:
         json.dump(datasets, f, indent=2)
 
 
-# TEMPORARY: flat-file persistence for predictions and account_statuses.
-# Prevents silent data loss on server restart until store.py (Phase 1) replaces
-# these files with Postgres-backed persistence. Do not extend this pattern.
-
-def _predictions_path(tenant_id: str) -> str:
-    return os.path.join(DATA_DIR, f".{tenant_id}_predictions.json")
-
-
-def _account_statuses_path(tenant_id: str) -> str:
-    return os.path.join(DATA_DIR, f".{tenant_id}_account_statuses.json")
-
-
-def _load_persisted_predictions(tenant_id: str) -> Dict[str, Any]:
-    path = _predictions_path(tenant_id)
-    if os.path.exists(path):
-        try:
-            with open(path) as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
-    return {}
-
-
-def _save_persisted_predictions(tenant_id: str, predictions: Dict[str, Any]) -> None:
-    with open(_predictions_path(tenant_id), "w") as f:
-        json.dump(predictions, f)
-
-
-def _load_persisted_account_statuses(tenant_id: str) -> Dict[str, Any]:
-    path = _account_statuses_path(tenant_id)
-    if os.path.exists(path):
-        try:
-            with open(path) as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
-    return {}
-
-
-def _save_persisted_account_statuses(tenant_id: str, statuses: Dict[str, Any]) -> None:
-    with open(_account_statuses_path(tenant_id), "w") as f:
-        json.dump(statuses, f)
-
-
-# Per-tenant in-memory state (with persistent dataset, predictions, and account_statuses layers)
+# Per-tenant in-memory state.
+# predictions and account_statuses are loaded from Supabase (store.py) on first
+# access. If Supabase is not configured, they start empty (local dev).
+# train_logs and metrics remain in-memory with fallback to _evaluation.json on disk.
 _tenant_state: Dict[str, Dict[str, Any]] = {}
 
 # Default tenant for backward compatibility during migration
@@ -194,30 +161,42 @@ _DEFAULT_TENANT = "00000000-0000-0000-0000-000000000000"
 
 
 def _get_state(tenant_id: str) -> Dict[str, Any]:
-    """Get or create per-tenant state."""
+    """Get or create per-tenant state, loading durable state from store on first access."""
     if tenant_id not in _tenant_state:
         _tenant_state[tenant_id] = {
-            "datasets": _load_persisted_datasets(),
+            "datasets": _load_persisted_datasets(),  # flat JSON, migrated to store below
             "train_logs": {},
             "metrics": {},
-            "predictions": _load_persisted_predictions(tenant_id),    # TEMPORARY
-            "account_statuses": _load_persisted_account_statuses(tenant_id),  # TEMPORARY
+            "predictions": {MODULE_NAME: store.get_predictions(tenant_id, MODULE_NAME)},
+            "account_statuses": store.get_account_statuses(tenant_id),
         }
     return _tenant_state[tenant_id]
 
 
 def _register_dataset(module_name: str, info: Dict[str, Any], tenant_id: str = _DEFAULT_TENANT) -> None:
-    """Register a dataset in both memory and on disk."""
+    """Register a dataset in memory, on disk, and in Supabase (store.py)."""
     state = _get_state(tenant_id)
     state["datasets"][module_name] = info
-    _save_persisted_datasets(state["datasets"])
+    _save_persisted_datasets(state["datasets"])  # flat JSON (backward compat, stays until Phase 3)
+    store.save_dataset(tenant_id, module_name, info)
+    store.log_action(tenant_id, "dataset.register", entity_id=module_name,
+                     metadata={"filename": info.get("name"), "rows": info.get("rows")})
 
 
 def _get_dataset(module_name: str, tenant_id: str = _DEFAULT_TENANT) -> Optional[Dict[str, Any]]:
-    """Get dataset info, validating the file still exists on disk."""
+    """Get dataset info, validating the file still exists on disk.
+
+    Checks the memory cache first (populated by _register_dataset or flat JSON),
+    then falls back to Supabase via store.get_current_dataset().
+    """
     state = _get_state(tenant_id)
     ds = state["datasets"].get(module_name)
-    if ds and os.path.exists(ds["path"]):
+    if not ds:
+        # Cache miss — try store (handles restarts before flat JSON is migrated)
+        ds = store.get_current_dataset(tenant_id, module_name)
+        if ds:
+            state["datasets"][module_name] = ds
+    if ds and ds.get("path") and os.path.exists(ds["path"]):
         return ds
     return None
 
@@ -592,40 +571,49 @@ def validate_current_dataset(module_name: str, tenant_id: str = Depends(get_tena
 
 
 # -----------------------------------------------------------------------
-# Training
+# Training — DB-backed job tracking with in-process worker execution
+#
+# The train endpoint returns 202 immediately with a job_id. A daemon thread
+# executes training in the background. Job lifecycle is tracked in the
+# model_runs table via store.py.
+#
+# NOTE: This architecture assumes a single process / single instance. If
+# Render is ever scaled to multiple dynos, replace the daemon thread with
+# dequeue semantics (worker picks up 'pending' rows from model_runs).
 # -----------------------------------------------------------------------
-@app.post("/api/train/{module_name}")
-def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str = Depends(get_tenant_id)):
-    mod = get_module(module_name)
-    ds = _get_dataset(module_name, tenant_id=tenant_id)
-    if not ds:
-        raise HTTPException(status_code=400, detail="No dataset loaded. Upload or load sample first.")
 
+def _execute_training_job(
+    tenant_id: str,
+    module_name: str,
+    run_id: str,
+    dataset_path: str,
+    val_frac: float,
+    artifact_dir: str,
+) -> None:
+    """Background worker — runs in a daemon thread. Updates model_run status."""
     try:
-        df = pd.read_csv(ds["path"])
+        store.update_model_run(
+            run_id,
+            status="running",
+            started_at=datetime.now(timezone.utc),
+        )
 
+        mod = get_module(module_name)
+        df = pd.read_csv(dataset_path)
         adapter = _get_adapter(module_name)
         if adapter:
             df = adapter.normalize_columns(df)
             df = adapter.add_derived_features(df)
 
-        # Block training if required columns are missing
-        from .engine.schema import validate_dataset
-        validation = validate_dataset(df, mod)
-        if not validation.valid:
-            raise HTTPException(
-                status_code=400,
-                detail="; ".join(validation.errors) or "Dataset failed validation. Check required columns.",
-            )
-
-        metadata = train_model(df, mod, val_frac=val_frac, tenant_id=tenant_id)
+        metadata = train_model(df, mod, val_frac=val_frac, tenant_id=tenant_id, run_id=run_id)
 
         if "error" in metadata:
-            raise HTTPException(status_code=400, detail=metadata.get("message", metadata["error"]))
+            raise RuntimeError(metadata.get("message", metadata["error"]))
 
-        state = _get_state(tenant_id)
         # Auto-evaluate on val split
+        state = _get_state(tenant_id)
         ts_col = mod.timestamp_column
+        metrics = None
         if ts_col in df.columns:
             df_sorted = df.copy()
             df_sorted["_ts"] = pd.to_datetime(df_sorted[ts_col], errors="coerce")
@@ -637,28 +625,100 @@ def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str 
             if len(val_df) >= 10:
                 metrics = evaluate_model(val_df, mod, tenant_id=tenant_id)
                 state["metrics"][module_name] = metrics
-                # Persist to disk so evaluate endpoint survives server restarts
                 eval_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_evaluation.json")
                 with open(eval_path, "w") as ef:
                     json.dump(metrics, ef, indent=2)
-        elif metadata.get("val_metrics"):
-            state["metrics"][module_name] = metadata["val_metrics"]
-            # Persist fallback metrics too
+        if metrics is None and metadata.get("val_metrics"):
+            metrics = metadata["val_metrics"]
+            state["metrics"][module_name] = metrics
             eval_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_evaluation.json")
             with open(eval_path, "w") as ef:
-                json.dump(metadata["val_metrics"], ef, indent=2)
+                json.dump(metrics, ef, indent=2)
 
-        return {
-            "status": "trained",
-            "metadata": metadata,
-            "metrics": state["metrics"].get(module_name),
-        }
+        # Mark complete and promote to current version
+        store.update_model_run(
+            run_id,
+            status="complete",
+            version_str=metadata.get("version"),
+            metrics_json=metrics or metadata.get("val_metrics"),
+            artifact_path=artifact_dir,
+            completed_at=datetime.now(timezone.utc),
+        )
+        store.set_current_model_run(tenant_id, module_name, run_id)
+        store.log_action(tenant_id, "model.train_complete", entity_id=run_id,
+                         metadata={"version": metadata.get("version"),
+                                   "artifact_path": artifact_dir})
 
+    except Exception as exc:
+        traceback.print_exc()
+        store.update_model_run(
+            run_id,
+            status="failed",
+            error_message=str(exc),
+            completed_at=datetime.now(timezone.utc),
+        )
+        sentry_sdk.capture_exception(exc)
+
+
+@app.post("/api/train/{module_name}", status_code=202)
+def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str = Depends(get_tenant_id)):
+    """Start a training job. Returns 202 immediately with job_id; poll /status for progress."""
+    mod = get_module(module_name)
+    ds = _get_dataset(module_name, tenant_id=tenant_id)
+    if not ds:
+        raise HTTPException(status_code=400, detail="No dataset loaded. Upload or load sample first.")
+
+    # Validate dataset before kicking off background job (fast, synchronous)
+    try:
+        df_check = pd.read_csv(ds["path"])
+        adapter = _get_adapter(module_name)
+        if adapter:
+            df_check = adapter.normalize_columns(df_check)
+            df_check = adapter.add_derived_features(df_check)
+        from .engine.schema import validate_dataset
+        validation = validate_dataset(df_check, mod)
+        if not validation.valid:
+            raise HTTPException(
+                status_code=400,
+                detail="; ".join(validation.errors) or "Dataset failed validation. Check required columns.",
+            )
     except HTTPException:
         raise
     except Exception as e:
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+    run_id = str(uuid.uuid4())
+    artifact_dir = mod.get_artifact_dir(tenant_id, run_id=run_id)
+    store.create_model_run(tenant_id, module_name, run_id, artifact_dir)
+    store.log_action(tenant_id, "model.train_start", entity_id=run_id,
+                     metadata={"module": module_name, "val_frac": val_frac})
+
+    threading.Thread(
+        target=_execute_training_job,
+        args=(tenant_id, module_name, run_id, ds["path"], val_frac, artifact_dir),
+        daemon=True,
+        name=f"train-{run_id[:8]}",
+    ).start()
+
+    return {"job_id": run_id, "status": "pending"}
+
+
+@app.get("/api/train/{module_name}/status/{job_id}")
+def training_job_status(module_name: str, job_id: str, tenant_id: str = Depends(get_tenant_id)):
+    """Poll training job status. Returns status + metrics when complete."""
+    get_module(module_name)  # validate module
+    run = store.get_model_run(job_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Training job not found.")
+    return {
+        "job_id": job_id,
+        "status": run.get("status"),
+        "version_str": run.get("version_str"),
+        "metrics": run.get("metrics_json"),
+        "error_message": run.get("error_message"),
+        "started_at": run.get("started_at"),
+        "completed_at": run.get("completed_at"),
+    }
 
 
 # -----------------------------------------------------------------------
@@ -722,10 +782,19 @@ def predict_module(
 ):
     """Generate predictions on the loaded dataset."""
     mod = get_module(module_name)
-    artifact_dir = mod.get_artifact_dir(tenant_id)
     ds = _get_dataset(module_name, tenant_id=tenant_id)
     if not ds:
         raise HTTPException(status_code=400, detail="No dataset loaded.")
+
+    # Resolve artifact directory: versioned path from model_runs (PR 3A+) with
+    # backward-compatible fallback to the flat per-tenant+module path.
+    current_run = store.get_current_model_run(tenant_id, module_name)
+    if current_run and current_run.get("artifact_path"):
+        artifact_dir = current_run["artifact_path"]
+        run_id = current_run.get("id")
+    else:
+        artifact_dir = mod.get_artifact_dir(tenant_id)  # legacy fallback
+        run_id = None
 
     if not os.path.exists(os.path.join(artifact_dir, "model.joblib")):
         raise HTTPException(status_code=400, detail="No trained model. Train first.")
@@ -737,7 +806,8 @@ def predict_module(
             df = adapter.normalize_columns(df)
             df = adapter.add_derived_features(df)
 
-        scored = predict(df, mod, tenant_id=tenant_id)
+        artifacts = load_model(mod, artifact_dir=artifact_dir)
+        scored = predict(df, mod, artifacts=artifacts)
 
         state = _get_state(tenant_id)
         # Apply any manual status overrides
@@ -773,7 +843,7 @@ def predict_module(
 
         records = scored_display[display_cols].head(limit).to_dict(orient="records")
         state["predictions"][module_name] = records
-        _save_persisted_predictions(tenant_id, state["predictions"])  # TEMPORARY
+        store.save_predictions(tenant_id, module_name, run_id or "", records)
 
         # Tier counts (from full active set)
         tier_counts = scored_display["tier"].value_counts().to_dict()
@@ -883,7 +953,9 @@ def update_account_status(account_id: str, status: str = Query(...), tenant_id: 
 
     state = _get_state(tenant_id)
     state["account_statuses"][account_id] = status
-    _save_persisted_account_statuses(tenant_id, state["account_statuses"])  # TEMPORARY
+    store.update_account_status(tenant_id, account_id, status)
+    store.log_action(tenant_id, "account.status_change", entity_id=account_id,
+                     metadata={"status": status})
     return {"account_id": account_id, "status": status}
 
 

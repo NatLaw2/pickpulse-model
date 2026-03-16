@@ -20,6 +20,7 @@ def train_model(
     val_frac: float = 0.2,
     model_type: str = "auto",
     tenant_id: str | None = None,
+    run_id: str | None = None,
 ) -> Dict[str, Any]:
     """Train a binary classifier for the given module.
 
@@ -160,8 +161,10 @@ def train_model(
     for f in importance[:10]:
         print(f"  {f['feature']:30s}  importance={f['importance']:+.5f}")
 
-    # Save artifacts
-    artifact_dir = module.get_artifact_dir(tenant_id)
+    # Save artifacts — write to a versioned subdirectory when run_id is supplied.
+    # Pre-3A models (no run_id) continue to use the flat per-tenant+module path
+    # so that prediction loading is backward compatible.
+    artifact_dir = module.get_artifact_dir(tenant_id, run_id=run_id)
     os.makedirs(artifact_dir, exist_ok=True)
 
     model_path = os.path.join(artifact_dir, "model.joblib")
