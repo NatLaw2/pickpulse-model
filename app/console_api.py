@@ -589,6 +589,7 @@ def _execute_training_job(
     dataset_path: str,
     val_frac: float,
     artifact_dir: str,
+    version_str: str,
 ) -> None:
     """Background worker — runs in a daemon thread. Updates model_run status."""
     try:
@@ -605,7 +606,8 @@ def _execute_training_job(
             df = adapter.normalize_columns(df)
             df = adapter.add_derived_features(df)
 
-        metadata = train_model(df, mod, val_frac=val_frac, tenant_id=tenant_id, run_id=run_id)
+        metadata = train_model(df, mod, val_frac=val_frac, tenant_id=tenant_id, run_id=run_id,
+                               version_str=version_str)
 
         if "error" in metadata:
             raise RuntimeError(metadata.get("message", metadata["error"]))
@@ -690,12 +692,22 @@ def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str 
     run_id = str(uuid.uuid4())
     artifact_dir = mod.get_artifact_dir(tenant_id, run_id=run_id)
     store.create_model_run(tenant_id, module_name, run_id, artifact_dir)
+
+    # Derive version string from durable run history before spawning the thread.
+    # Only completed runs count; failed/pending runs do not consume a version number.
+    completed_count = sum(
+        1 for r in store.list_model_runs(tenant_id, module_name)
+        if r.get("status") == "complete"
+    )
+    version_str = f"{module_name}_v{completed_count + 1}"
+
     store.log_action(tenant_id, "model.train_start", entity_id=run_id,
-                     metadata={"module": module_name, "val_frac": val_frac})
+                     metadata={"module": module_name, "val_frac": val_frac,
+                                "version_str": version_str})
 
     threading.Thread(
         target=_execute_training_job,
-        args=(tenant_id, module_name, run_id, ds["path"], val_frac, artifact_dir),
+        args=(tenant_id, module_name, run_id, ds["path"], val_frac, artifact_dir, version_str),
         daemon=True,
         name=f"train-{run_id[:8]}",
     ).start()
@@ -707,7 +719,7 @@ def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str 
 def training_job_status(module_name: str, job_id: str, tenant_id: str = Depends(get_tenant_id)):
     """Poll training job status. Returns status + metrics when complete."""
     get_module(module_name)  # validate module
-    run = store.get_model_run(job_id)
+    run = store.get_model_run(job_id, tenant_id=tenant_id)
     if not run:
         raise HTTPException(status_code=404, detail="Training job not found.")
     return {
@@ -728,7 +740,6 @@ def training_job_status(module_name: str, job_id: str, tenant_id: str = Depends(
 def get_evaluation(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
     state = _get_state(tenant_id)
-    artifact_dir = mod.get_artifact_dir(tenant_id)
     metrics = state["metrics"].get(module_name)
 
     if not metrics:
@@ -739,6 +750,13 @@ def get_evaluation(module_name: str, tenant_id: str = Depends(get_tenant_id)):
             state["metrics"][module_name] = metrics
 
     if not metrics:
+        # Resolve artifact dir from current model run (post-3A versioned path)
+        # with legacy fallback for models trained before PR 3A.
+        current_run = store.get_current_model_run(tenant_id, module_name)
+        if current_run and current_run.get("artifact_path"):
+            artifact_dir = current_run["artifact_path"]
+        else:
+            artifact_dir = mod.get_artifact_dir(tenant_id)  # legacy fallback
         meta_path = os.path.join(artifact_dir, "metadata.json")
         if os.path.exists(meta_path):
             with open(meta_path) as f:
@@ -953,7 +971,7 @@ def update_account_status(account_id: str, status: str = Query(...), tenant_id: 
 
     state = _get_state(tenant_id)
     state["account_statuses"][account_id] = status
-    store.update_account_status(tenant_id, account_id, status)
+    store.update_account_status(tenant_id, account_id, status, module=MODULE_NAME)
     store.log_action(tenant_id, "account.status_change", entity_id=account_id,
                      metadata={"status": status})
     return {"account_id": account_id, "status": status}

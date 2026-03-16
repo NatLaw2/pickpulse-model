@@ -95,8 +95,8 @@ def save_dataset(tenant_id: str, module: str, info: Dict[str, Any]) -> None:
             "filename": info.get("name"),
             "raw_path": info.get("path"),
             "readiness_mode": info.get("readiness_mode"),
-            "source_columns": json.dumps(info.get("source_columns", [])),
-            "confirmed_mappings": json.dumps(info.get("confirmed_mappings", {})),
+            "source_columns": info.get("source_columns", []),
+            "confirmed_mappings": info.get("confirmed_mappings", {}),
             "is_current": True,
             "registered_at": _now_iso(),
         }).execute()
@@ -171,13 +171,14 @@ def update_model_run(run_id: str, **fields: Any) -> None:
     if not _available():
         return
     try:
-        # Convert non-serializable values (datetime → ISO string)
+        # Convert non-serializable values (datetime → ISO string).
+        # dict/list values are passed as-is; supabase-py serialises them to
+        # JSONB natively.  Wrapping with json.dumps() would produce a
+        # string-inside-JSONB which is not queryable.
         payload: Dict[str, Any] = {}
         for k, v in fields.items():
             if isinstance(v, datetime):
                 payload[k] = v.isoformat()
-            elif isinstance(v, (dict, list)):
-                payload[k] = json.dumps(v)
             else:
                 payload[k] = v
         _db().table("model_runs").update(payload).eq("id", run_id).execute()
@@ -185,12 +186,19 @@ def update_model_run(run_id: str, **fields: Any) -> None:
         logger.warning("[store] update_model_run failed: %s", exc)
 
 
-def get_model_run(run_id: str) -> Optional[Dict[str, Any]]:
-    """Return a single model_run row by id, or None."""
+def get_model_run(run_id: str, tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Return a single model_run row by id, or None.
+
+    When tenant_id is provided the query filters by both id AND tenant_id, so a
+    caller can never retrieve a run that belongs to a different tenant.
+    """
     if not _available():
         return None
     try:
-        resp = _db().table("model_runs").select("*").eq("id", run_id).limit(1).execute()
+        q = _db().table("model_runs").select("*").eq("id", run_id)
+        if tenant_id is not None:
+            q = q.eq("tenant_id", tenant_id)
+        resp = q.limit(1).execute()
         return resp.data[0] if resp.data else None
     except Exception as exc:
         logger.warning("[store] get_model_run failed: %s", exc)
@@ -218,15 +226,20 @@ def get_current_model_run(tenant_id: str, module: str) -> Optional[Dict[str, Any
 
 
 def set_current_model_run(tenant_id: str, module: str, run_id: str) -> None:
-    """Flip is_current: True on run_id, False on all other runs for tenant+module."""
+    """Flip is_current: True on run_id, False on all other runs for tenant+module.
+
+    Order is deliberate: promote the new run first, then demote the old one.
+    This means any predict call landing between the two updates uses the new
+    model (correct behaviour) rather than finding no current model at all.
+    """
     if not _available():
         return
     try:
         db = _db()
+        db.table("model_runs").update({"is_current": True}).eq("id", run_id).execute()
         db.table("model_runs").update({"is_current": False}).eq(
             "tenant_id", tenant_id
-        ).eq("module", module).eq("is_current", True).execute()
-        db.table("model_runs").update({"is_current": True}).eq("id", run_id).execute()
+        ).eq("module", module).eq("is_current", True).neq("id", run_id).execute()
     except Exception as exc:
         logger.warning("[store] set_current_model_run failed: %s", exc)
 
@@ -251,32 +264,63 @@ def list_model_runs(tenant_id: str, module: str) -> List[Dict[str, Any]]:
 
 
 def fail_stale_model_runs(older_than_minutes: int = 60) -> None:
-    """Mark any model_run still 'running' from a previous process as 'failed'.
+    """Mark abandoned training jobs as failed at application startup.
 
-    Call at application startup to clean up jobs that were abandoned when the
-    previous process was killed (e.g. by a Render deploy).
+    Handles two abandoned states:
+
+    1. status=running, older than older_than_minutes — the training thread was
+       executing when the process was killed. Use a long threshold (default 60 min)
+       to avoid failing legitimately long-running jobs.
+
+    2. status=pending, older than 5 minutes — the job row was created but the
+       daemon thread was never spawned (process died between create_model_run and
+       Thread.start). A pending job that is still pending after 5 minutes is
+       definitively orphaned.
+
+    Call at application startup only.
     """
     if not _available():
         return
+    db = _db()
+    now = datetime.now(timezone.utc)
+
+    # --- running jobs abandoned mid-execution ---
     try:
-        cutoff = (
-            datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
-        ).isoformat()
+        running_cutoff = (now - timedelta(minutes=older_than_minutes)).isoformat()
         resp = (
-            _db().table("model_runs")
+            db.table("model_runs")
             .update({
                 "status": "failed",
                 "error_message": "Process was killed before this job completed (stale cleanup at startup)",
                 "completed_at": _now_iso(),
             })
             .eq("status", "running")
-            .lt("started_at", cutoff)
+            .lt("started_at", running_cutoff)
             .execute()
         )
         if resp.data:
-            logger.info("[store] Marked %d stale model_run(s) as failed", len(resp.data))
+            logger.info("[store] Marked %d stale running model_run(s) as failed", len(resp.data))
     except Exception as exc:
-        logger.warning("[store] fail_stale_model_runs failed: %s", exc)
+        logger.warning("[store] fail_stale_model_runs (running) failed: %s", exc)
+
+    # --- pending jobs whose thread was never spawned ---
+    try:
+        pending_cutoff = (now - timedelta(minutes=5)).isoformat()
+        resp = (
+            db.table("model_runs")
+            .update({
+                "status": "failed",
+                "error_message": "Job was never picked up — process likely died before thread could start (stale cleanup at startup)",
+                "completed_at": _now_iso(),
+            })
+            .eq("status", "pending")
+            .lt("trained_at", pending_cutoff)
+            .execute()
+        )
+        if resp.data:
+            logger.info("[store] Marked %d orphaned pending model_run(s) as failed", len(resp.data))
+    except Exception as exc:
+        logger.warning("[store] fail_stale_model_runs (pending) failed: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +359,7 @@ def save_predictions(
                 if "churn_risk_pct" in rec
                 else float(rec.get("probability") or 0),
                 "confidence_tier": rec.get("tier"),
-                "prediction_json": json.dumps(rec),
+                "prediction_json": rec,
                 "predicted_at": _now_iso(),
             })
         if rows:
@@ -340,6 +384,7 @@ def get_predictions(tenant_id: str, module: str) -> List[Dict[str, Any]]:
             .select("account_id, score, confidence_tier, status, status_changed_at, prediction_json")
             .eq("tenant_id", tenant_id)
             .eq("module", module)
+            .not_.is_("score", "null")   # exclude status-only placeholder rows
             .order("score", desc=True)
             .execute()
         )
@@ -357,15 +402,33 @@ def get_predictions(tenant_id: str, module: str) -> List[Dict[str, Any]]:
         return []
 
 
-def update_account_status(tenant_id: str, account_id: str, status: str) -> None:
-    """Update the CSM status for a single account in predictions_live."""
+def update_account_status(
+    tenant_id: str,
+    account_id: str,
+    status: str,
+    module: str = "churn",
+) -> None:
+    """Upsert the CSM status for a single account in predictions_live.
+
+    Uses upsert on the (tenant_id, module, account_id) unique constraint so that
+    a status write before predictions are run creates a minimal placeholder row
+    rather than silently no-oping.  The placeholder row has an empty prediction_json
+    ({}) which is the column's DEFAULT — it will be overwritten on the next predict
+    run via save_predictions upsert.
+    """
     if not _available():
         return
     try:
-        _db().table("predictions_live").update({
-            "status": status,
-            "status_changed_at": _now_iso(),
-        }).eq("tenant_id", tenant_id).eq("account_id", account_id).execute()
+        _db().table("predictions_live").upsert(
+            {
+                "tenant_id": tenant_id,
+                "module": module,
+                "account_id": account_id,
+                "status": status,
+                "status_changed_at": _now_iso(),
+            },
+            on_conflict="tenant_id,module,account_id",
+        ).execute()
     except Exception as exc:
         logger.warning("[store] update_account_status failed: %s", exc)
 
@@ -408,7 +471,7 @@ def log_action(
             "user_id": user_id,
             "action": action,
             "entity_id": entity_id,
-            "metadata_json": json.dumps(metadata or {}),
+            "metadata_json": metadata or {},
             "created_at": _now_iso(),
         }).execute()
     except Exception as exc:

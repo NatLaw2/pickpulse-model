@@ -21,6 +21,7 @@ def train_model(
     model_type: str = "auto",
     tenant_id: str | None = None,
     run_id: str | None = None,
+    version_str: str | None = None,
 ) -> Dict[str, Any]:
     """Train a binary classifier for the given module.
 
@@ -180,19 +181,24 @@ def train_model(
     with open(feature_meta_path, "w") as f:
         json.dump(serializable_meta, f, indent=2)
 
-    # Model versioning — increment from previous version
-    version_num = 1
-    prev_meta_path = os.path.join(artifact_dir, "metadata.json")
-    if os.path.exists(prev_meta_path):
-        try:
-            with open(prev_meta_path) as f:
-                prev = json.load(f)
-            prev_ver = prev.get("version", f"{module.name}_v0")
-            prev_num = int(prev_ver.rsplit("_v", 1)[-1])
-            version_num = prev_num + 1
-        except (ValueError, KeyError, json.JSONDecodeError):
-            pass
-    version_str = f"{module.name}_v{version_num}"
+    # Model versioning — use caller-supplied version_str when available (preferred
+    # path post-PR-3A: console_api derives this from model_runs history before
+    # spawning the training thread, ensuring correct sequential numbering across
+    # restarts).  Fall back to file-based counter only when called directly
+    # without store context (e.g. CLI / tests).
+    if version_str is None:
+        version_num = 1
+        prev_meta_path = os.path.join(artifact_dir, "metadata.json")
+        if os.path.exists(prev_meta_path):
+            try:
+                with open(prev_meta_path) as f:
+                    prev = json.load(f)
+                prev_ver = prev.get("version", f"{module.name}_v0")
+                prev_num = int(prev_ver.rsplit("_v", 1)[-1])
+                version_num = prev_num + 1
+            except (ValueError, KeyError, json.JSONDecodeError):
+                pass
+        version_str = f"{module.name}_v{version_num}"
     print(f"[train] Version: {version_str}")
 
     metadata = {
