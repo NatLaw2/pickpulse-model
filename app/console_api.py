@@ -142,7 +142,51 @@ def _save_persisted_datasets(datasets: Dict[str, Any]) -> None:
         json.dump(datasets, f, indent=2)
 
 
-# Per-tenant in-memory state (with persistent dataset layer)
+# TEMPORARY: flat-file persistence for predictions and account_statuses.
+# Prevents silent data loss on server restart until store.py (Phase 1) replaces
+# these files with Postgres-backed persistence. Do not extend this pattern.
+
+def _predictions_path(tenant_id: str) -> str:
+    return os.path.join(DATA_DIR, f".{tenant_id}_predictions.json")
+
+
+def _account_statuses_path(tenant_id: str) -> str:
+    return os.path.join(DATA_DIR, f".{tenant_id}_account_statuses.json")
+
+
+def _load_persisted_predictions(tenant_id: str) -> Dict[str, Any]:
+    path = _predictions_path(tenant_id)
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+
+def _save_persisted_predictions(tenant_id: str, predictions: Dict[str, Any]) -> None:
+    with open(_predictions_path(tenant_id), "w") as f:
+        json.dump(predictions, f)
+
+
+def _load_persisted_account_statuses(tenant_id: str) -> Dict[str, Any]:
+    path = _account_statuses_path(tenant_id)
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+
+def _save_persisted_account_statuses(tenant_id: str, statuses: Dict[str, Any]) -> None:
+    with open(_account_statuses_path(tenant_id), "w") as f:
+        json.dump(statuses, f)
+
+
+# Per-tenant in-memory state (with persistent dataset, predictions, and account_statuses layers)
 _tenant_state: Dict[str, Dict[str, Any]] = {}
 
 # Default tenant for backward compatibility during migration
@@ -156,8 +200,8 @@ def _get_state(tenant_id: str) -> Dict[str, Any]:
             "datasets": _load_persisted_datasets(),
             "train_logs": {},
             "metrics": {},
-            "predictions": {},
-            "account_statuses": {},
+            "predictions": _load_persisted_predictions(tenant_id),    # TEMPORARY
+            "account_statuses": _load_persisted_account_statuses(tenant_id),  # TEMPORARY
         }
     return _tenant_state[tenant_id]
 
@@ -729,6 +773,7 @@ def predict_module(
 
         records = scored_display[display_cols].head(limit).to_dict(orient="records")
         state["predictions"][module_name] = records
+        _save_persisted_predictions(tenant_id, state["predictions"])  # TEMPORARY
 
         # Tier counts (from full active set)
         tier_counts = scored_display["tier"].value_counts().to_dict()
@@ -836,7 +881,9 @@ def update_account_status(account_id: str, status: str = Query(...), tenant_id: 
     if status not in valid:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid}")
 
-    _get_state(tenant_id)["account_statuses"][account_id] = status
+    state = _get_state(tenant_id)
+    state["account_statuses"][account_id] = status
+    _save_persisted_account_statuses(tenant_id, state["account_statuses"])  # TEMPORARY
     return {"account_id": account_id, "status": status}
 
 
