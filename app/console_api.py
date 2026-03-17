@@ -176,6 +176,7 @@ def _get_state(tenant_id: str) -> Dict[str, Any]:
             "metrics": {},
             "predictions": {MODULE_NAME: store.get_predictions(tenant_id, MODULE_NAME)},
             "account_statuses": store.get_account_statuses(tenant_id),
+            "model_runs": {},  # in-memory fallback when Supabase writes are unavailable
         }
     return _tenant_state[tenant_id]
 
@@ -606,12 +607,17 @@ def _execute_training_job(
     version_str: str,
 ) -> None:
     """Background worker — runs in a daemon thread. Updates model_run status."""
+
+    def _update_mem(run_id: str, **fields) -> None:
+        """Mirror a status update into in-memory state (always succeeds)."""
+        mem = _get_state(tenant_id).get("model_runs", {}).get(run_id)
+        if mem is not None:
+            mem.update(fields)
+
     try:
-        store.update_model_run(
-            run_id,
-            status="running",
-            started_at=datetime.now(timezone.utc),
-        )
+        started = datetime.now(timezone.utc)
+        store.update_model_run(run_id, status="running", started_at=started)
+        _update_mem(run_id, status="running", started_at=started.isoformat())
 
         mod = get_module(module_name)
         df = pd.read_csv(dataset_path)
@@ -652,14 +658,18 @@ def _execute_training_job(
                 json.dump(metrics, ef, indent=2)
 
         # Mark complete and promote to current version
+        completed = datetime.now(timezone.utc)
+        final_metrics = metrics or metadata.get("val_metrics")
         store.update_model_run(
             run_id,
             status="complete",
             version_str=metadata.get("version"),
-            metrics_json=metrics or metadata.get("val_metrics"),
+            metrics_json=final_metrics,
             artifact_path=artifact_dir,
-            completed_at=datetime.now(timezone.utc),
+            completed_at=completed,
         )
+        _update_mem(run_id, status="complete", version_str=metadata.get("version"),
+                    metrics_json=final_metrics, completed_at=completed.isoformat())
         store.set_current_model_run(tenant_id, module_name, run_id)
         store.log_action(tenant_id, "model.train_complete", entity_id=run_id,
                          metadata={"version": metadata.get("version"),
@@ -667,12 +677,15 @@ def _execute_training_job(
 
     except Exception as exc:
         traceback.print_exc()
+        failed_at = datetime.now(timezone.utc)
         store.update_model_run(
             run_id,
             status="failed",
             error_message=str(exc),
-            completed_at=datetime.now(timezone.utc),
+            completed_at=failed_at,
         )
+        _update_mem(run_id, status="failed", error_message=str(exc),
+                    completed_at=failed_at.isoformat())
         sentry_sdk.capture_exception(exc)
 
 
@@ -707,6 +720,15 @@ def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str 
     artifact_dir = mod.get_artifact_dir(tenant_id, run_id=run_id)
     store.create_model_run(tenant_id, module_name, run_id, artifact_dir)
 
+    # Mirror to in-memory state so the status endpoint works even when the
+    # Supabase insert above fails silently (e.g. env vars not set on demo server).
+    _get_state(tenant_id)["model_runs"][run_id] = {
+        "id": run_id, "tenant_id": tenant_id, "module": module_name,
+        "status": "pending", "trained_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": None, "completed_at": None,
+        "version_str": None, "metrics_json": None, "error_message": None,
+    }
+
     # Derive version string from durable run history before spawning the thread.
     # Only completed runs count; failed/pending runs do not consume a version number.
     completed_count = sum(
@@ -734,6 +756,10 @@ def training_job_status(module_name: str, job_id: str, tenant_id: str = Depends(
     """Poll training job status. Returns status + metrics when complete."""
     get_module(module_name)  # validate module
     run = store.get_model_run(job_id, tenant_id=tenant_id)
+    if not run:
+        # Fall back to in-memory state — covers the case where create_model_run
+        # failed silently (Supabase env vars absent or connection error).
+        run = _get_state(tenant_id).get("model_runs", {}).get(job_id)
     if not run:
         raise HTTPException(status_code=404, detail="Training job not found.")
 
