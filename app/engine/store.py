@@ -22,6 +22,8 @@ Model runs:
 Predictions:
     save_predictions(tenant_id, module, run_id, records)
     get_predictions(tenant_id, module) -> list[dict]
+    get_prediction_for_account(tenant_id, module, account_id) -> dict | None
+    patch_prediction_json(tenant_id, module, account_id, patch)
     update_account_status(tenant_id, account_id, status)
     get_account_statuses(tenant_id) -> dict[str, str]
 
@@ -431,6 +433,92 @@ def update_account_status(
         ).execute()
     except Exception as exc:
         logger.warning("[store] update_account_status failed: %s", exc)
+
+
+def get_prediction_for_account(
+    tenant_id: str,
+    module: str,
+    account_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Return the full prediction_json for a single account, or None."""
+    if not _available():
+        return None
+    try:
+        resp = (
+            _db().table("predictions_live")
+            .select("prediction_json, score, confidence_tier, status")
+            .eq("tenant_id", tenant_id)
+            .eq("module", module)
+            .eq("account_id", account_id)
+            .not_.is_("score", "null")
+            .limit(1)
+            .execute()
+        )
+        if not resp.data:
+            return None
+        row = resp.data[0]
+        rec = row.get("prediction_json") or {}
+        if isinstance(rec, str):
+            import json as _json
+            rec = _json.loads(rec)
+        rec["_account_status"] = row.get("status", "none")
+        return rec
+    except Exception as exc:
+        logger.warning("[store] get_prediction_for_account failed: %s", exc)
+        return None
+
+
+def patch_prediction_json(
+    tenant_id: str,
+    module: str,
+    account_id: str,
+    patch: Dict[str, Any],
+) -> None:
+    """Merge patch dict into the existing prediction_json JSONB for an account.
+
+    Uses Postgres || operator via a raw RPC to avoid a read-modify-write cycle.
+    Falls back to a Python-side read-then-write when the RPC is unavailable.
+    """
+    if not _available():
+        return
+    try:
+        db = _db()
+        # Attempt server-side merge using Postgres jsonb concatenation via rpc
+        db.rpc(
+            "patch_prediction_json",
+            {
+                "p_tenant_id": tenant_id,
+                "p_module": module,
+                "p_account_id": account_id,
+                "p_patch": patch,
+            },
+        ).execute()
+    except Exception:
+        # Fallback: Python-side read-modify-write
+        try:
+            db = _db()
+            resp = (
+                db.table("predictions_live")
+                .select("prediction_json")
+                .eq("tenant_id", tenant_id)
+                .eq("module", module)
+                .eq("account_id", account_id)
+                .limit(1)
+                .execute()
+            )
+            existing: Dict[str, Any] = {}
+            if resp.data:
+                raw = resp.data[0].get("prediction_json") or {}
+                if isinstance(raw, str):
+                    import json as _json
+                    raw = _json.loads(raw)
+                existing = dict(raw)
+            existing.update(patch)
+            db.table("predictions_live").update(
+                {"prediction_json": existing}
+            ).eq("tenant_id", tenant_id).eq("module", module).eq("account_id", account_id).execute()
+        except Exception as exc2:
+            logger.warning("[store] patch_prediction_json fallback failed: %s", exc2)
 
 
 def get_account_statuses(tenant_id: str) -> Dict[str, str]:

@@ -63,6 +63,11 @@ from .explain import router as explain_router
 from .executive_summary import router as executive_summary_router
 from .revenue_impact import compute_revenue_impact
 from .expansion_demo import router as expansion_demo_router
+try:
+    from .hubspot_card import router as hubspot_card_router
+    _hubspot_card_available = True
+except Exception:
+    _hubspot_card_available = False
 
 app = FastAPI(title="Churn Risk Engine", version="1.0.0")
 
@@ -78,6 +83,8 @@ app.include_router(outreach_router)
 app.include_router(explain_router)
 app.include_router(executive_summary_router)
 app.include_router(expansion_demo_router)
+if _hubspot_card_available:
+    app.include_router(hubspot_card_router)
 
 
 # ---------------------------------------------------------------------------
@@ -789,6 +796,94 @@ def generate_report(module_name: str, tenant_id: str = Depends(get_tenant_id)):
 
 
 # -----------------------------------------------------------------------
+# HubSpot write-back
+# -----------------------------------------------------------------------
+
+def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> None:
+    """Push scored predictions to HubSpot company properties + create tasks.
+
+    Runs in a daemon thread — failures are logged and silently swallowed so
+    they never break the predict response to the user.
+
+    Flow:
+      1. Look up the tenant's HubSpot integration (skip if not connected).
+      2. Ensure PickPulse custom properties exist (idempotent).
+      3. Batch-update company properties for all scored accounts.
+      4. Create tasks for high-risk accounts that don't already have one.
+      5. Persist the task_id back into prediction_json so we don't duplicate.
+    """
+    if not integration_service:
+        return
+    try:
+        hs_integration = integration_service.get_integration(
+            tenant_id=tenant_id, provider="hubspot"
+        )
+        if not hs_integration or hs_integration.get("status") != "active":
+            return
+
+        from app.integrations.registry import get_connector_for_integration
+        connector = get_connector_for_integration(hs_integration["id"])
+        if not connector:
+            return
+
+        # Ensure custom properties exist in this tenant's portal
+        connector.ensure_churn_properties()
+
+        # Push scores for all accounts
+        pushed = connector.push_churn_scores(records)
+        logger.info("[writeback] Pushed %d churn scores to HubSpot for tenant %s", pushed, tenant_id)
+
+        # Create tasks for high-risk, renewal-window accounts
+        tasks_created = 0
+        for rec in records:
+            try:
+                churn_risk_pct = float(rec.get("churn_risk_pct") or 0)
+                from app.integrations.hubspot import TASK_RISK_THRESHOLD, TASK_RENEWAL_WINDOW_DAYS
+                if churn_risk_pct < TASK_RISK_THRESHOLD:
+                    continue
+                days_renewal = rec.get("days_until_renewal")
+                if days_renewal is not None:
+                    try:
+                        if float(days_renewal) > TASK_RENEWAL_WINDOW_DAYS:
+                            continue
+                    except (TypeError, ValueError):
+                        pass
+
+                # Skip if task already created
+                if rec.get("hs_task_id"):
+                    continue
+
+                task_id = connector.create_task(rec)
+                if task_id:
+                    store.patch_prediction_json(
+                        tenant_id, MODULE_NAME,
+                        str(rec.get("account_id", "")),
+                        {"hs_task_id": task_id},
+                    )
+                    tasks_created += 1
+            except Exception as exc:
+                logger.warning("[writeback] Task creation failed for account %s: %s",
+                               rec.get("account_id"), exc)
+
+        if tasks_created:
+            logger.info("[writeback] Created %d HubSpot tasks for tenant %s", tasks_created, tenant_id)
+
+    except Exception as exc:
+        logger.warning("[writeback] HubSpot write-back failed for tenant %s: %s", tenant_id, exc)
+
+
+def _spawn_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> None:
+    """Fire-and-forget: spawn write-back in a daemon thread."""
+    t = threading.Thread(
+        target=_run_hubspot_writeback,
+        args=(tenant_id, records),
+        daemon=True,
+        name=f"hs-writeback-{tenant_id[:8]}",
+    )
+    t.start()
+
+
+# -----------------------------------------------------------------------
 # Predictions
 # -----------------------------------------------------------------------
 @app.post("/api/predict/{module_name}")
@@ -862,6 +957,10 @@ def predict_module(
         records = scored_display[display_cols].head(limit).to_dict(orient="records")
         state["predictions"][module_name] = records
         store.save_predictions(tenant_id, module_name, run_id or "", records)
+
+        # Async write-back to HubSpot (no-op if not connected)
+        if module_name == MODULE_NAME:
+            _spawn_hubspot_writeback(tenant_id, records)
 
         # Tier counts (from full active set)
         tier_counts = scored_display["tier"].value_counts().to_dict()

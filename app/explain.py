@@ -1,10 +1,11 @@
 """Per-account risk drivers and playbook actions."""
 from __future__ import annotations
 
+import json
 import logging
 import os
 from datetime import datetime, date, time, timedelta, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,6 +15,39 @@ from pydantic import BaseModel
 from .auth import get_tenant_id
 
 logger = logging.getLogger("pickpulse.explain")
+
+# ---------------------------------------------------------------------------
+# Feature importance cache  (artifact_dir → {feature_name: importance})
+# Populated lazily; cleared implicitly when process restarts (new model run).
+# ---------------------------------------------------------------------------
+_importance_cache: Dict[str, Dict[str, float]] = {}
+
+
+def _load_feature_weights(artifact_dir: str) -> Dict[str, float]:
+    """Return {feature_name: abs_importance} from the artifact's metadata.json.
+
+    Returns an empty dict when the file is absent or malformed — callers fall
+    back to equal-weight ordering in that case.
+    """
+    if artifact_dir in _importance_cache:
+        return _importance_cache[artifact_dir]
+    try:
+        meta_path = os.path.join(artifact_dir, "metadata.json")
+        if not os.path.exists(meta_path):
+            return {}
+        with open(meta_path) as f:
+            meta = json.load(f)
+        weights: Dict[str, float] = {}
+        for entry in meta.get("feature_importance", []):
+            name = entry.get("feature", "")
+            imp = entry.get("importance", 0.0)
+            if name:
+                weights[name] = abs(float(imp))
+        _importance_cache[artifact_dir] = weights
+        return weights
+    except Exception as exc:
+        logger.debug("[explain] Could not load feature weights: %s", exc)
+        return {}
 
 router = APIRouter(prefix="/api/predictions", tags=["explain"])
 
@@ -37,84 +71,102 @@ class ExplainResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Heuristic risk driver generation
 # ---------------------------------------------------------------------------
-def generate_risk_drivers(row: dict) -> list[str]:
+def generate_risk_drivers(
+    row: dict,
+    feature_weights: Optional[Dict[str, float]] = None,
+) -> list[str]:
     """Generate human-readable risk driver bullets from a prediction row.
 
-    Uses raw feature values already present in the scored data to produce
-    3–5 concrete, actionable driver strings.
+    When feature_weights is provided (dict of {feature_name: abs_importance}),
+    each candidate driver is ranked by its corresponding model feature's
+    importance so that the most predictive signals surface first.
+
+    Without weights, the legacy deterministic order is preserved.
     """
-    drivers: list[str] = []
+    # Each candidate: (weight, message)
+    # weight = 0.0 when feature_weights is absent → stable append order
+    candidates: list[tuple[float, str]] = []
+    w = feature_weights or {}
+
+    def _w(feature: str) -> float:
+        return w.get(feature, 0.0)
 
     # 1. Login activity
     days_inactive = row.get("days_since_last_login")
     if days_inactive is not None and not pd.isna(days_inactive):
         days_inactive = float(days_inactive)
         if days_inactive > 60:
-            drivers.append(f"No login activity in {int(days_inactive)} days")
+            candidates.append((_w("days_since_last_login"), f"No login activity in {int(days_inactive)} days"))
         elif days_inactive > 30:
-            drivers.append(f"Last login was {int(days_inactive)} days ago")
+            candidates.append((_w("days_since_last_login"), f"Last login was {int(days_inactive)} days ago"))
 
     monthly_logins = row.get("monthly_logins")
     if monthly_logins is not None and not pd.isna(monthly_logins):
         monthly_logins = float(monthly_logins)
         if monthly_logins <= 2:
-            drivers.append(f"Only {int(monthly_logins)} logins this month")
+            candidates.append((_w("monthly_logins"), f"Only {int(monthly_logins)} logins this month"))
         elif monthly_logins <= 5:
-            drivers.append(f"Low login frequency ({int(monthly_logins)}/month)")
+            candidates.append((_w("monthly_logins"), f"Low login frequency ({int(monthly_logins)}/month)"))
 
     # 2. Support tickets
     tickets = row.get("support_tickets")
     if tickets is not None and not pd.isna(tickets):
         tickets = int(float(tickets))
         if tickets >= 5:
-            drivers.append(f"{tickets} support tickets — potential frustration signal")
+            candidates.append((_w("support_tickets"), f"{tickets} support tickets — potential frustration signal"))
         elif tickets >= 3:
-            drivers.append(f"{tickets} open support tickets")
+            candidates.append((_w("support_tickets"), f"{tickets} open support tickets"))
 
     # 3. NPS / satisfaction
     nps = row.get("nps_score")
     if nps is not None and not pd.isna(nps):
         nps = float(nps)
         if nps <= 5:
-            drivers.append(f"NPS score is {nps:.0f} (detractor range)")
+            candidates.append((_w("nps_score"), f"NPS score is {nps:.0f} (detractor range)"))
         elif nps <= 7:
-            drivers.append(f"NPS score is {nps:.0f} (passive range)")
+            candidates.append((_w("nps_score"), f"NPS score is {nps:.0f} (passive range)"))
 
     # 4. Renewal proximity
     days_renewal = row.get("days_until_renewal")
     if days_renewal is not None and not pd.isna(days_renewal):
         days_renewal = int(float(days_renewal))
         if days_renewal <= 30:
-            drivers.append(f"Renewal in {days_renewal} days — immediate window")
+            candidates.append((_w("days_until_renewal"), f"Renewal in {days_renewal} days — immediate window"))
         elif days_renewal <= 90:
-            drivers.append(f"Renewal in {days_renewal} days")
+            candidates.append((_w("days_until_renewal"), f"Renewal in {days_renewal} days"))
 
     # 5. Seat utilization / engagement
     seats = row.get("seats")
     if seats is not None and not pd.isna(seats):
         seats = int(float(seats))
         if seats <= 2:
-            drivers.append(f"Only {seats} active seats — low adoption")
+            candidates.append((_w("seats"), f"Only {seats} active seats — low adoption"))
 
     # 6. Contract urgency
     months_remaining = row.get("contract_months_remaining")
     if months_remaining is not None and not pd.isna(months_remaining):
         months_remaining = float(months_remaining)
         if months_remaining <= 2:
-            drivers.append(f"Contract expires in {months_remaining:.0f} months")
+            candidates.append((_w("contract_months_remaining"), f"Contract expires in {months_remaining:.0f} months"))
 
     # 7. Auto-renew off
     auto_renew = row.get("auto_renew_flag")
     if auto_renew is not None and not pd.isna(auto_renew) and int(float(auto_renew)) == 0:
-        drivers.append("Auto-renewal is OFF — manual renewal required")
+        candidates.append((_w("auto_renew_flag"), "Auto-renewal is OFF — manual renewal required"))
 
-    # 8. High churn probability itself as context
+    # 8. High churn probability as context fallback
     risk_pct = row.get("churn_risk_pct", 0)
-    if risk_pct and float(risk_pct) >= 70 and len(drivers) < 2:
-        drivers.append("Model identifies multiple weak engagement signals")
+    if risk_pct and float(risk_pct) >= 70 and not candidates:
+        return ["Model identifies multiple weak engagement signals"]
 
-    # Limit to 5 drivers
-    return drivers[:5] if drivers else ["Composite risk from multiple engagement signals"]
+    if not candidates:
+        return ["Composite risk from multiple engagement signals"]
+
+    # Sort by weight descending when weights are provided; otherwise stable order
+    if feature_weights:
+        candidates.sort(key=lambda x: x[0], reverse=True)
+
+    return [msg for _, msg in candidates[:5]]
 
 
 def build_risk_driver_summary(drivers: list[str]) -> str:
@@ -167,7 +219,17 @@ def explain_account(
         except Exception:
             pass  # Fall back to prediction dict
 
-    drivers = generate_risk_drivers(full_row)
+    # Load model feature weights for importance-ranked drivers
+    feature_weights: Dict[str, float] = {}
+    try:
+        from .engine import store
+        current_run = store.get_current_model_run(tenant_id, "churn")
+        if current_run and current_run.get("artifact_path"):
+            feature_weights = _load_feature_weights(current_run["artifact_path"])
+    except Exception:
+        pass
+
+    drivers = generate_risk_drivers(full_row, feature_weights=feature_weights or None)
     summary = build_risk_driver_summary(drivers)
 
     return ExplainResponse(
