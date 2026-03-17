@@ -333,8 +333,18 @@ class HubSpotConnector(BaseConnector):
                     timeout=30,
                 )
                 if r.status_code in (200, 207):
-                    updated += len(batch)
-                    logger.info("[hubspot] Batch updated %d companies (batch %d)", len(batch), i // batch_size + 1)
+                    resp_data = r.json()
+                    n_errors = resp_data.get("numErrors", 0) or 0
+                    successful = len(batch) - n_errors
+                    updated += max(0, successful)
+                    if n_errors:
+                        logger.warning(
+                            "[hubspot] Batch %d had %d/%d errors: %s",
+                            i // batch_size + 1, n_errors, len(batch),
+                            str(resp_data.get("errors", []))[:300],
+                        )
+                    else:
+                        logger.info("[hubspot] Batch updated %d companies (batch %d)", len(batch), i // batch_size + 1)
                 else:
                     logger.warning("[hubspot] Batch update returned %d: %s", r.status_code, r.text[:300])
             except Exception as exc:
@@ -396,15 +406,22 @@ class HubSpotConnector(BaseConnector):
             return None
 
     def _associate_task_to_company(self, task_id: str, company_id: str) -> None:
-        """Associate a task to a HubSpot company via the associations API."""
+        """Associate a task to a HubSpot company via the associations API.
+
+        Association type label must be uppercase TASK_TO_COMPANY as required by
+        HubSpot CRM v3 associations API.
+        """
         try:
             r = requests.put(
-                f"{API_BASE}/crm/v3/objects/tasks/{task_id}/associations/companies/{company_id}/task_to_company",
+                f"{API_BASE}/crm/v3/objects/tasks/{task_id}/associations/companies/{company_id}/TASK_TO_COMPANY",
                 headers=self._headers(),
                 timeout=10,
             )
             if r.status_code not in (200, 201):
-                logger.warning("[hubspot] task-company association returned %d", r.status_code)
+                logger.warning(
+                    "[hubspot] task-company association returned %d for task=%s company=%s: %s",
+                    r.status_code, task_id, company_id, r.text[:200],
+                )
         except Exception as exc:
             logger.warning("[hubspot] _associate_task_to_company failed: %s", exc)
 

@@ -799,6 +799,13 @@ def generate_report(module_name: str, tenant_id: str = Depends(get_tenant_id)):
 # HubSpot write-back
 # -----------------------------------------------------------------------
 
+# Per-process cache: integration IDs for which we have already confirmed that
+# PickPulse custom properties exist in the tenant's HubSpot portal.
+# Cleared implicitly on process restart.  Keyed by integration_id (1:1 with
+# HubSpot portal), not tenant_id, since properties are portal-scoped.
+_hs_properties_provisioned: set = set()
+
+
 def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> None:
     """Push scored predictions to HubSpot company properties + create tasks.
 
@@ -807,18 +814,24 @@ def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> Non
 
     Flow:
       1. Look up the tenant's HubSpot integration (skip if not connected).
-      2. Ensure PickPulse custom properties exist (idempotent).
+      2. Ensure PickPulse custom properties exist (idempotent, once per process).
       3. Batch-update company properties for all scored accounts.
-      4. Create tasks for high-risk accounts that don't already have one.
-      5. Persist the task_id back into prediction_json so we don't duplicate.
+      4. Load persisted hs_task_id values to deduplicate task creation.
+      5. Create tasks for high-risk accounts that don't already have one.
+      6. Persist the task_id back into prediction_json so we don't duplicate.
     """
+    # M3: import constants once at function entry, outside the per-record loop
+    from app.integrations.hubspot import TASK_RISK_THRESHOLD, TASK_RENEWAL_WINDOW_DAYS
+
     if not integration_service:
         return
     try:
         hs_integration = integration_service.get_integration(
             tenant_id=tenant_id, provider="hubspot"
         )
-        if not hs_integration or hs_integration.get("status") != "active":
+        # C1: integration status is "connected" for OAuth; "active" was never
+        # set by the service layer and would have caused a permanent silent no-op.
+        if not hs_integration or hs_integration.get("status") != "connected":
             return
 
         from app.integrations.registry import get_connector_for_integration
@@ -826,19 +839,26 @@ def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> Non
         if not connector:
             return
 
-        # Ensure custom properties exist in this tenant's portal
-        connector.ensure_churn_properties()
+        # M1: only provision properties once per process per integration
+        integration_id = hs_integration["id"]
+        if integration_id not in _hs_properties_provisioned:
+            connector.ensure_churn_properties()
+            _hs_properties_provisioned.add(integration_id)
 
         # Push scores for all accounts
         pushed = connector.push_churn_scores(records)
         logger.info("[writeback] Pushed %d churn scores to HubSpot for tenant %s", pushed, tenant_id)
+
+        # C2: load persisted task IDs from Supabase in one batch query.
+        # Fresh scored rows never carry hs_task_id (it lives only in prediction_json
+        # in the DB), so the old in-memory check always failed.
+        existing_task_ids = store.get_accounts_with_task_ids(tenant_id, MODULE_NAME)
 
         # Create tasks for high-risk, renewal-window accounts
         tasks_created = 0
         for rec in records:
             try:
                 churn_risk_pct = float(rec.get("churn_risk_pct") or 0)
-                from app.integrations.hubspot import TASK_RISK_THRESHOLD, TASK_RENEWAL_WINDOW_DAYS
                 if churn_risk_pct < TASK_RISK_THRESHOLD:
                     continue
                 days_renewal = rec.get("days_until_renewal")
@@ -849,17 +869,21 @@ def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> Non
                     except (TypeError, ValueError):
                         pass
 
-                # Skip if task already created
-                if rec.get("hs_task_id"):
+                # C2: deduplicate using the DB-backed lookup
+                account_id = str(rec.get("account_id", ""))
+                if existing_task_ids.get(account_id):
                     continue
 
                 task_id = connector.create_task(rec)
                 if task_id:
                     store.patch_prediction_json(
                         tenant_id, MODULE_NAME,
-                        str(rec.get("account_id", "")),
+                        account_id,
                         {"hs_task_id": task_id},
                     )
+                    # Update local dedup map so subsequent iterations in this
+                    # same run don't double-create if the same account_id appears twice
+                    existing_task_ids[account_id] = task_id
                     tasks_created += 1
             except Exception as exc:
                 logger.warning("[writeback] Task creation failed for account %s: %s",
@@ -958,9 +982,16 @@ def predict_module(
         state["predictions"][module_name] = records
         store.save_predictions(tenant_id, module_name, run_id or "", records)
 
-        # Async write-back to HubSpot (no-op if not connected)
+        # H3: write-back uses the full active scored set (no head() cap).
+        # The display subset above is limited to `limit` rows for the UI;
+        # HubSpot needs all scored accounts regardless of display pagination.
         if module_name == MODULE_NAME:
-            _spawn_hubspot_writeback(tenant_id, records)
+            _wb_cols = [c for c in [
+                mod.id_column, "churn_risk_pct", "arr_at_risk",
+                "recommended_action", "days_until_renewal", "tier",
+            ] if c in scored_display.columns]
+            writeback_records = scored_display[_wb_cols].to_dict(orient="records")
+            _spawn_hubspot_writeback(tenant_id, writeback_records)
 
         # Tier counts (from full active set)
         tier_counts = scored_display["tier"].value_counts().to_dict()

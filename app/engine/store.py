@@ -24,6 +24,7 @@ Predictions:
     get_predictions(tenant_id, module) -> list[dict]
     get_prediction_for_account(tenant_id, module, account_id) -> dict | None
     patch_prediction_json(tenant_id, module, account_id, patch)
+    get_accounts_with_task_ids(tenant_id, module) -> dict[str, str]
     update_account_status(tenant_id, account_id, status)
     get_account_statuses(tenant_id) -> dict[str, str]
 
@@ -519,6 +520,36 @@ def patch_prediction_json(
             ).eq("tenant_id", tenant_id).eq("module", module).eq("account_id", account_id).execute()
         except Exception as exc2:
             logger.warning("[store] patch_prediction_json fallback failed: %s", exc2)
+
+
+def get_accounts_with_task_ids(tenant_id: str, module: str) -> Dict[str, str]:
+    """Return {account_id: hs_task_id} for all accounts that have a persisted HubSpot task ID.
+
+    Single query — used by write-back for batched task dedup before the per-account task loop.
+    """
+    if not _available():
+        return {}
+    try:
+        resp = (
+            _db().table("predictions_live")
+            .select("account_id, prediction_json")
+            .eq("tenant_id", tenant_id)
+            .eq("module", module)
+            .not_.is_("score", "null")
+            .execute()
+        )
+        result: Dict[str, str] = {}
+        for row in (resp.data or []):
+            rec = row.get("prediction_json") or {}
+            if isinstance(rec, str):
+                rec = json.loads(rec)
+            task_id = rec.get("hs_task_id")
+            if task_id:
+                result[row["account_id"]] = str(task_id)
+        return result
+    except Exception as exc:
+        logger.warning("[store] get_accounts_with_task_ids failed: %s", exc)
+        return {}
 
 
 def get_account_statuses(tenant_id: str) -> Dict[str, str]:
