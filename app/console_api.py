@@ -729,6 +729,45 @@ def training_job_status(module_name: str, job_id: str, tenant_id: str = Depends(
     run = store.get_model_run(job_id, tenant_id=tenant_id)
     if not run:
         raise HTTPException(status_code=404, detail="Training job not found.")
+
+    # Inline stale-job cleanup: mark abandoned jobs failed without waiting for
+    # the next server restart. Handles the common case where a Render deploy
+    # killed the daemon thread mid-flight, leaving the row stuck in "pending".
+    status = run.get("status")
+    now_utc = datetime.now(timezone.utc)
+    if status == "pending":
+        trained_at_str = run.get("trained_at")
+        if trained_at_str:
+            try:
+                trained_at = datetime.fromisoformat(trained_at_str.replace("Z", "+00:00"))
+                if (now_utc - trained_at).total_seconds() > 120:  # 2 minutes
+                    store.update_model_run(
+                        job_id,
+                        status="failed",
+                        error_message="Training job was never picked up — the server may have restarted. Please try again.",
+                        completed_at=now_utc,
+                    )
+                    run["status"] = "failed"
+                    run["error_message"] = "Training job was never picked up — the server may have restarted. Please try again."
+            except (ValueError, TypeError):
+                pass
+    elif status == "running":
+        started_at_str = run.get("started_at")
+        if started_at_str:
+            try:
+                started_at = datetime.fromisoformat(started_at_str.replace("Z", "+00:00"))
+                if (now_utc - started_at).total_seconds() > 3600:  # 60 minutes
+                    store.update_model_run(
+                        job_id,
+                        status="failed",
+                        error_message="Training timed out after 60 minutes. Please try again.",
+                        completed_at=now_utc,
+                    )
+                    run["status"] = "failed"
+                    run["error_message"] = "Training timed out after 60 minutes. Please try again."
+            except (ValueError, TypeError):
+                pass
+
     return {
         "job_id": job_id,
         "status": run.get("status"),

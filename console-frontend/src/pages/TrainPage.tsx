@@ -29,8 +29,18 @@ export function TrainPage({ embedded }: { embedded?: boolean } = {}) {
           if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
         }
-      } catch {
-        // Transient network error — keep polling
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.startsWith('404')) {
+          // Job row not found — server may have restarted and lost the job.
+          // Stop polling and surface the error so the user can retry.
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          setJobId(null);
+          setJobStatus(null);
+          setError('Training job not found — the server may have restarted. Please try again.');
+        }
+        // Other errors (5xx, network timeout) are transient — keep polling.
       }
     };
 
