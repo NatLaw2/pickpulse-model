@@ -522,7 +522,14 @@ def load_sample_dataset(
     filepath = os.path.join(SAMPLE_DIR, f"{module_name}_sample.csv")
     df.to_csv(filepath, index=False)
 
-    validation = validate_dataset(df, mod)
+    # Validate the normalized form so demo datasets that use column aliases
+    # (e.g. customer_id → account_id) don't show a misleading warning state.
+    # The raw CSV is kept as-is; the adapter handles normalization at training time.
+    df_for_validation = df
+    _adapter = _get_adapter(module_name)
+    if _adapter:
+        df_for_validation = _adapter.normalize_columns(df.copy())
+    validation = validate_dataset(df_for_validation, mod)
 
     # Store a trivial identity mapping for sample data so predict-time
     # normalization always has a mapping.json to load.
