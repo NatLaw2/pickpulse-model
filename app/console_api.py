@@ -133,8 +133,10 @@ SAMPLE_DIR = os.path.join(DATA_DIR, "sample")
 MODULE_NAME = "churn"
 DEMO_MODE = os.environ.get("DEMO_MODE", "").lower() in ("true", "1")
 
-# Ensure data directories exist at startup
-os.makedirs(DATA_DIR, exist_ok=True)
+# Ensure subdirectories exist at startup.
+# Do NOT call makedirs on DATA_DIR itself — on Render, /data is the persistent
+# disk mount point created and owned by the platform. Attempting to create it
+# raises PermissionError. Only create directories *inside* DATA_DIR.
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(SAMPLE_DIR, exist_ok=True)
 
@@ -152,7 +154,8 @@ def _load_persisted_datasets() -> Dict[str, Any]:
 
 def _save_persisted_datasets(datasets: Dict[str, Any]) -> None:
     """Save dataset registry to disk (kept for backward-compat flush on first run)."""
-    os.makedirs(os.path.dirname(DATASET_STATE_PATH) or ".", exist_ok=True)
+    # DATA_DIR itself is the mount root on Render — do not call makedirs on it.
+    # UPLOAD_DIR and SAMPLE_DIR are already created at startup; DATA_DIR exists.
     with open(DATASET_STATE_PATH, "w") as f:
         json.dump(datasets, f, indent=2)
 
