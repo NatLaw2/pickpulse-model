@@ -45,9 +45,12 @@ def _validate_hubspot_signature(request: Request, body: bytes, timestamp: str) -
     """
     client_secret = os.environ.get("HUBSPOT_CLIENT_SECRET", "")
     if not client_secret:
-        # If the secret isn't configured, skip validation (dev mode)
-        logger.warning("[hubspot_card] HUBSPOT_CLIENT_SECRET not set — skipping HMAC check")
-        return
+        # Hard fail — a missing secret means the endpoint is unauthenticated.
+        # This must be visible at deploy time, not silently bypassed.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="HUBSPOT_CLIENT_SECRET is not configured. CRM card endpoint cannot validate requests.",
+        )
 
     # Reject stale timestamps
     try:
@@ -162,9 +165,12 @@ async def hubspot_crm_card(
     timestamp = request.headers.get("X-HubSpot-Signature-Timestamp", "0")
     _validate_hubspot_signature(request, body, timestamp)
 
-    # Look up prediction for this company
-    # HubSpot's hs_object_id maps to account_id in predictions_live
-    rec = store.get_prediction_for_account(tenant_id, MODULE, hs_object_id)
+    # Look up prediction by hs_object_id stored inside prediction_json.
+    # Fallback to account_id match for backward compatibility with tenants
+    # who have not yet added the hs_object_id column to their dataset.
+    rec = store.get_prediction_by_hs_object_id(tenant_id, MODULE, hs_object_id)
+    if rec is None:
+        rec = store.get_prediction_for_account(tenant_id, MODULE, hs_object_id)
 
     # Load model feature weights for importance-ranked drivers
     feature_weights: Optional[Dict[str, float]] = None

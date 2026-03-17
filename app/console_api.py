@@ -839,13 +839,24 @@ def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> Non
         if not connector:
             return
 
+        # Part 3: if no records carry hs_object_id, the whole write-back would
+        # target wrong companies. Warn with an actionable message and stop early.
+        if not any(rec.get("hs_object_id") for rec in records):
+            logger.warning(
+                "[writeback] Skipping HubSpot write-back for tenant %s: hs_object_id not found "
+                "in scored records. Add an 'hs_object_id' column to the dataset mapped to "
+                "HubSpot company Record IDs (found in HubSpot exports as 'Record ID').",
+                tenant_id,
+            )
+            return
+
         # M1: only provision properties once per process per integration
         integration_id = hs_integration["id"]
         if integration_id not in _hs_properties_provisioned:
             connector.ensure_churn_properties()
             _hs_properties_provisioned.add(integration_id)
 
-        # Push scores for all accounts
+        # Push scores for all accounts (push_churn_scores skips records missing hs_object_id)
         pushed = connector.push_churn_scores(records)
         logger.info("[writeback] Pushed %d churn scores to HubSpot for tenant %s", pushed, tenant_id)
 
@@ -856,8 +867,14 @@ def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> Non
 
         # Create tasks for high-risk, renewal-window accounts
         tasks_created = 0
+        skipped_no_hs_id = 0
         for rec in records:
             try:
+                # Part 2: require hs_object_id for task creation / association
+                if not rec.get("hs_object_id"):
+                    skipped_no_hs_id += 1
+                    continue
+
                 churn_risk_pct = float(rec.get("churn_risk_pct") or 0)
                 if churn_risk_pct < TASK_RISK_THRESHOLD:
                     continue
@@ -869,7 +886,8 @@ def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> Non
                     except (TypeError, ValueError):
                         pass
 
-                # C2: deduplicate using the DB-backed lookup
+                # C2: deduplicate using the DB-backed lookup (keyed by account_id,
+                # which is the primary key in predictions_live)
                 account_id = str(rec.get("account_id", ""))
                 if existing_task_ids.get(account_id):
                     continue
@@ -881,14 +899,18 @@ def _run_hubspot_writeback(tenant_id: str, records: List[Dict[str, Any]]) -> Non
                         account_id,
                         {"hs_task_id": task_id},
                     )
-                    # Update local dedup map so subsequent iterations in this
-                    # same run don't double-create if the same account_id appears twice
+                    # Update local dedup map so same-run duplicates are prevented
                     existing_task_ids[account_id] = task_id
                     tasks_created += 1
             except Exception as exc:
                 logger.warning("[writeback] Task creation failed for account %s: %s",
                                rec.get("account_id"), exc)
 
+        if skipped_no_hs_id:
+            logger.warning(
+                "[writeback] Skipped task creation for %d records with missing hs_object_id "
+                "(tenant %s)", skipped_no_hs_id, tenant_id,
+            )
         if tasks_created:
             logger.info("[writeback] Created %d HubSpot tasks for tenant %s", tasks_created, tenant_id)
 
@@ -967,6 +989,7 @@ def predict_module(
             mod.id_column, "churn_risk_pct", "urgency_score",
             "renewal_window_label", "days_until_renewal", "auto_renew_flag",
             "arr", "arr_at_risk", "recommended_action", "account_status", "tier", "rank",
+            "hs_object_id",  # included when present; flows into prediction_json for CRM card lookup
         ]
         # Fall back to generic cols if churn-specific ones aren't present
         display_cols = [c for c in display_cols if c in scored_display.columns]
@@ -989,6 +1012,7 @@ def predict_module(
             _wb_cols = [c for c in [
                 mod.id_column, "churn_risk_pct", "arr_at_risk",
                 "recommended_action", "days_until_renewal", "tier",
+                "hs_object_id",  # deterministic HubSpot company ID for write-back
             ] if c in scored_display.columns]
             writeback_records = scored_display[_wb_cols].to_dict(orient="records")
             _spawn_hubspot_writeback(tenant_id, writeback_records)

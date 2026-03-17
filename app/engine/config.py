@@ -101,6 +101,7 @@ CHURN_MODULE = ModuleConfig(
         "nps_score", "days_since_last_login", "contract_months_remaining",
         "industry", "company_size",
         "days_until_renewal", "auto_renew_flag", "renewal_status",
+        "hs_object_id",   # HubSpot company Record ID — required for CRM card and write-back
     ],
     tiers=TierConfig(
         high_threshold=0.70,

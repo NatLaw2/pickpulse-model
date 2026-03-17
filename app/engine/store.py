@@ -23,6 +23,7 @@ Predictions:
     save_predictions(tenant_id, module, run_id, records)
     get_predictions(tenant_id, module) -> list[dict]
     get_prediction_for_account(tenant_id, module, account_id) -> dict | None
+    get_prediction_by_hs_object_id(tenant_id, module, hs_object_id) -> dict | None
     patch_prediction_json(tenant_id, module, account_id, patch)
     get_accounts_with_task_ids(tenant_id, module) -> dict[str, str]
     update_account_status(tenant_id, account_id, status)
@@ -520,6 +521,42 @@ def patch_prediction_json(
             ).eq("tenant_id", tenant_id).eq("module", module).eq("account_id", account_id).execute()
         except Exception as exc2:
             logger.warning("[store] patch_prediction_json fallback failed: %s", exc2)
+
+
+def get_prediction_by_hs_object_id(
+    tenant_id: str,
+    module: str,
+    hs_object_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Look up a prediction by HubSpot company object ID stored in prediction_json.
+
+    Uses PostgREST JSONB text-extraction filter. Falls back to None (not to
+    account_id) — callers that want account_id fallback must implement it themselves.
+    """
+    if not _available():
+        return None
+    try:
+        resp = (
+            _db().table("predictions_live")
+            .select("prediction_json, score, confidence_tier, status")
+            .eq("tenant_id", tenant_id)
+            .eq("module", module)
+            .not_.is_("score", "null")
+            .filter("prediction_json->>hs_object_id", "eq", hs_object_id)
+            .limit(1)
+            .execute()
+        )
+        if not resp.data:
+            return None
+        row = resp.data[0]
+        rec = row.get("prediction_json") or {}
+        if isinstance(rec, str):
+            rec = json.loads(rec)
+        rec["_account_status"] = row.get("status", "none")
+        return rec
+    except Exception as exc:
+        logger.warning("[store] get_prediction_by_hs_object_id failed: %s", exc)
+        return None
 
 
 def get_accounts_with_task_ids(tenant_id: str, module: str) -> Dict[str, str]:

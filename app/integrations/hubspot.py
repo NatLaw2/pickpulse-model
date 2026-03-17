@@ -293,15 +293,22 @@ class HubSpotConnector(BaseConnector):
     def push_churn_scores(self, scores: List[Dict[str, Any]]) -> int:
         """Batch-update company properties for a list of scored accounts.
 
-        Each score dict must have 'account_id' (== hs_object_id) and optionally:
-          churn_risk_pct, tier, arr_at_risk, recommended_action, predicted_at.
+        Each score dict must have 'hs_object_id' (HubSpot company Record ID).
+        Records without hs_object_id are silently skipped — the caller should
+        have already warned if the entire dataset lacks the field.
 
         Returns the number of companies successfully updated.
         """
         self._refresh_token_if_needed()
 
-        # Filter to records that have a usable HubSpot ID
-        rows = [s for s in scores if s.get("account_id")]
+        # Filter to records that carry a deterministic HubSpot company ID
+        rows = [s for s in scores if s.get("hs_object_id")]
+        skipped = len(scores) - len(rows)
+        if skipped:
+            logger.warning(
+                "[hubspot] push_churn_scores: skipping %d records with missing hs_object_id",
+                skipped,
+            )
         if not rows:
             return 0
 
@@ -323,7 +330,8 @@ class HubSpotConnector(BaseConnector):
                     props["pickpulse_recommended_action"] = str(s["recommended_action"])
                 props["pickpulse_scored_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-                inputs.append({"id": str(s["account_id"]), "properties": props})
+                # Use hs_object_id as the authoritative HubSpot company identifier
+                inputs.append({"id": str(s["hs_object_id"]), "properties": props})
 
             try:
                 r = requests.post(
@@ -361,16 +369,27 @@ class HubSpotConnector(BaseConnector):
         subject: Optional[str] = None,
         body: Optional[str] = None,
     ) -> Optional[str]:
-        """Create a HubSpot task for a high-risk account. Returns task_id or None."""
+        """Create a HubSpot task for a high-risk account. Returns task_id or None.
+
+        Requires hs_object_id in the account dict for task-to-company association.
+        Returns None without making any API call if hs_object_id is absent.
+        """
         self._refresh_token_if_needed()
 
+        hs_company_id = str(account.get("hs_object_id", ""))
+        if not hs_company_id:
+            logger.warning(
+                "[hubspot] create_task skipped for account %s: hs_object_id missing",
+                account.get("account_id", "unknown"),
+            )
+            return None
+
         account_id = str(account.get("account_id", ""))
-        account_name = account.get("account_id", "account")
         churn_risk_pct = float(account.get("churn_risk_pct") or 0)
         days_renewal = account.get("days_until_renewal")
         recommended_action = account.get("recommended_action", "Review")
 
-        task_subject = subject or f"[PickPulse] {recommended_action} — {account_name}"
+        task_subject = subject or f"[PickPulse] {recommended_action} — {account_id}"
         renewal_note = f" | Renewal in {int(float(days_renewal))} days" if days_renewal is not None else ""
         task_body = body or (
             f"PickPulse churn risk: {churn_risk_pct:.0f}%{renewal_note}. "
@@ -394,11 +413,11 @@ class HubSpotConnector(BaseConnector):
             )
             r.raise_for_status()
             task_id = r.json().get("id")
-            logger.info("[hubspot] Created task %s for account %s", task_id, account_id)
+            logger.info("[hubspot] Created task %s for account %s (hs_company=%s)", task_id, account_id, hs_company_id)
 
-            # Associate task to company
-            if task_id and account_id:
-                self._associate_task_to_company(task_id, account_id)
+            # Associate task to the correct HubSpot company using hs_object_id
+            if task_id:
+                self._associate_task_to_company(task_id, hs_company_id)
 
             return task_id
         except Exception as exc:
