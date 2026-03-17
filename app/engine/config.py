@@ -62,21 +62,24 @@ class ModuleConfig:
         if not self.display_name:
             self.display_name = self.name.title()
         if not self.artifact_dir:
-            self.artifact_dir = f"artifacts/{self.name}"
+            data_dir = os.environ.get("DATA_DIR", "data")
+            self.artifact_dir = os.path.join(data_dir, "artifacts", self.name)
 
     def get_artifact_dir(self, tenant_id: Optional[str] = None, run_id: Optional[str] = None) -> str:
-        """Return per-tenant artifact directory.
+        """Return per-tenant artifact directory rooted under DATA_DIR.
+
+        On Render, DATA_DIR=/data (persistent disk) so artifacts survive
+        redeploys. Locally, DATA_DIR defaults to "data".
 
         Args:
-            tenant_id: If None, returns the default (shared) artifact_dir.
-            run_id: If provided, returns a versioned subdirectory for that
-                    training run: artifacts/{tenant_id}/{module}/{run_id}/
-                    This is the path written by PR 3A+ training runs.
-                    Omit for backward-compatible reads of pre-3A models.
+            tenant_id: If None, returns the module-level artifact dir.
+            run_id: If provided, returns a versioned subdirectory:
+                    {DATA_DIR}/artifacts/{tenant_id}/{module}/{run_id}/
         """
+        data_dir = os.environ.get("DATA_DIR", "data")
+        base = os.path.join(data_dir, "artifacts")
         if tenant_id is None:
-            return self.artifact_dir
-        base = os.path.dirname(self.artifact_dir)  # e.g. "artifacts"
+            return os.path.join(base, self.name)
         if run_id:
             return os.path.join(base, tenant_id, self.name, run_id)
         return os.path.join(base, tenant_id, self.name)

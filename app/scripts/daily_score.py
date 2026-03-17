@@ -23,7 +23,7 @@ DATA_PATH = os.path.join("data", "sample", "churn_customers.csv")
 
 def main() -> None:
     mod = get_module(MODULE)
-    model_path = os.path.join(mod.artifact_dir, "model.joblib")
+    model_path = os.path.join(mod.get_artifact_dir(), "model.joblib")
 
     if not os.path.exists(DATA_PATH):
         print(f"[SKIP] No dataset at {DATA_PATH}")
