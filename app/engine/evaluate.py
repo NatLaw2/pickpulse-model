@@ -18,6 +18,7 @@ def evaluate_model(
     module: ModuleConfig,
     output_dir: str = "outputs",
     tenant_id: str | None = None,
+    artifacts: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run full evaluation on a labeled dataset.
 
@@ -25,6 +26,10 @@ def evaluate_model(
         df: DataFrame with labels (typically the validation/test split).
         module: Module configuration.
         output_dir: Directory to write output files.
+        artifacts: Pre-loaded model artifacts dict (from load_model). When
+            provided, skips artifact discovery so the correct versioned path
+            is used. Required when calling immediately after training a
+            versioned run (run_id path) to avoid the no-run_id fallback.
 
     Returns:
         Evaluation report dict.
@@ -39,7 +44,7 @@ def evaluate_model(
     print(f"{'=' * 60}\n")
 
     # Score the dataset
-    scored = predict(df, module, tenant_id=tenant_id)
+    scored = predict(df, module, artifacts=artifacts, tenant_id=tenant_id)
     # Reset index so scored and arrays align
     scored = scored.reset_index(drop=True)
 

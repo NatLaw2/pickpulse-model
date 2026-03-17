@@ -635,7 +635,12 @@ def _execute_training_job(
         if "error" in metadata:
             raise RuntimeError(metadata.get("message", metadata["error"]))
 
-        # Auto-evaluate on val split
+        # Auto-evaluate on val split.
+        # Pre-load the model from the explicit artifact_dir so evaluate_model
+        # doesn't fall back to get_artifact_dir(tenant_id) (no run_id), which
+        # points to a path where nothing was written.
+        loaded_artifacts = load_model(mod, artifact_dir=artifact_dir)
+
         state = _get_state(tenant_id)
         ts_col = mod.timestamp_column
         metrics = None
@@ -648,7 +653,8 @@ def _execute_training_job(
             if adapter:
                 val_df = adapter.add_derived_features(val_df)
             if len(val_df) >= 10:
-                metrics = evaluate_model(val_df, mod, tenant_id=tenant_id)
+                metrics = evaluate_model(val_df, mod, tenant_id=tenant_id,
+                                         artifacts=loaded_artifacts)
                 state["metrics"][module_name] = metrics
                 eval_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_evaluation.json")
                 with open(eval_path, "w") as ef:
