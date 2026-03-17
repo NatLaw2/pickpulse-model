@@ -54,12 +54,23 @@ logger = logging.getLogger(__name__)
 # Supabase client access
 # ---------------------------------------------------------------------------
 
+_unavailable_warned = False
+
+
 def _available() -> bool:
     """Return True if Supabase credentials are configured."""
-    return bool(
+    global _unavailable_warned
+    ok = bool(
         os.environ.get("SUPABASE_URL")
         and os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     )
+    if not ok and not _unavailable_warned:
+        _unavailable_warned = True
+        logger.warning(
+            "[store] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set — "
+            "all DB operations will be skipped. Set both env vars in the Render dashboard."
+        )
+    return ok
 
 
 def _db():
