@@ -6,11 +6,11 @@
   "icon": "hubspot",
   "description": "Sync companies, contacts, and deals from HubSpot",
   "oauth_scopes": [
-    "crm.objects.appointments.read",
+    "oauth",
     "crm.objects.companies.read",
-    "crm.objects.deals.read",
-    "crm.objects.owners.read",
-    "crm.schemas.companies.read"
+    "crm.objects.companies.write",
+    "crm.schemas.companies.read",
+    "crm.schemas.companies.write"
   ],
   "oauth_authorize_url": "https://app.hubspot.com/oauth/authorize",
   "oauth_token_url": "https://api.hubapi.com/oauth/v1/token",

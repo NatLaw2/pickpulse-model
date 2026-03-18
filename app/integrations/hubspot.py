@@ -15,22 +15,23 @@ logger = logging.getLogger(__name__)
 
 API_BASE = "https://api.hubapi.com"
 
-# Custom property group and properties created in the tenant's HubSpot portal
+# Custom property group and properties created in the tenant's HubSpot portal.
+# Property names are canonical — changing them after first use would orphan existing data.
 _PICKPULSE_PROPERTY_GROUP = "pickpulse_churn"
 _CHURN_PROPERTIES = [
     {
-        "name": "pickpulse_churn_risk_pct",
-        "label": "Churn Risk %",
+        "name": "pickpulse_churn_probability",
+        "label": "Churn Probability",
         "type": "number",
         "fieldType": "number",
-        "description": "PickPulse churn risk score (0–100)",
+        "description": "PickPulse churn probability (0.00–1.00)",
     },
     {
-        "name": "pickpulse_tier",
+        "name": "pickpulse_risk_tier",
         "label": "PickPulse Risk Tier",
         "type": "string",
         "fieldType": "text",
-        "description": "PickPulse confidence tier: High / Medium / Low",
+        "description": "PickPulse confidence tier: High Risk / Medium Risk / Low Risk",
     },
     {
         "name": "pickpulse_arr_at_risk",
@@ -40,6 +41,13 @@ _CHURN_PROPERTIES = [
         "description": "ARR weighted by churn probability (PickPulse)",
     },
     {
+        "name": "pickpulse_top_risk_drivers",
+        "label": "Top Risk Drivers",
+        "type": "string",
+        "fieldType": "text",
+        "description": "Comma-separated list of top churn risk factors (PickPulse)",
+    },
+    {
         "name": "pickpulse_recommended_action",
         "label": "Recommended Action",
         "type": "string",
@@ -47,7 +55,7 @@ _CHURN_PROPERTIES = [
         "description": "PickPulse recommended CSM action",
     },
     {
-        "name": "pickpulse_scored_at",
+        "name": "pickpulse_last_scored_at",
         "label": "PickPulse Last Scored",
         "type": "datetime",
         "fieldType": "date",
@@ -321,14 +329,17 @@ class HubSpotConnector(BaseConnector):
             for s in batch:
                 props: Dict[str, str] = {}
                 if s.get("churn_risk_pct") is not None:
-                    props["pickpulse_churn_risk_pct"] = str(round(float(s["churn_risk_pct"]), 1))
+                    # Store as 0–1 probability (churn_risk_pct is 0–100 internally)
+                    props["pickpulse_churn_probability"] = str(round(float(s["churn_risk_pct"]) / 100, 4))
                 if s.get("tier"):
-                    props["pickpulse_tier"] = str(s["tier"])
+                    props["pickpulse_risk_tier"] = str(s["tier"])
                 if s.get("arr_at_risk") is not None:
                     props["pickpulse_arr_at_risk"] = str(round(float(s["arr_at_risk"]), 2))
+                if s.get("top_risk_drivers"):
+                    props["pickpulse_top_risk_drivers"] = str(s["top_risk_drivers"])
                 if s.get("recommended_action"):
                     props["pickpulse_recommended_action"] = str(s["recommended_action"])
-                props["pickpulse_scored_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                props["pickpulse_last_scored_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
                 # Use hs_object_id as the authoritative HubSpot company identifier
                 inputs.append({"id": str(s["hs_object_id"]), "properties": props})

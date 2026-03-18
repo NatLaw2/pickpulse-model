@@ -9,6 +9,16 @@ services:
         value: "3.12.3"
       - key: DATA_DIR
         value: /data
+      - key: HUBSPOT_CLIENT_ID
+        sync: false
+      - key: HUBSPOT_CLIENT_SECRET
+        sync: false
+      - key: OAUTH_STATE_SECRET
+        sync: false
+      - key: INTEGRATION_ENCRYPTION_KEY
+        sync: false
+      - key: API_BASE_URL
+        sync: false
     disk:
       name: pickpulse-data
       mountPath: /data
