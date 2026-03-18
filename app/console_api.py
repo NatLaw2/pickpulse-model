@@ -238,9 +238,7 @@ async def whoami(tenant_id: str = Depends(get_tenant_id)):
 # -----------------------------------------------------------------------
 @app.post("/api/demo/reset")
 def reset_demo(tenant_id: str = Depends(get_tenant_id)):
-    """Reset the demo environment to a clean first-time state for the current tenant."""
-    if not DEMO_MODE:
-        raise HTTPException(status_code=403, detail="Demo reset is only available in DEMO_MODE.")
+    """Reset the environment to a clean first-time state for the current tenant."""
 
     cleared: list[str] = []
 
@@ -277,7 +275,7 @@ def reset_demo(tenant_id: str = Depends(get_tenant_id)):
                 cleared.append("model")
 
     # 5. Delete tenant-scoped outputs
-    tenant_out = os.path.join("outputs", tenant_id)
+    tenant_out = _tenant_output_dir(tenant_id)
     if os.path.exists(tenant_out):
         shutil.rmtree(tenant_out, ignore_errors=True)
         cleared.append("outputs")
