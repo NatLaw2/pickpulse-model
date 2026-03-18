@@ -173,11 +173,18 @@ _DEFAULT_TENANT = "00000000-0000-0000-0000-000000000000"
 def _get_state(tenant_id: str) -> Dict[str, Any]:
     """Get or create per-tenant state, loading durable state from store on first access."""
     if tenant_id not in _tenant_state:
+        loaded_preds = store.get_predictions(tenant_id, MODULE_NAME)
+        # Derive when those predictions were generated so staleness checks work on cold start.
+        preds_generated_at = (
+            max((p.get("_predicted_at", "") for p in loaded_preds), default="")
+            if loaded_preds else ""
+        )
         _tenant_state[tenant_id] = {
             "datasets": _load_persisted_datasets(),  # flat JSON, migrated to store below
             "train_logs": {},
             "metrics": {},
-            "predictions": {MODULE_NAME: store.get_predictions(tenant_id, MODULE_NAME)},
+            "predictions": {MODULE_NAME: loaded_preds},
+            "predictions_generated_at": preds_generated_at,
             "account_statuses": store.get_account_statuses(tenant_id),
             "model_runs": {},  # in-memory fallback when Supabase writes are unavailable
         }
@@ -210,6 +217,23 @@ def _get_dataset(module_name: str, tenant_id: str = _DEFAULT_TENANT) -> Optional
     if ds and ds.get("path") and os.path.exists(ds["path"]):
         return ds
     return None
+
+
+def _predictions_are_stale(state: Dict[str, Any], module_name: str, tenant_id: str) -> bool:
+    """Return True if the cached predictions pre-date the current dataset registration.
+
+    Prevents stale predictions from a prior dataset/model context being served as
+    if they belong to the currently loaded dataset.
+    """
+    ds = _get_dataset(module_name, tenant_id=tenant_id)
+    if not ds:
+        return False  # no dataset loaded — nothing to validate against
+    dataset_ts = ds.get("registered_at") or ds.get("loaded_at", "")
+    if not dataset_ts:
+        return False
+    preds_ts = state.get("predictions_generated_at", "")
+    # No timestamp means predictions arrived from a pre-fix DB row; treat as stale.
+    return not preds_ts or preds_ts < dataset_ts
 
 
 def _tenant_output_dir(tenant_id: str) -> str:
@@ -284,6 +308,11 @@ def reset_demo(tenant_id: str = Depends(get_tenant_id)):
     from .executive_summary import clear_tenant_settings
     clear_tenant_settings(tenant_id)
     cleared.append("notifications")
+
+    # 7. Delete persisted predictions from Supabase so a cold-start after reset
+    #    does not re-inject stale predictions into _get_state().
+    store.delete_tenant_predictions(tenant_id)
+    cleared.append("predictions_live")
 
     return {"status": "reset", "tenant_id": tenant_id, "cleared": cleared}
 
@@ -1082,6 +1111,7 @@ def predict_module(
 
         records = scored_display[display_cols].head(limit).to_dict(orient="records")
         state["predictions"][module_name] = records
+        state["predictions_generated_at"] = datetime.now(timezone.utc).isoformat()
         store.save_predictions(tenant_id, module_name, run_id or "", records)
 
         # H3: write-back uses the full active scored set (no head() cap).
@@ -1136,6 +1166,8 @@ def get_cached_predictions(
     state = _get_state(tenant_id)
     records = state["predictions"].get(module_name, [])
     if not records:
+        raise HTTPException(status_code=404, detail="No cached predictions. Run predict first.")
+    if _predictions_are_stale(state, module_name, tenant_id):
         raise HTTPException(status_code=404, detail="No cached predictions. Run predict first.")
 
     tier_counts: dict[str, int] = {}
@@ -1397,6 +1429,9 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
                 metrics = json.load(f)
 
     predictions = state["predictions"].get("churn", [])
+    # Discard predictions that pre-date the current dataset registration.
+    if predictions and _predictions_are_stale(state, "churn", tenant_id):
+        predictions = []
 
     # Compute summary KPIs from cached predictions
     total_arr_at_risk = 0.0

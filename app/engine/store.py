@@ -399,13 +399,15 @@ def get_predictions(tenant_id: str, module: str) -> List[Dict[str, Any]]:
     """Return current prediction records for tenant+module.
 
     Returns the full prediction_json records merged with current account status.
+    Each record includes a _predicted_at field (ISO timestamp) so callers can
+    validate whether predictions are current relative to the active dataset.
     """
     if not _available():
         return []
     try:
         resp = (
             _db().table("predictions_live")
-            .select("account_id, score, confidence_tier, status, status_changed_at, prediction_json")
+            .select("account_id, score, confidence_tier, status, status_changed_at, prediction_json, predicted_at")
             .eq("tenant_id", tenant_id)
             .eq("module", module)
             .not_.is_("score", "null")   # exclude status-only placeholder rows
@@ -417,13 +419,29 @@ def get_predictions(tenant_id: str, module: str) -> List[Dict[str, Any]]:
             rec = row.get("prediction_json") or {}
             if isinstance(rec, str):
                 rec = json.loads(rec)
-            # Overlay live status onto the prediction record
+            # Overlay live status and provenance onto the prediction record
             rec["_account_status"] = row.get("status", "none")
+            rec["_predicted_at"] = row.get("predicted_at") or ""
             records.append(rec)
         return records
     except Exception as exc:
         logger.warning("[store] get_predictions failed: %s", exc)
         return []
+
+
+def delete_tenant_predictions(tenant_id: str, module: str = "churn") -> None:
+    """Delete all prediction rows for a tenant+module from predictions_live.
+
+    Called by reset_demo to ensure a cold-start after reset does not re-load
+    stale predictions from Supabase.
+    """
+    if not _available():
+        return
+    try:
+        _db().table("predictions_live").delete().eq("tenant_id", tenant_id).eq("module", module).execute()
+        logger.info("[store] Deleted predictions_live rows for tenant %s module %s", tenant_id, module)
+    except Exception as exc:
+        logger.warning("[store] delete_tenant_predictions failed: %s", exc)
 
 
 def update_account_status(

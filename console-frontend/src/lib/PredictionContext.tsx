@@ -38,9 +38,14 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
   const setPredictions = useCallback((data: PredictResponse) => {
     setPredictionsState(data);
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      // Store alongside the current dataset token so cross-session restores
+      // can be validated against the active dataset.
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        data,
+        dataset_loaded_at: dataset?.loaded_at ?? null,
+      }));
     } catch { /* quota exceeded — not critical */ }
-  }, []);
+  }, [dataset?.loaded_at]);
 
   const clearPredictions = useCallback(() => {
     setPredictionsState(null);
@@ -55,28 +60,39 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as PredictResponse;
-        if (parsed.predictions?.length) {
-          setPredictionsState(parsed);
+        const parsed = JSON.parse(stored);
+        // Support both new keyed format { data, dataset_loaded_at } and legacy bare PredictResponse
+        const cachedData: PredictResponse = parsed.data ?? parsed;
+        const cachedDatasetAt: string | null = parsed.dataset_loaded_at ?? null;
+        // If both tokens are non-null and don't match, discard — stale from prior dataset
+        const currentDatasetAt = dataset?.loaded_at ?? null;
+        if (cachedDatasetAt !== null && currentDatasetAt !== null && cachedDatasetAt !== currentDatasetAt) {
+          try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+          // fall through to backend
+        } else if (cachedData.predictions?.length) {
+          setPredictionsState(cachedData);
           return;
         }
       }
     } catch { /* corrupt data — fall through */ }
 
-    // Last resort: backend cached endpoint
+    // Last resort: backend cached endpoint (returns 404 if predictions are stale or absent)
     setLoading(true);
     try {
       const res = await api.cachedPredictions();
       setPredictionsState(res);
       try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(res));
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+          data: res,
+          dataset_loaded_at: dataset?.loaded_at ?? null,
+        }));
       } catch { /* ignore */ }
     } catch {
-      // 404 = no cached predictions, not an error
+      // 404 = no cached predictions (or stale), not an error
     } finally {
       setLoading(false);
     }
-  }, [predictions]);
+  }, [predictions, dataset?.loaded_at]);
 
   return (
     <PredictionContext.Provider value={{ predictions, loading, setPredictions, clearPredictions, loadCached }}>
