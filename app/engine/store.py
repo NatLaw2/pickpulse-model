@@ -112,6 +112,9 @@ def save_dataset(tenant_id: str, module: str, info: Dict[str, Any]) -> None:
             "readiness_mode": info.get("readiness_mode"),
             "source_columns": info.get("source_columns", []),
             "confirmed_mappings": info.get("confirmed_mappings", {}),
+            "row_count": int(info.get("rows") or 0),
+            "column_count": int(info.get("columns") or 0),
+            "is_demo": bool(info.get("is_demo", False)),
             "is_current": True,
             "registered_at": _now_iso(),
         }).execute()
@@ -137,13 +140,19 @@ def get_current_dataset(tenant_id: str, module: str) -> Optional[Dict[str, Any]]
         if not resp.data:
             return None
         row = resp.data[0]
-        # Re-hydrate to the dict shape that console_api.py expects
+        # Re-hydrate to the dict shape that console_api.py expects.
+        # registered_at doubles as loaded_at — both represent when the dataset
+        # was registered; no separate column is needed.
         return {
             "path": row.get("raw_path"),
             "name": row.get("filename"),
             "readiness_mode": row.get("readiness_mode"),
             "source_columns": row.get("source_columns") or [],
             "confirmed_mappings": row.get("confirmed_mappings") or {},
+            "rows": row.get("row_count") or 0,
+            "columns": row.get("column_count") or 0,
+            "is_demo": bool(row.get("is_demo", False)),
+            "loaded_at": row.get("registered_at"),
             "registered_at": row.get("registered_at"),
         }
     except Exception as exc:
