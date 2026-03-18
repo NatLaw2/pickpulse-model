@@ -65,7 +65,7 @@ def prepare_features(
                 pass
             # Try datetime
             try:
-                work[col] = pd.to_datetime(series, errors="raise")
+                work[col] = pd.to_datetime(series, format="mixed", errors="raise")
                 datetime_cols.append(col)
                 continue
             except (ValueError, TypeError):
@@ -96,7 +96,7 @@ def prepare_features(
     dt_features: List[str] = []
     for col in datetime_cols:
         if col in work.columns:
-            dt = pd.to_datetime(work[col], errors="coerce")
+            dt = pd.to_datetime(work[col], format="mixed", errors="coerce")
             dow_col = f"{col}_dow"
             month_col = f"{col}_month"
             work[dow_col] = dt.dt.dayofweek.fillna(0).astype(float)

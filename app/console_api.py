@@ -213,8 +213,8 @@ def _get_dataset(module_name: str, tenant_id: str = _DEFAULT_TENANT) -> Optional
 
 
 def _tenant_output_dir(tenant_id: str) -> str:
-    """Return tenant-scoped output directory, creating it if needed."""
-    d = os.path.join("outputs", tenant_id)
+    """Return tenant-scoped output directory under DATA_DIR, creating it if needed."""
+    d = os.path.join(os.environ.get("DATA_DIR", "data"), "outputs", tenant_id)
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -1369,8 +1369,9 @@ def download_data_template(module_name: str, tenant_id: str = Depends(get_tenant
     mod = get_module(module_name)
     cols = mod.required_columns + mod.optional_columns
     df = pd.DataFrame(columns=cols)
-    path = f"outputs/{module_name}_template.csv"
-    os.makedirs("outputs", exist_ok=True)
+    output_dir = os.path.join(os.environ.get("DATA_DIR", "data"), "outputs")
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, f"{module_name}_template.csv")
     df.to_csv(path, index=False)
     return FileResponse(path, media_type="text/csv",
                         filename="churn_data_template.csv")

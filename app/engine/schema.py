@@ -41,7 +41,7 @@ def _infer_dtype(series: pd.Series) -> str:
         return "datetime"
     # Try parsing as date
     try:
-        pd.to_datetime(series.dropna().head(20))
+        pd.to_datetime(series.dropna().head(20), format="mixed")
         return "datetime"
     except (ValueError, TypeError):
         pass
@@ -102,7 +102,7 @@ def validate_dataset(df: pd.DataFrame, module: ModuleConfig) -> ValidationResult
     # Timestamp check
     if module.timestamp_column in df.columns:
         try:
-            pd.to_datetime(df[module.timestamp_column].dropna().head(20))
+            pd.to_datetime(df[module.timestamp_column].dropna().head(20), format="mixed")
         except (ValueError, TypeError):
             result.warnings.append(
                 f"Timestamp column '{module.timestamp_column}' may not be parseable as dates."
