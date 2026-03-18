@@ -115,7 +115,7 @@ export function Sidebar() {
             {dataset.name}
           </div>
           <div className="text-[10px] text-[var(--color-sidebar-text-muted)] mt-0.5">
-            {dataset.rows.toLocaleString()} rows
+            {(dataset.rows ?? 0).toLocaleString()} rows
           </div>
         </div>
       )}

@@ -144,12 +144,12 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate">{dataset.name}</div>
             <div className="text-xs text-[var(--color-text-muted)]">
-              {dataset.rows.toLocaleString()} rows, {dataset.columns} columns
+              {dataset.rows != null ? `${dataset.rows.toLocaleString()} rows, ` : ''}{dataset.columns != null ? `${dataset.columns} columns` : ''}
               {dataset.is_demo && ' — sample data'}
             </div>
           </div>
           <span className="text-xs text-[var(--color-text-muted)] shrink-0">
-            Loaded {new Date(dataset.loaded_at).toLocaleString()}
+            {dataset.loaded_at ? `Loaded ${new Date(dataset.loaded_at).toLocaleString()}` : ''}
           </span>
         </div>
       )}
