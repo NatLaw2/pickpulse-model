@@ -8,8 +8,11 @@ Tables:
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone, date
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from app.storage.db import get_client
 from app.integrations.models import Account, AccountSignal, ChurnScore
@@ -61,13 +64,17 @@ def list_accounts(
     offset: int = 0,
     tenant_id: str = DEFAULT_TENANT,
 ) -> List[Dict[str, Any]]:
-    sb = get_client()
-    q = sb.table("accounts").select("*").eq("tenant_id", tenant_id)
-    if source:
-        q = q.eq("source", source)
-    q = q.order("arr", desc=True).range(offset, offset + limit - 1)
-    res = q.execute()
-    return res.data or []
+    try:
+        sb = get_client()
+        q = sb.table("accounts").select("*").eq("tenant_id", tenant_id)
+        if source:
+            q = q.eq("source", source)
+        q = q.order("arr", desc=True).range(offset, offset + limit - 1)
+        res = q.execute()
+        return res.data or []
+    except Exception as exc:
+        logger.warning("list_accounts: table unavailable (%s) — returning empty list", exc)
+        return []
 
 
 def get_account(
@@ -90,12 +97,16 @@ def get_account_id(external_id: str, tenant_id: str = DEFAULT_TENANT) -> Optiona
 
 
 def account_count(source: Optional[str] = None, tenant_id: str = DEFAULT_TENANT) -> int:
-    sb = get_client()
-    q = sb.table("accounts").select("id", count="exact").eq("tenant_id", tenant_id)
-    if source:
-        q = q.eq("source", source)
-    res = q.execute()
-    return res.count if res.count is not None else 0
+    try:
+        sb = get_client()
+        q = sb.table("accounts").select("id", count="exact").eq("tenant_id", tenant_id)
+        if source:
+            q = q.eq("source", source)
+        res = q.execute()
+        return res.count if res.count is not None else 0
+    except Exception as exc:
+        logger.warning("account_count: table unavailable (%s) — returning 0", exc)
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -245,66 +256,74 @@ def insert_scores(scores: List[ChurnScore], tenant_id: str = DEFAULT_TENANT) -> 
 
 def latest_scores(limit: int = 200, tenant_id: str = DEFAULT_TENANT) -> List[Dict[str, Any]]:
     """Get the most recent score per account, joined with account info."""
-    sb = get_client()
+    try:
+        sb = get_client()
 
-    # Get latest scores ordered by risk
-    res = (
-        sb.table("churn_scores_daily")
-        .select("*, accounts(name, domain, arr, source, external_id, metadata)")
-        .eq("tenant_id", tenant_id)
-        .order("score_date", desc=True)
-        .order("churn_risk_pct", desc=True)
-        .limit(limit)
-        .execute()
-    )
+        # Get latest scores ordered by risk
+        res = (
+            sb.table("churn_scores_daily")
+            .select("*, accounts(name, domain, arr, source, external_id, metadata)")
+            .eq("tenant_id", tenant_id)
+            .order("score_date", desc=True)
+            .order("churn_risk_pct", desc=True)
+            .limit(limit)
+            .execute()
+        )
 
-    if not res.data:
+        if not res.data:
+            return []
+
+        # Flatten the join
+        results = []
+        seen_accounts = set()
+        for row in res.data:
+            acct = row.pop("accounts", {}) or {}
+            aid = row.get("account_id")
+            if aid in seen_accounts:
+                continue  # only latest per account
+            seen_accounts.add(aid)
+
+            meta = acct.get("metadata") or {}
+            results.append({
+                **row,
+                "name": acct.get("name"),
+                "email": acct.get("domain"),
+                "plan": meta.get("plan"),
+                "arr": acct.get("arr"),
+                "source": acct.get("source"),
+                "external_id": acct.get("external_id"),
+                # Map fields for frontend compatibility
+                "churn_probability": row.get("churn_risk_pct", 0) / 100.0,
+                "tier": _risk_to_tier(row.get("churn_risk_pct", 0)),
+                "urgency_score": row.get("urgency"),
+            })
+
+        return results
+    except Exception as exc:
+        logger.warning("latest_scores: table unavailable (%s) — returning empty list", exc)
         return []
-
-    # Flatten the join
-    results = []
-    seen_accounts = set()
-    for row in res.data:
-        acct = row.pop("accounts", {}) or {}
-        aid = row.get("account_id")
-        if aid in seen_accounts:
-            continue  # only latest per account
-        seen_accounts.add(aid)
-
-        meta = acct.get("metadata") or {}
-        results.append({
-            **row,
-            "name": acct.get("name"),
-            "email": acct.get("domain"),
-            "plan": meta.get("plan"),
-            "arr": acct.get("arr"),
-            "source": acct.get("source"),
-            "external_id": acct.get("external_id"),
-            # Map fields for frontend compatibility
-            "churn_probability": row.get("churn_risk_pct", 0) / 100.0,
-            "tier": _risk_to_tier(row.get("churn_risk_pct", 0)),
-            "urgency_score": row.get("urgency"),
-        })
-
-    return results
 
 
 def score_history(external_id: str, limit: int = 30, tenant_id: str = DEFAULT_TENANT) -> List[Dict[str, Any]]:
-    account_id = get_account_id(external_id, tenant_id=tenant_id)
-    if not account_id:
-        return []
+    try:
+        account_id = get_account_id(external_id, tenant_id=tenant_id)
+        if not account_id:
+            return []
 
-    sb = get_client()
-    res = (
-        sb.table("churn_scores_daily")
-        .select("*")
-        .eq("tenant_id", tenant_id)
-        .eq("account_id", account_id)
-        .order("score_date", desc=True)
-        .limit(limit)
-        .execute()
-    )
-    return res.data or []
+        sb = get_client()
+        res = (
+            sb.table("churn_scores_daily")
+            .select("*")
+            .eq("tenant_id", tenant_id)
+            .eq("account_id", account_id)
+            .order("score_date", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception as exc:
+        logger.warning("score_history: table unavailable (%s) — returning empty list", exc)
+        return []
 
 
 def _risk_to_tier(pct: float) -> str:

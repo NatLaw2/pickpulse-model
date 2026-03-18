@@ -308,8 +308,8 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
         }));
       }
       setProviders(providerList);
-      setAccounts(acctRes.accounts);
-      setScores(scoresRes.scores);
+      setAccounts(acctRes.accounts ?? []);
+      setScores(scoresRes.scores ?? []);
 
       // Fetch health for connected providers
       const connected = providerList.filter(
