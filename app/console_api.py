@@ -1868,7 +1868,11 @@ def list_integration_accounts(
 def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
     """Score all integrated accounts using the trained churn model."""
     mod = get_module("churn")
-    artifact_dir = mod.get_artifact_dir(tenant_id)
+    current_run = store.get_current_model_run(tenant_id, "churn")
+    if current_run and current_run.get("artifact_path"):
+        artifact_dir = current_run["artifact_path"]
+    else:
+        artifact_dir = mod.get_artifact_dir(tenant_id)  # legacy fallback
     model_path = os.path.join(artifact_dir, "model.joblib")
 
     if not os.path.exists(model_path):
@@ -1879,7 +1883,7 @@ def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
         raise HTTPException(status_code=400, detail="No accounts in database. Sync an integration first.")
 
     try:
-        scores = score_accounts(tenant_id=tenant_id)
+        scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir)
         high = sum(1 for s in scores if s.tier == "High Risk")
         med = sum(1 for s in scores if s.tier == "Medium Risk")
         low = sum(1 for s in scores if s.tier == "Low Risk")
@@ -1927,13 +1931,17 @@ def run_demo(connector_name: str, tenant_id: str = Depends(get_tenant_id)):
     score_error = None
 
     mod = get_module("churn")
-    artifact_dir = mod.get_artifact_dir(tenant_id)
+    current_run = store.get_current_model_run(tenant_id, "churn")
+    if current_run and current_run.get("artifact_path"):
+        artifact_dir = current_run["artifact_path"]
+    else:
+        artifact_dir = mod.get_artifact_dir(tenant_id)  # legacy fallback
     model_exists = os.path.exists(os.path.join(artifact_dir, "model.joblib"))
     acct_count = storage_repo.account_count(tenant_id=tenant_id)
 
     if model_exists and acct_count > 0:
         try:
-            scores = score_accounts(tenant_id=tenant_id)
+            scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir)
             scored = len(scores)
             tier_counts = {
                 "High Risk": sum(1 for s in scores if s.tier == "High Risk"),

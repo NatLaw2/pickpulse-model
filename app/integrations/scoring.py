@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import joblib
 import pandas as pd
@@ -57,13 +57,20 @@ def _build_scoring_dataframe(tenant_id: str = repo.DEFAULT_TENANT) -> pd.DataFra
     return pd.DataFrame(rows)
 
 
-def score_accounts(tenant_id: str = repo.DEFAULT_TENANT) -> List[ChurnScore]:
+def score_accounts(
+    tenant_id: str = repo.DEFAULT_TENANT,
+    artifact_dir: Optional[str] = None,
+) -> List[ChurnScore]:
     """Score all stored accounts using the trained churn model.
+
+    artifact_dir should be the versioned run path from store.get_current_model_run().
+    If not provided, falls back to the flat per-tenant path (legacy).
 
     Returns a list of ChurnScore objects (also persisted to DB).
     """
     module = get_module("churn")
-    artifact_dir = module.get_artifact_dir(tenant_id)
+    if artifact_dir is None:
+        artifact_dir = module.get_artifact_dir(tenant_id)
     model_path = os.path.join(artifact_dir, "model.joblib")
 
     if not os.path.exists(model_path):
