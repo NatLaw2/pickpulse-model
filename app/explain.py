@@ -200,6 +200,26 @@ def explain_account(
             break
 
     if row is None:
+        # CRM mode fallback: look up from churn_scores_daily + signals
+        from .console_api import _crm_mode_active
+        from .storage import repo as _repo
+        if _crm_mode_active(tenant_id):
+            crm_score = _repo.get_account_latest_score(account_id, tenant_id=tenant_id)
+            if crm_score:
+                sig = _repo.latest_signals(account_id, tenant_id=tenant_id) or {}
+                row = {
+                    "account_id": account_id,
+                    "churn_risk_pct": float(crm_score.get("churn_risk_pct", 0)),
+                    "arr": float(crm_score.get("arr") or 0),
+                    "arr_at_risk": float(crm_score.get("arr_at_risk") or 0),
+                    "days_until_renewal": sig.get("days_until_renewal"),
+                    "renewal_window_label": crm_score.get("renewal_window") or "unknown",
+                    "tier": crm_score.get("tier") or "Low Risk",
+                    "recommended_action": crm_score.get("recommended_action") or "Monitor",
+                    **sig,  # merge all signal fields for risk driver generation
+                }
+
+    if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No prediction found for account '{account_id}'. Run predictions first.",

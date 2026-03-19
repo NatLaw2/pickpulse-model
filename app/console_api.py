@@ -1157,12 +1157,126 @@ def predict_module(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ---------------------------------------------------------------------------
+# CRM pipeline helpers — power the Accounts page from churn_scores_daily
+# ---------------------------------------------------------------------------
+
+def _crm_mode_active(tenant_id: str) -> bool:
+    """True if churn_scores_daily has rows scored within the last 30 days."""
+    return storage_repo.has_recent_scores(tenant_id, days=30)
+
+
+def _build_crm_predict_response(
+    tenant_id: str,
+    limit: int = 500,
+    include_archived: bool = False,
+) -> Dict[str, Any]:
+    """Build a PredictResponse-shaped dict from churn_scores_daily + accounts + signals.
+
+    Replaces the predictions_live path when the integrations pipeline has
+    recent scores (CRM mode). Returns the same shape as predict_module so
+    the frontend requires zero changes.
+    """
+    from .modules.churn.adapter import compute_renewal_window_label
+
+    scores = storage_repo.latest_scores(limit=10000, tenant_id=tenant_id)
+    signals_by_account = storage_repo.bulk_latest_signals(tenant_id)
+    account_statuses = _get_state(tenant_id).get("account_statuses", {})
+
+    predictions: List[Dict[str, Any]] = []
+    for s in scores:
+        acct_uuid = s.get("account_id", "")
+        ext_id = s.get("external_id") or acct_uuid
+
+        # Apply any manual lifecycle status overrides
+        status = account_statuses.get(str(ext_id), s.get("account_status", "active"))
+        is_archived = status not in ("active", "at_risk", "save_in_progress")
+        if is_archived and not include_archived:
+            continue
+
+        sig = signals_by_account.get(acct_uuid, {})
+        days_until_renewal = sig.get("days_until_renewal")
+        auto_renew_flag = sig.get("auto_renew_flag")
+
+        # Renewal window label: prefer stored value, fall back to computing from signals
+        renewal_window = s.get("renewal_window") or (
+            compute_renewal_window_label(float(days_until_renewal))
+            if days_until_renewal is not None else "unknown"
+        )
+
+        predictions.append({
+            "account_id": ext_id,
+            "churn_risk_pct": float(s.get("churn_risk_pct", 0)),
+            "urgency_score": s.get("urgency_score"),
+            "renewal_window_label": renewal_window or "unknown",
+            "days_until_renewal": int(float(days_until_renewal)) if days_until_renewal is not None else None,
+            "auto_renew_flag": int(float(auto_renew_flag)) if auto_renew_flag is not None else None,
+            "arr": s.get("arr"),
+            "arr_at_risk": s.get("arr_at_risk"),
+            "recommended_action": s.get("recommended_action") or "Monitor",
+            "tier": s.get("tier") or "Low Risk",
+            "account_status": status,
+            "name": s.get("name"),
+        })
+
+    # Rank is positional after sort-by-risk (latest_scores already orders DESC)
+    for i, p in enumerate(predictions):
+        p["rank"] = i + 1
+
+    showing = predictions[:limit]
+
+    tier_counts: Dict[str, int] = {}
+    total_arr_at_risk = 0.0
+    renewing_90d = 0
+    high_risk_in_window = 0
+    active_count = 0
+    archived_count = 0
+    for p in predictions:
+        t = p.get("tier", "Unknown")
+        tier_counts[t] = tier_counts.get(t, 0) + 1
+        total_arr_at_risk += p.get("arr_at_risk") or 0
+        if p.get("account_status") in ("active", "at_risk", "save_in_progress"):
+            active_count += 1
+        else:
+            archived_count += 1
+        wl = p.get("renewal_window_label", "")
+        if wl in ("<30d", "30-90d"):
+            renewing_90d += 1
+            if float(p.get("churn_risk_pct", 0)) >= 70:
+                high_risk_in_window += 1
+
+    return {
+        "predictions": showing,
+        "total": len(predictions),
+        "showing": len(showing),
+        "active_count": active_count,
+        "archived_count": archived_count,
+        "tier_counts": tier_counts,
+        "summary": {
+            "total_arr_at_risk": round(total_arr_at_risk, 2),
+            "renewing_90d": renewing_90d,
+            "high_risk_in_window": high_risk_in_window,
+        },
+    }
+
+
 @app.get("/api/predict/{module_name}/cached")
 def get_cached_predictions(
     module_name: str,
     tenant_id: str = Depends(get_tenant_id),
 ):
-    """Return cached predictions without re-scoring."""
+    """Return cached predictions without re-scoring.
+
+    CRM mode: when churn_scores_daily has recent rows for this tenant,
+    builds the response from the integrations pipeline (churn_scores_daily
+    + accounts + account_signals_daily) so the Accounts page shows real
+    CRM accounts instead of demo dataset predictions.
+
+    Demo/CSV mode: falls back to the existing predictions_live path.
+    """
+    if module_name == MODULE_NAME and _crm_mode_active(tenant_id):
+        return _build_crm_predict_response(tenant_id)
+
     state = _get_state(tenant_id)
     records = state["predictions"].get(module_name, [])
     if not records:

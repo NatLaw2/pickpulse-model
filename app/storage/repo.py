@@ -332,3 +332,109 @@ def _risk_to_tier(pct: float) -> str:
     if pct >= 40:
         return "Medium Risk"
     return "Low Risk"
+
+
+# ---------------------------------------------------------------------------
+# Bulk signals (one query for all accounts — avoids N+1 in CRM mode)
+# ---------------------------------------------------------------------------
+
+def bulk_latest_signals(tenant_id: str = DEFAULT_TENANT) -> Dict[str, Dict[str, Any]]:
+    """Fetch the latest signal snapshot for every account in one query.
+
+    Returns {account_uuid: {signal_key: value, ...}}.
+    Rows are ordered date DESC so the first occurrence per account is the latest.
+    """
+    try:
+        sb = get_client()
+        res = (
+            sb.table("account_signals_daily")
+            .select("account_id, signal_key, signal_value, signal_text, signal_date")
+            .eq("tenant_id", tenant_id)
+            .order("signal_date", desc=True)
+            .limit(10000)
+            .execute()
+        )
+        if not res.data:
+            return {}
+
+        latest_date: Dict[str, str] = {}
+        result: Dict[str, Dict[str, Any]] = {}
+        for row in res.data:
+            aid = row["account_id"]
+            key = row["signal_key"]
+            sig_date = row["signal_date"]
+            if key == "extra":
+                continue
+            if aid not in latest_date:
+                latest_date[aid] = sig_date
+                result[aid] = {}
+            if sig_date != latest_date[aid]:
+                continue  # older date for this account
+            if key not in result[aid]:  # first occurrence = latest
+                result[aid][key] = (
+                    row["signal_value"] if row["signal_value"] is not None else row["signal_text"]
+                )
+        return result
+    except Exception as exc:
+        logger.warning("bulk_latest_signals: unavailable (%s) — returning empty dict", exc)
+        return {}
+
+
+def has_recent_scores(tenant_id: str = DEFAULT_TENANT, days: int = 30) -> bool:
+    """Return True if churn_scores_daily has rows scored within `days` days."""
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+    try:
+        sb = get_client()
+        res = (
+            sb.table("churn_scores_daily")
+            .select("id")
+            .eq("tenant_id", tenant_id)
+            .gte("score_date", cutoff)
+            .limit(1)
+            .execute()
+        )
+        return bool(res.data)
+    except Exception as exc:
+        logger.warning("has_recent_scores: unavailable (%s) — returning False", exc)
+        return False
+
+
+def get_account_latest_score(
+    external_id: str,
+    tenant_id: str = DEFAULT_TENANT,
+) -> Optional[Dict[str, Any]]:
+    """Get the most recent churn score for one account by external_id."""
+    account_id = get_account_id(external_id, tenant_id=tenant_id)
+    if not account_id:
+        return None
+    try:
+        sb = get_client()
+        res = (
+            sb.table("churn_scores_daily")
+            .select("*, accounts(name, domain, arr, source, external_id, metadata)")
+            .eq("tenant_id", tenant_id)
+            .eq("account_id", account_id)
+            .order("score_date", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not res.data:
+            return None
+        row = res.data[0]
+        acct = row.pop("accounts", {}) or {}
+        meta = acct.get("metadata") or {}
+        return {
+            **row,
+            "name": acct.get("name"),
+            "domain": acct.get("domain"),
+            "plan": meta.get("plan"),
+            "arr": acct.get("arr"),
+            "source": acct.get("source"),
+            "external_id": acct.get("external_id"),
+            "tier": _risk_to_tier(row.get("churn_risk_pct", 0)),
+            "urgency_score": row.get("urgency"),
+        }
+    except Exception as exc:
+        logger.warning("get_account_latest_score: unavailable (%s) — returning None", exc)
+        return None
