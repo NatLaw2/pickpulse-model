@@ -81,7 +81,7 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
     try {
       const req: DraftEmailRequest = {
         account_id: prediction.account_id,
-        customer_name: prediction.account_id,
+        customer_name: prediction.name || prediction.account_id,
         contact_email: contactEmail || null,
         churn_risk_pct: prediction.churn_risk_pct,
         arr: prediction.arr,
@@ -207,7 +207,7 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
       <div className="sticky top-0 bg-white border-b border-[var(--color-border)] px-5 py-4 flex items-center justify-between z-10">
         <div>
           <h3 className="text-sm font-bold">Why This Account Is At Risk</h3>
-          <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{prediction.account_id}</p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{prediction.name || prediction.account_id}</p>
         </div>
         <button
           onClick={onClose}

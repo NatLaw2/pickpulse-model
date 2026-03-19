@@ -121,7 +121,11 @@ export function PredictPage() {
   let filtered: ChurnPrediction[] = result?.predictions ?? [];
   if (search) {
     const q = search.toLowerCase();
-    filtered = filtered.filter((r) => r.account_id?.toLowerCase().includes(q));
+    filtered = filtered.filter((r) =>
+      r.account_id?.toLowerCase().includes(q) ||
+      r.name?.toLowerCase().includes(q) ||
+      r.domain?.toLowerCase().includes(q)
+    );
   }
   if (riskFilter !== 'all') {
     filtered = filtered.filter((r) => {
@@ -370,7 +374,10 @@ export function PredictPage() {
                           i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''
                         } ${selectedId === row.account_id ? 'bg-[var(--color-accent)]/10' : ''}`}
                       >
-                        <td className="py-3 px-4 font-medium text-xs">{row.account_id}</td>
+                        <td className="py-3 px-4 font-medium text-xs">
+                          <span>{row.name || row.account_id}</span>
+                          {row.domain && <span className="block text-[var(--color-text-muted)] font-normal">{row.domain}</span>}
+                        </td>
                         <td className="py-3 px-4 text-right">
                           <span
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"

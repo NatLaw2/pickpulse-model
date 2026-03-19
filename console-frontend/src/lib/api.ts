@@ -605,6 +605,8 @@ export interface FeatureImportance {
 
 export interface ChurnPrediction {
   account_id: string;
+  name?: string;
+  domain?: string;
   churn_risk_pct: number;
   urgency_score: number;
   renewal_window_label: string;
