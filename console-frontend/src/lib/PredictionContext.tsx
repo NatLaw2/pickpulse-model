@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { api, type PredictResponse } from './api';
+import { type PredictResponse } from './api';
 import { useDataset } from './DatasetContext';
 
 const STORAGE_KEY = 'pickpulse_predictions';
@@ -22,7 +22,7 @@ const PredictionContext = createContext<PredictionState>({
 
 export function PredictionProvider({ children }: { children: ReactNode }) {
   const [predictions, setPredictionsState] = useState<PredictResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const loading = false;
   const { dataset } = useDataset();
   const prevDatasetRef = useRef(dataset?.loaded_at);
 
