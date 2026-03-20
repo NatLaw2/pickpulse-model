@@ -2009,6 +2009,52 @@ def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
         low = sum(1 for s in scores if s.tier == "Low Risk")
         total_arr = sum(s.arr_at_risk or 0 for s in scores)
 
+        # HubSpot property writeback — fire-and-forget in a daemon thread.
+        # Filters to hubspot-source accounts only so CSV-sourced accounts in
+        # the same tenant are never pushed.  Task deduplication is skipped in
+        # this path (V1): _run_hubspot_writeback will see an empty task-id map
+        # for CRM accounts and may create tasks for high-risk accounts each run.
+        # Full dedup against churn_scores_daily is a V2 item.
+        try:
+            scored_rows = storage_repo.latest_scores(limit=10000, tenant_id=tenant_id)
+            signals_by_account = storage_repo.bulk_latest_signals(tenant_id)
+            writeback_records = []
+            for row in scored_rows:
+                if row.get("source") != "hubspot":
+                    continue
+                ext_id = row.get("external_id") or ""
+                if not ext_id:
+                    continue
+                acct_uuid = row.get("account_id", "")
+                sig = signals_by_account.get(acct_uuid, {})
+                days_until_renewal = sig.get("days_until_renewal")
+                writeback_records.append({
+                    # account_id used by _run_hubspot_writeback for task dedup lookup
+                    "account_id": ext_id,
+                    # hs_object_id is the HubSpot company Record ID; for HubSpot-
+                    # sourced accounts this is identical to external_id.
+                    "hs_object_id": ext_id,
+                    "churn_risk_pct": row.get("churn_risk_pct"),
+                    "tier": row.get("tier"),
+                    "arr_at_risk": row.get("arr_at_risk"),
+                    "recommended_action": row.get("recommended_action"),
+                    "days_until_renewal": (
+                        int(float(days_until_renewal))
+                        if days_until_renewal is not None else None
+                    ),
+                })
+            if writeback_records:
+                _spawn_hubspot_writeback(tenant_id, writeback_records)
+                logger.info(
+                    "[integrations/score] Queued HubSpot writeback for %d accounts (tenant %s)",
+                    len(writeback_records), tenant_id,
+                )
+        except Exception as wb_exc:
+            logger.warning(
+                "[integrations/score] HubSpot writeback setup failed for tenant %s: %s",
+                tenant_id, wb_exc,
+            )
+
         return {
             "status": "scored",
             "accounts_scored": len(scores),
