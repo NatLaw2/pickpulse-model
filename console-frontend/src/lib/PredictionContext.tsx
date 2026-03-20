@@ -68,7 +68,6 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         const currentDatasetAt = dataset?.loaded_at ?? null;
         if (cachedDatasetAt !== null && currentDatasetAt !== null && cachedDatasetAt !== currentDatasetAt) {
           try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-          // fall through to backend
         } else if (cachedData.predictions?.length) {
           setPredictionsState(cachedData);
           return;
@@ -76,22 +75,6 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       }
     } catch { /* corrupt data — fall through */ }
 
-    // Last resort: backend cached endpoint (returns 404 if predictions are stale or absent)
-    setLoading(true);
-    try {
-      const res = await api.cachedPredictions();
-      setPredictionsState(res);
-      try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-          data: res,
-          dataset_loaded_at: dataset?.loaded_at ?? null,
-        }));
-      } catch { /* ignore */ }
-    } catch {
-      // 404 = no cached predictions (or stale), not an error
-    } finally {
-      setLoading(false);
-    }
   }, [predictions, dataset?.loaded_at]);
 
   return (

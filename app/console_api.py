@@ -1252,6 +1252,7 @@ def _build_crm_predict_response(
         "active_count": active_count,
         "archived_count": archived_count,
         "tier_counts": tier_counts,
+        "crm_mode": True,
         "summary": {
             "total_arr_at_risk": round(total_arr_at_risk, 2),
             "renewing_90d": renewing_90d,

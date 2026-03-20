@@ -223,8 +223,8 @@ export function PredictPage() {
         </div>
       )}
 
-      {/* Action bar — only show when we have a dataset */}
-      {!noDataset && !noModel && (
+      {/* Action bar — only show when we have a dataset and are not in CRM mode */}
+      {!noDataset && !noModel && !result?.crm_mode && (
         <div className="flex items-center gap-3 mb-6 flex-wrap">
           <button
             onClick={handlePredict}

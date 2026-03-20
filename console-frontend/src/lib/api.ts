@@ -660,6 +660,7 @@ export interface PredictResponse {
   active_count: number;
   archived_count: number;
   tier_counts: Record<string, number>;
+  crm_mode?: boolean;
   summary: {
     total_arr_at_risk?: number;
     renewing_90d?: number;

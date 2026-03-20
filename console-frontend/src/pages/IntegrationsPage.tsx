@@ -4,6 +4,7 @@ import type {
   ProviderInfo, IntegrationScore, HealthResponse,
   IntegrationAccount,
 } from '../lib/api';
+import { usePredictions } from '../lib/PredictionContext';
 import { formatCurrency } from '../lib/format';
 import { IntegrationWizard } from '../components/IntegrationWizard';
 import {
@@ -259,10 +260,12 @@ function ScoresTable({ scores }: { scores: IntegrationScore[] }) {
 // ---------------------------------------------------------------------------
 
 export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
+  const { setPredictions } = usePredictions();
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [healthMap, setHealthMap] = useState<Record<string, HealthResponse>>({});
   const [accounts, setAccounts] = useState<IntegrationAccount[]>([]);
   const [scores, setScores] = useState<IntegrationScore[]>([]);
+  const [hasScored, setHasScored] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [scoring, setScoring] = useState(false);
@@ -388,6 +391,12 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
       const result = await api.triggerScoring();
       showToast(`Scored ${result.accounts_scored} accounts — ${formatCurrency(result.total_arr_at_risk)} ARR at risk`);
       await loadData();
+      setHasScored(true);
+      // Populate the predictions context so Accounts page shows CRM results without manual navigation
+      try {
+        const cached = await api.cachedPredictions();
+        setPredictions(cached);
+      } catch { /* non-critical */ }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -582,8 +591,8 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
         </div>
       )}
 
-      {/* Scores table */}
-      {scores.length > 0 && (
+      {/* Scores table — only shown after explicit Rescore All action this session */}
+      {hasScored && scores.length > 0 && (
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
             <Activity size={14} className="text-[var(--color-accent)]" /> Latest Churn Scores

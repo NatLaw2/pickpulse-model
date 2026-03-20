@@ -132,7 +132,7 @@ def _build_html(
         renewal_days = acct.get("days_until_renewal", "—")
         renewal_label = f"{renewal_days}d" if isinstance(renewal_days, (int, float)) else renewal_days
         acct_rows += f"""<tr>
-              <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#1a1d26;border-bottom:1px solid #e5e7eb" bgcolor="{bg}">{acct.get("customer_id", "—")}</td>
+              <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#1a1d26;border-bottom:1px solid #e5e7eb" bgcolor="{bg}">{acct.get("name") or acct.get("account_id") or acct.get("customer_id") or "—"}</td>
               <td align="right" style="padding:10px 14px;font-size:13px;border-bottom:1px solid #e5e7eb" bgcolor="{bg}"><span style="color:{risk_color};font-weight:700">{risk_pct}%</span></td>
               <td align="right" style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb" bgcolor="{bg}">{_fmt_currency(acct.get("arr", 0))}</td>
               <td align="right" style="padding:10px 14px;font-size:13px;font-weight:700;color:#ef4444;border-bottom:1px solid #e5e7eb" bgcolor="{bg}">{_fmt_currency(acct.get("arr_at_risk", 0))}</td>

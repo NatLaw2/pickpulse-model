@@ -69,6 +69,7 @@ export function DashboardPage() {
 
       const topAccounts = (dashData.top_at_risk ?? []).slice(0, 5).map((p) => ({
         account_id: p.account_id,
+        name: p.name || p.account_id,
         churn_risk_pct: p.churn_risk_pct,
         arr: p.arr,
         arr_at_risk: p.arr_at_risk,
@@ -298,7 +299,7 @@ export function DashboardPage() {
                           i % 2 === 1 ? 'bg-[var(--color-bg-primary)]' : ''
                         } ${selectedId === row.account_id ? 'bg-[var(--color-accent)]/10' : ''}`}
                       >
-                        <td className="py-2.5 pr-3 font-medium text-xs">{row.account_id}</td>
+                        <td className="py-2.5 pr-3 font-medium text-xs">{row.name || row.account_id}</td>
                         <td className="py-2.5 pr-3 text-right">
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold"
