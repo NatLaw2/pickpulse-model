@@ -83,30 +83,29 @@ def score_accounts(
         logger.info("No accounts to score")
         return []
 
-    # Normalize and add derived features (same pipeline as predict.py)
-    df = normalize_columns(df)
-    df = add_derived_features(df)
-
-    # Load model + feature metadata
-    model = joblib.load(model_path)
-    meta_path = os.path.join(artifact_dir, "feature_meta.json")
-
+    # Load feature metadata first — needed for engagement normalization
+    # maxes before add_derived_features runs.
     import json as _json
+    meta_path = os.path.join(artifact_dir, "feature_meta.json")
     with open(meta_path) as _f:
         feature_meta = _json.load(_f)
+
+    # Normalize and add derived features using training-time engagement maxes
+    # so the engagement_score feature is on the same scale as during training.
+    df = normalize_columns(df)
+    df = add_derived_features(
+        df,
+        engagement_maxes=feature_meta.get("engagement_maxes"),
+    )
 
     # Prepare features using the engine
     from app.engine.features import prepare_features
 
+    model = joblib.load(model_path)
+
     X, _y, _feat_names, _meta = prepare_features(
         df, module, fit=False, feature_meta=feature_meta,
     )
-
-    # CalibratedClassifierCV can fail on very small batches, so use the
-    # uncalibrated base model when available for small scoring runs.
-    base_path = os.path.join(artifact_dir, "base_model.joblib")
-    if len(X) < 50 and os.path.exists(base_path):
-        model = joblib.load(base_path)
 
     probs = model.predict_proba(X)[:, 1]
     probs = probs.clip(module.calibration.prob_floor, module.calibration.prob_ceil)

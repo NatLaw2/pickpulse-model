@@ -1,7 +1,7 @@
 """Churn vertical adapter — customer churn risk prediction."""
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -69,8 +69,20 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Add churn-specific derived features."""
+def add_derived_features(
+    df: pd.DataFrame,
+    engagement_maxes: Optional[Dict[str, float]] = None,
+) -> pd.DataFrame:
+    """Add churn-specific derived features.
+
+    Args:
+        df: Input DataFrame.
+        engagement_maxes: Optional dict of {column: training_max} for
+            engagement_score normalization.  When provided (inference),
+            the training-time maxes are used instead of the batch max so
+            the feature is on the same scale as during training.  When
+            None (training), maxes are computed from the current batch.
+    """
     work = df.copy()
 
     # ARR risk tier
@@ -96,7 +108,10 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
             work[c] = work[c].fillna(0)
         normed = work[present].copy()
         for c in present:
-            mx = normed[c].max()
+            if engagement_maxes and c in engagement_maxes:
+                mx = engagement_maxes[c]  # use training-time max at inference
+            else:
+                mx = normed[c].max()      # compute from batch at training time
             if mx > 0:
                 normed[c] = normed[c] / mx
         work["engagement_score"] = normed.mean(axis=1)

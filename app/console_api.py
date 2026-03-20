@@ -1542,10 +1542,16 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
             with open(eval_path) as f:
                 metrics = json.load(f)
 
-    predictions = state["predictions"].get("churn", [])
-    # Discard predictions that pre-date the current dataset registration.
-    if predictions and _predictions_are_stale(state, "churn", tenant_id):
-        predictions = []
+    # CRM mode: source predictions from churn_scores_daily instead of
+    # the in-memory CSV pipeline state.
+    if _crm_mode_active(tenant_id):
+        crm_response = _build_crm_predict_response(tenant_id, limit=10000)
+        predictions = crm_response.get("predictions", [])
+    else:
+        predictions = state["predictions"].get("churn", [])
+        # Discard predictions that pre-date the current dataset registration.
+        if predictions and _predictions_are_stale(state, "churn", tenant_id):
+            predictions = []
 
     # Compute summary KPIs from cached predictions
     total_arr_at_risk = 0.0

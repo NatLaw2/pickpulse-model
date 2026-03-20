@@ -84,6 +84,17 @@ def prepare_features(
             medians[col] = float(work[col].median()) if not work[col].isna().all() else 0.0
         meta["numeric_cols"] = numeric_cols
         meta["medians"] = medians
+
+        # Persist engagement normalization maxes so inference uses the same
+        # scale as training rather than normalising against the scoring batch.
+        eng_maxes: Dict[str, float] = {}
+        for col in ["monthly_logins", "seats"]:
+            if col in work.columns:
+                mx = float(work[col].fillna(0).max())
+                if mx > 0:
+                    eng_maxes[col] = mx
+        if eng_maxes:
+            meta["engagement_maxes"] = eng_maxes
     else:
         numeric_cols = meta.get("numeric_cols", numeric_cols)
         medians = meta.get("medians", {})
