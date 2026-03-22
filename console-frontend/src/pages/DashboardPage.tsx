@@ -47,9 +47,12 @@ export function DashboardPage() {
     api.dashboard(rate).then(setData).catch(console.error);
   }, []);
 
+  // Only fetch dashboard data if predictions have been explicitly set this session.
+  // Prevents Overview from auto-populating from the DB on fresh login in CRM mode.
   useEffect(() => {
+    if (!predictions) return;
     fetchDashboard(saveRate);
-  }, [fetchDashboard, saveRate]);
+  }, [fetchDashboard, saveRate, predictions]);
 
   // Auto-generate executive summary when dashboard data loads with predictions
   useEffect(() => {
