@@ -95,17 +95,49 @@ def _build_signal_rows(
     return rows
 
 
+# The minimal set of signal keys that must be present for demo scoring to
+# produce a realistic risk distribution.  Partial HubSpot-synced rows
+# (e.g. support_tickets=0, extra=null) must NOT block re-seeding.
+_REQUIRED_DEMO_KEYS = frozenset({
+    "days_since_last_login", "monthly_logins", "nps_score",
+    "days_until_renewal", "auto_renew_flag",
+})
+
+
+def _demo_signals_complete(
+    signals_by_account: Dict[str, Dict[str, Any]],
+    required: frozenset,
+    min_fraction: float = 0.5,
+) -> bool:
+    """Return True only when required keys are present for ≥ min_fraction of accounts."""
+    if not signals_by_account:
+        return False
+    fully_seeded = sum(
+        1 for sigs in signals_by_account.values()
+        if required.issubset(sigs.keys())
+    )
+    return (fully_seeded / len(signals_by_account)) >= min_fraction
+
+
 def auto_seed_if_needed(tenant_id: str, source: Optional[str] = None) -> bool:
-    """Seed demo signals if none exist for this tenant. Returns True if seeding occurred."""
-    # TEMPORARY DIAGNOSTIC — print() used to guarantee visibility in Render logs
+    """Seed demo signals unless required keys are already present for this tenant."""
     print(f"[demo_seed] auto_seed_if_needed called — tenant={tenant_id[:8]}… source={source}")
 
     try:
         existing = repo.bulk_latest_signals(tenant_id)
         print(f"[demo_seed] existing signals count: {len(existing)}")
-        if existing:
-            print("[demo_seed] signals already present — skipping seed")
+
+        if _demo_signals_complete(existing, _REQUIRED_DEMO_KEYS):
+            print("[demo_seed] required demo keys present — skipping seed")
             return False
+
+        # Signals exist but are partial/legacy — report and re-seed
+        if existing:
+            missing_count = sum(
+                1 for sigs in existing.values()
+                if not _REQUIRED_DEMO_KEYS.issubset(sigs.keys())
+            )
+            print(f"[demo_seed] {missing_count}/{len(existing)} accounts missing required demo keys — seeding now")
 
         accounts = repo.list_accounts(source=source, limit=50_000, tenant_id=tenant_id)
         print(f"[demo_seed] accounts found: {len(accounts)}")
