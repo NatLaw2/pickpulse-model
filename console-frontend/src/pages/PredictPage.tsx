@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crosshair, Database, Download, Loader2, Search, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Crosshair, Database, Download, Loader2, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { api, isNoDatasetError, isNoModelError, type ChurnPrediction } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
