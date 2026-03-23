@@ -107,8 +107,8 @@ CHURN_MODULE = ModuleConfig(
         "hs_object_id",   # HubSpot company Record ID — required for CRM card and write-back
     ],
     tiers=TierConfig(
-        high_threshold=0.70,
-        medium_threshold=0.40,
+        high_threshold=0.30,
+        medium_threshold=0.20,
         high_label="High Risk",
         medium_label="Medium Risk",
         low_label="Low Risk",

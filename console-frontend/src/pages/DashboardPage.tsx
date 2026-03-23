@@ -91,6 +91,14 @@ export function DashboardPage() {
       if (tc['Medium Risk']) tierCountLabels.push(`${tc['Medium Risk']} accounts at Medium Risk`);
       const driverSummary = [...riskDriverNames.slice(0, 3), ...tierCountLabels];
 
+      const priorityAccounts = (dashData.top_priority_accounts ?? []).slice(0, 3).map((p) => ({
+        account_id: p.account_id,
+        name: p.name || p.account_id,
+        churn_risk_pct: p.churn_risk_pct,
+        arr_at_risk: p.arr_at_risk,
+        days_until_renewal: p.days_until_renewal,
+      }));
+
       const res = await api.sendExecutiveSummary({
         recipients,
         total_arr_at_risk: dashData.kpis.total_arr_at_risk,
@@ -99,6 +107,7 @@ export function DashboardPage() {
         high_risk_in_window: dashData.kpis.high_risk_in_window,
         renewing_90d: dashData.kpis.renewing_90d,
         top_accounts: topAccounts,
+        top_priority_accounts: priorityAccounts,
         tier_counts: dashData.tier_counts ?? {},
         risk_drivers: driverSummary,
       });
@@ -188,10 +197,10 @@ export function DashboardPage() {
             <StatCard
               label="Accounts Requiring Action"
               value={kpis?.high_risk_in_window ?? '—'}
-              sub="High risk and renewing soon"
+              sub="High risk and renewing within 30 days"
               icon={<AlertTriangle size={16} />}
               accent="var(--color-danger)"
-              tooltip="Accounts with ≥70% churn probability that also renew within 90 days. These need immediate outreach."
+              tooltip="Accounts with ≥25% churn probability that also renew within 30 days. These need immediate outreach."
               onClick={() => navigate('/predict')}
             />
             <StatCard
@@ -288,6 +297,7 @@ export function DashboardPage() {
                     <tr className="text-left text-xs text-[var(--color-text-muted)] uppercase tracking-wider border-b border-[var(--color-border)]">
                       <th className="py-2 pr-3">Account</th>
                       <th className="py-2 pr-3 text-right">Risk</th>
+                      <th className="py-2 pr-3">Tier</th>
                       <th className="py-2 pr-3 text-right">ARR</th>
                       <th className="py-2 pr-3 text-right">ARR at Risk</th>
                       <th className="py-2 pr-3">Renewal</th>
@@ -311,6 +321,17 @@ export function DashboardPage() {
                           >
                             {row.churn_risk_pct}%
                           </span>
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          {row.tier && (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                              row.tier === 'High Risk' ? 'bg-red-50 text-red-600' :
+                              row.tier === 'Medium Risk' ? 'bg-amber-50 text-amber-600' :
+                              'bg-emerald-50 text-emerald-600'
+                            }`}>
+                              {row.tier}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 pr-3 text-right text-xs">{formatCurrency(row.arr)}</td>
                         <td className="py-2.5 pr-3 text-right text-xs font-bold text-[var(--color-danger)]">{formatCurrency(row.arr_at_risk)}</td>

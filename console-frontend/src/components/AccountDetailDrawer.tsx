@@ -218,6 +218,13 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
       </div>
 
       <div className="px-5 py-5 space-y-6">
+        {/* Urgent renewal warning */}
+        {prediction.days_until_renewal != null && prediction.days_until_renewal <= 30 && (
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700">
+            ⚠️ Renewal in {prediction.days_until_renewal} days — act now
+          </div>
+        )}
+
         {/* Account Summary */}
         <div>
           <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-3">Account Summary</h4>
@@ -280,10 +287,14 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
               {explainData.risk_drivers.map((driver, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-2 px-3 py-2.5 bg-[var(--color-bg-primary)] rounded-xl text-xs"
+                  className={`flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs ${
+                    i < 2
+                      ? 'bg-red-50 border border-red-100'
+                      : 'bg-[var(--color-bg-primary)]'
+                  }`}
                 >
                   <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] flex-shrink-0" />
-                  <span className="text-[var(--color-text-primary)]">{driver}</span>
+                  <span className={i < 2 ? 'text-[var(--color-text-primary)] font-semibold' : 'text-[var(--color-text-primary)]'}>{driver}</span>
                 </div>
               ))}
               {explainData.risk_driver_summary && (

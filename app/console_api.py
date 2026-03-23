@@ -1136,10 +1136,11 @@ def predict_module(
             summary["total_arr_at_risk"] = round(float(scored_display["arr_at_risk"].sum()), 2)
         if "renewal_window_90d" in scored.columns:
             summary["renewing_90d"] = int(scored[scored["account_status"] == "active"]["renewal_window_90d"].sum()) if "account_status" in scored.columns else int(scored["renewal_window_90d"].sum())
-        if "churn_risk_pct" in scored_display.columns and "renewal_window_90d" in scored.columns:
+        if "churn_risk_pct" in scored_display.columns and "days_until_renewal" in scored_display.columns:
             high_in_window = scored_display[
-                (scored_display["churn_risk_pct"] >= 70) &
-                (scored.loc[scored_display.index, "renewal_window_90d"] == 1 if "renewal_window_90d" in scored.columns else False)
+                (scored_display["churn_risk_pct"] >= 25) &
+                (scored_display["days_until_renewal"].notna()) &
+                (scored_display["days_until_renewal"] <= 30)
             ]
             summary["high_risk_in_window"] = len(high_in_window)
 
@@ -1243,8 +1244,9 @@ def _build_crm_predict_response(
         wl = p.get("renewal_window_label", "")
         if wl in ("<30d", "30-90d"):
             renewing_90d += 1
-            if float(p.get("churn_risk_pct", 0)) >= 70:
-                high_risk_in_window += 1
+        dur = p.get("days_until_renewal")
+        if dur is not None and dur <= 30 and float(p.get("churn_risk_pct", 0)) >= 25:
+            high_risk_in_window += 1
 
     return {
         "predictions": showing,
@@ -1306,8 +1308,9 @@ def get_cached_predictions(
         wl = p.get("renewal_window_label", "")
         if wl in ("<30d", "30-90d"):
             renewing_90d += 1
-            if pct >= 70:
-                high_risk_in_window += 1
+        dur = p.get("days_until_renewal")
+        if dur is not None and dur <= 30 and pct >= 25:
+            high_risk_in_window += 1
 
     return {
         "predictions": records,
@@ -1577,24 +1580,25 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
     renewing_90d = 0
     high_risk_in_window = 0
     # Recovery buckets by churn probability tier
-    high_saves = 0.0   # churn_risk_pct >= 70
-    medium_saves = 0.0  # 40 <= churn_risk_pct < 70
-    low_saves = 0.0     # churn_risk_pct < 40
+    high_saves = 0.0   # churn_risk_pct >= 30
+    medium_saves = 0.0  # 20 <= churn_risk_pct < 30
+    low_saves = 0.0     # churn_risk_pct < 20
     tier_counts: dict[str, int] = {}
     for p in predictions:
         arr_r = p.get("arr_at_risk", 0) or 0
         total_arr_at_risk += arr_r
         pct = p.get("churn_risk_pct") or 0
-        if pct >= 70:
+        if pct >= 30:
             high_saves += arr_r
-        elif pct >= 40:
+        elif pct >= 20:
             medium_saves += arr_r
         else:
             low_saves += arr_r
         if p.get("renewal_window_label") in ("<30d", "30-90d"):
             renewing_90d += 1
-            if pct >= 70:
-                high_risk_in_window += 1
+        dur = p.get("days_until_renewal")
+        if dur is not None and dur <= 30 and pct >= 25:
+            high_risk_in_window += 1
         tier = p.get("tier", "Unknown")
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
 
@@ -1613,6 +1617,17 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
 
     # Top 10 at-risk accounts
     top_10 = sorted(predictions, key=lambda x: x.get("arr_at_risk", 0) or 0, reverse=True)[:10]
+
+    # Top priority accounts: prob >= 25%, sorted by days_until_renewal ASC (nulls last), prob DESC
+    priority_candidates = [p for p in predictions if (p.get("churn_risk_pct") or 0) >= 25]
+    top_priority_accounts = sorted(
+        priority_candidates,
+        key=lambda x: (
+            x.get("days_until_renewal") is None,
+            x.get("days_until_renewal") if x.get("days_until_renewal") is not None else 9999,
+            -(x.get("churn_risk_pct") or 0),
+        ),
+    )[:5]
 
     ds = _get_dataset("churn", tenant_id=tenant_id)
 
@@ -1643,6 +1658,7 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
             "low_confidence_saves": round(low_saves, 2),
         },
         "top_at_risk": top_10,
+        "top_priority_accounts": top_priority_accounts,
         "tier_counts": tier_counts,
         "top_risk_drivers": top_risk_drivers,
     }

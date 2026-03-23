@@ -34,6 +34,7 @@ class ExecutiveSummaryRequest(BaseModel):
     high_risk_in_window: int
     renewing_90d: int
     top_accounts: List[Dict[str, Any]]
+    top_priority_accounts: List[Dict[str, Any]] = []
     tier_counts: Dict[str, int] = {}
     risk_drivers: List[str] = []
 
@@ -69,6 +70,7 @@ def send_executive_summary(
         high_risk_in_window=req.high_risk_in_window,
         renewing_90d=req.renewing_90d,
         top_accounts=req.top_accounts[:5],
+        top_priority_accounts=req.top_priority_accounts[:3],
         tier_counts=req.tier_counts,
         risk_drivers=req.risk_drivers[:5],
         generated_at=generated_at,
@@ -81,6 +83,7 @@ def send_executive_summary(
         high_risk_in_window=req.high_risk_in_window,
         renewing_90d=req.renewing_90d,
         top_accounts=req.top_accounts[:5],
+        top_priority_accounts=req.top_priority_accounts[:3],
         risk_drivers=req.risk_drivers[:5],
         generated_at=generated_at,
     )
@@ -126,6 +129,7 @@ def _build_text(
     top_accounts: List[Dict[str, Any]],
     risk_drivers: List[str],
     generated_at: str,
+    top_priority_accounts: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     lines = [
         "PickPulse Executive ARR Risk Brief",
@@ -134,9 +138,19 @@ def _build_text(
         "PORTFOLIO SUMMARY",
         f"  ARR at Risk:           {_fmt_currency_simple(total_arr_at_risk)}",
         f"  Projected Recoverable: {_fmt_currency_simple(projected_recoverable_arr)} (at {round(save_rate * 100)}% save rate)",
-        f"  Urgent Accounts:       {high_risk_in_window} (high risk + renewing soon)",
+        f"  Urgent Accounts:       {high_risk_in_window} (high risk + renewing within 30 days)",
         f"  Renewing in 90 Days:   {renewing_90d}",
     ]
+
+    if top_priority_accounts:
+        lines += ["", "TOP PRIORITY ACCOUNTS (renewing soon + high risk)"]
+        for acct in top_priority_accounts:
+            name = acct.get("name") or acct.get("account_id") or "—"
+            risk = acct.get("churn_risk_pct", 0)
+            dur = acct.get("days_until_renewal")
+            renewal_str = f"{int(dur)}d" if dur is not None else "unknown"
+            arr_risk = _fmt_currency_simple(acct.get("arr_at_risk", 0))
+            lines.append(f"  {name}: {risk}% risk  |  Renewal in {renewal_str}  |  At risk {arr_risk}")
 
     if top_accounts:
         lines += ["", "TOP ACCOUNTS REQUIRING ATTENTION"]
@@ -190,13 +204,14 @@ def _build_html(
     tier_counts: Dict[str, int],
     risk_drivers: List[str],
     generated_at: str,
+    top_priority_accounts: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     # Top accounts table rows
     acct_rows = ""
     for i, acct in enumerate(top_accounts):
         bg = "#f9fafb" if i % 2 == 1 else "#ffffff"
         risk_pct = acct.get("churn_risk_pct", 0)
-        risk_color = "#ef4444" if risk_pct >= 70 else "#f59e0b" if risk_pct >= 40 else "#10b981"
+        risk_color = "#ef4444" if risk_pct >= 30 else "#f59e0b" if risk_pct >= 20 else "#10b981"
         renewal_days = acct.get("days_until_renewal", "—")
         renewal_label = f"{renewal_days}d" if isinstance(renewal_days, (int, float)) else renewal_days
         acct_rows += f"""<tr>
@@ -227,7 +242,49 @@ def _build_html(
               <td style="padding:6px 14px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;font-family:Arial,sans-serif">&#8226;&nbsp; {d}</td>
             </tr>"""
 
+    # Top priority accounts rows
+    priority_rows = ""
+    for i, acct in enumerate(top_priority_accounts or []):
+        bg = "#f9fafb" if i % 2 == 1 else "#ffffff"
+        risk_pct = acct.get("churn_risk_pct", 0)
+        dur = acct.get("days_until_renewal")
+        renewal_label = f"{int(dur)}d" if dur is not None else "—"
+        arr_risk = _fmt_currency(acct.get("arr_at_risk", 0))
+        priority_rows += f"""<tr>
+              <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#1a1d26;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}">{acct.get("name") or acct.get("account_id") or "—"}</td>
+              <td align="right" style="padding:10px 14px;font-size:13px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}"><span style="color:#ef4444;font-weight:700;font-family:Arial,sans-serif">{risk_pct}%</span></td>
+              <td align="right" style="padding:10px 14px;font-size:13px;color:#f59e0b;font-weight:700;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}">{renewal_label}</td>
+              <td align="right" style="padding:10px 14px;font-size:13px;font-weight:700;color:#ef4444;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}">{arr_risk}</td>
+            </tr>"""
+
     # Conditional sections
+    priority_section = ""
+    if priority_rows:
+        priority_section = f"""
+        <!-- Top Priority Accounts -->
+        <tr>
+          <td style="padding:0 0 24px 0">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif">
+              <tr>
+                <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26;font-family:Arial,sans-serif">Top Priority Accounts <span style="font-size:12px;color:#f59e0b;font-weight:600;font-family:Arial,sans-serif">(renewing within 30 days)</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #fde68a;font-family:Arial,sans-serif">
+                    <tr bgcolor="#fffbeb">
+                      <th align="left" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;border-bottom:1px solid #fde68a;font-weight:600;font-family:Arial,sans-serif">Account</th>
+                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;border-bottom:1px solid #fde68a;font-weight:600;font-family:Arial,sans-serif">Risk %</th>
+                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;border-bottom:1px solid #fde68a;font-weight:600;font-family:Arial,sans-serif">Renewal</th>
+                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#92400e;border-bottom:1px solid #fde68a;font-weight:600;font-family:Arial,sans-serif">ARR at Risk</th>
+                    </tr>
+                    {priority_rows}
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>"""
+
     tier_section = ""
     if tier_rows:
         tier_section = f"""
@@ -364,7 +421,7 @@ def _build_html(
                               <td style="padding:14px;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">Urgent Accounts</td>
                               <td align="right" style="padding:14px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">
                                 <span style="display:block;font-size:20px;font-weight:800;color:#f59e0b;font-family:Arial,sans-serif">{high_risk_in_window}</span>
-                                <span style="display:block;font-size:11px;color:#6b7280;font-family:Arial,sans-serif">High risk + renewing soon</span>
+                                <span style="display:block;font-size:11px;color:#6b7280;font-family:Arial,sans-serif">High risk + renewing within 30 days</span>
                               </td>
                             </tr>
                             <tr>
@@ -378,6 +435,7 @@ def _build_html(
                   </td>
                 </tr>
 
+                {priority_section}
                 {tier_section}
                 {accounts_section}
                 {drivers_section}

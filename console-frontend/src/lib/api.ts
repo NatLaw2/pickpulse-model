@@ -339,6 +339,7 @@ export interface ExecutiveSummaryRequest {
   high_risk_in_window: number;
   renewing_90d: number;
   top_accounts: Record<string, unknown>[];
+  top_priority_accounts?: Record<string, unknown>[];
   tier_counts: Record<string, number>;
   risk_drivers: string[];
 }
@@ -378,6 +379,7 @@ export interface DashboardResponse {
     low_confidence_saves: number;
   };
   top_at_risk: ChurnPrediction[];
+  top_priority_accounts?: ChurnPrediction[];
   tier_counts: Record<string, number>;
   top_risk_drivers: { feature: string; importance: number }[];
 }

@@ -327,9 +327,9 @@ def score_history(external_id: str, limit: int = 30, tenant_id: str = DEFAULT_TE
 
 
 def _risk_to_tier(pct: float) -> str:
-    if pct >= 70:
+    if pct >= 30:
         return "High Risk"
-    if pct >= 40:
+    if pct >= 20:
         return "Medium Risk"
     return "Low Risk"
 
