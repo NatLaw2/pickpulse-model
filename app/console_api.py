@@ -53,6 +53,7 @@ from .integrations.models import ConnectorConfig, ConnectorStatus
 from .integrations import registry as connector_registry
 from .integrations.sync import sync_connector, sync_all
 from .integrations.scoring import score_accounts
+from .demo_seed import auto_seed_if_needed
 try:
     from .integrations import service as integration_service
 except Exception:
@@ -2020,6 +2021,11 @@ def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
     if acct_count == 0:
         raise HTTPException(status_code=400, detail="No accounts in database. Sync an integration first.")
 
+    # In demo mode, auto-seed engagement signals if none exist yet so that
+    # scoring produces a realistic risk distribution without a manual CLI step.
+    if DEMO_MODE:
+        auto_seed_if_needed(tenant_id=tenant_id)
+
     try:
         scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir)
         high = sum(1 for s in scores if s.tier == "High Risk")
@@ -2124,6 +2130,8 @@ def run_demo(connector_name: str, tenant_id: str = Depends(get_tenant_id)):
     acct_count = storage_repo.account_count(tenant_id=tenant_id)
 
     if model_exists and acct_count > 0:
+        if DEMO_MODE:
+            auto_seed_if_needed(tenant_id=tenant_id)
         try:
             scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir)
             scored = len(scores)
