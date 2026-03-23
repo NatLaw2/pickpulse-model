@@ -475,21 +475,21 @@ export function DashboardPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    // Copy the full HTML to clipboard so the user can paste it
-                    // as a rich email body (Gmail, Outlook, Apple Mail all accept
-                    // HTML paste in compose). mailto: only supports plain text so
-                    // we omit the body and let the user paste the copied HTML.
+                    // Open mailto with plain-text body so the email compose window
+                    // has content immediately. Also copy the rich HTML to clipboard
+                    // so the user can paste it for a formatted version.
                     navigator.clipboard.writeText(summaryData.html_body).catch(() => {});
                     const subject = encodeURIComponent(summaryData.subject);
                     const to = summaryData.recipients.join(',');
-                    window.location.href = `mailto:${to}?subject=${subject}`;
+                    const body = encodeURIComponent(summaryData.text_body);
+                    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
                     setEmailCopied(true);
                     setTimeout(() => setEmailCopied(false), 4000);
                   }}
                   className="btn-primary flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium"
                 >
                   <Mail size={14} />
-                  {emailCopied ? 'HTML copied — paste as body' : 'Send Executive Brief'}
+                  {emailCopied ? 'HTML copied to clipboard' : 'Send Executive Brief'}
                 </button>
                 <button
                   onClick={() => {

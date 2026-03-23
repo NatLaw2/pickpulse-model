@@ -87,6 +87,7 @@ class ChurnScore(BaseModel):
     arr_at_risk: Optional[float] = None
     urgency_score: Optional[float] = None
     recommended_action: Optional[str] = None
+    renewal_window_label: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

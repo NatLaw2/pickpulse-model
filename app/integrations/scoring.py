@@ -29,9 +29,13 @@ def _build_scoring_dataframe(tenant_id: str = repo.DEFAULT_TENANT) -> pd.DataFra
     if not accounts:
         return pd.DataFrame()
 
+    # Fetch all signals in one query (keyed by internal account UUID) rather
+    # than making N+1 per-account calls which are fragile under load.
+    signals_by_account = repo.bulk_latest_signals(tenant_id=tenant_id)
+
     rows = []
     for acct in accounts:
-        sig = repo.latest_signals(acct["external_id"], tenant_id=tenant_id)
+        sig = signals_by_account.get(acct.get("id")) or None
         row: Dict[str, Any] = {
             "account_id": acct["external_id"],
             "snapshot_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -135,6 +139,7 @@ def score_accounts(
             arr_at_risk=arr_at_risk,
             urgency_score=urgency,
             recommended_action=action,
+            renewal_window_label=renewal_label,
         ))
 
     # Persist

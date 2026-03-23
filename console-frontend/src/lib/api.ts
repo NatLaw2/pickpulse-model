@@ -348,6 +348,7 @@ export interface ExecutiveSummaryResponse {
   recipients: string[];
   subject: string;
   html_body: string;
+  text_body: string;
   generated_at: string;
 }
 
