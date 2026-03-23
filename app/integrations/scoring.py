@@ -33,6 +33,20 @@ def _build_scoring_dataframe(tenant_id: str = repo.DEFAULT_TENANT) -> pd.DataFra
     # than making N+1 per-account calls which are fragile under load.
     signals_by_account = repo.bulk_latest_signals(tenant_id=tenant_id)
 
+    # TEMPORARY DIAGNOSTIC
+    print(f"[scoring] accounts={len(accounts)} signals_by_account keys={len(signals_by_account)}")
+    if accounts:
+        sample_acct = accounts[0]
+        sample_id = sample_acct.get("id")
+        sample_ext = sample_acct.get("external_id")
+        sample_sig = signals_by_account.get(sample_id)
+        print(f"[scoring] sample acct id={sample_id!r} external_id={sample_ext!r}")
+        print(f"[scoring] sample sig found={sample_sig is not None} dur={sample_sig.get('days_until_renewal') if sample_sig else 'N/A'}")
+        if not sample_sig and signals_by_account:
+            # Show a sample key from signals_by_account to check UUID format
+            sample_sig_key = next(iter(signals_by_account))
+            print(f"[scoring] first signals_by_account key={sample_sig_key!r} (vs acct id={sample_id!r})")
+
     rows = []
     for acct in accounts:
         sig = signals_by_account.get(acct.get("id")) or None
@@ -141,6 +155,11 @@ def score_accounts(
             recommended_action=action,
             renewal_window_label=renewal_label,
         ))
+
+    # TEMPORARY DIAGNOSTIC
+    if scores:
+        s0 = scores[0]
+        print(f"[scoring] sample score: ext={s0.external_id!r} prob={s0.churn_probability} renewal={s0.renewal_window_label!r} urgency={s0.urgency_score}")
 
     # Persist
     repo.insert_scores(scores, tenant_id=tenant_id)
