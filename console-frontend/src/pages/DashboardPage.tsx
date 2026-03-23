@@ -39,9 +39,10 @@ export function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Executive summary (shared context, persisted via sessionStorage)
-  const { summaryData, setSummaryData, showModal: showSummaryModal, setShowModal: setShowSummaryModal, buildMailtoUrl, getPlainText } = useExecutiveSummary();
+  const { summaryData, setSummaryData, showModal: showSummaryModal, setShowModal: setShowSummaryModal, getPlainText } = useExecutiveSummary();
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
 
   const fetchDashboard = useCallback((rate: number) => {
     api.dashboard(rate).then(setData).catch(console.error);
@@ -472,13 +473,24 @@ export function DashboardPage() {
                   : 'No recipients configured — configure in API settings'}
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={buildMailtoUrl()}
+                <button
+                  onClick={() => {
+                    // Copy the full HTML to clipboard so the user can paste it
+                    // as a rich email body (Gmail, Outlook, Apple Mail all accept
+                    // HTML paste in compose). mailto: only supports plain text so
+                    // we omit the body and let the user paste the copied HTML.
+                    navigator.clipboard.writeText(summaryData.html_body).catch(() => {});
+                    const subject = encodeURIComponent(summaryData.subject);
+                    const to = summaryData.recipients.join(',');
+                    window.location.href = `mailto:${to}?subject=${subject}`;
+                    setEmailCopied(true);
+                    setTimeout(() => setEmailCopied(false), 4000);
+                  }}
                   className="btn-primary flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-sm font-medium"
                 >
                   <Mail size={14} />
-                  Send Executive Brief
-                </a>
+                  {emailCopied ? 'HTML copied — paste as body' : 'Send Executive Brief'}
+                </button>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(getPlainText());

@@ -36,7 +36,7 @@ class FieldMappingItem(PydanticBaseModel):
 import pandas as pd
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from .auth import get_tenant_id, _decode_token
 
@@ -1325,7 +1325,24 @@ def get_cached_predictions(
 
 @app.get("/api/predict/{module_name}/export")
 def export_predictions(module_name: str, tenant_id: str = Depends(get_tenant_id)):
-    mod = get_module(module_name)
+    import io as _io
+
+    # CRM mode: build CSV in-memory from live scores (no static file exists)
+    if module_name == MODULE_NAME and _crm_mode_active(tenant_id):
+        crm_data = _build_crm_predict_response(tenant_id, limit=100_000)
+        predictions = crm_data.get("predictions", [])
+        if not predictions:
+            raise HTTPException(status_code=404, detail="No scored predictions. Run Rescore All first.")
+        buf = _io.StringIO()
+        pd.DataFrame(predictions).to_csv(buf, index=False)
+        buf.seek(0)
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=\"churn_predictions.csv\""},
+        )
+
+    get_module(module_name)
     scored_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_scored.csv")
     if not os.path.exists(scored_path):
         raise HTTPException(status_code=404, detail="No scored predictions. Run predict first.")

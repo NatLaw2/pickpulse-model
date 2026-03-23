@@ -254,13 +254,13 @@ def explain_account(
 
     return ExplainResponse(
         account_id=account_id,
-        churn_risk_pct=float(row.get("churn_risk_pct", 0)),
-        arr=float(row.get("arr", 0)),
-        arr_at_risk=float(row.get("arr_at_risk", 0)),
-        days_until_renewal=int(row.get("days_until_renewal", 0)),
-        renewal_window_label=str(row.get("renewal_window_label", "unknown")),
-        tier=str(row.get("tier", "Unknown")),
-        recommended_action=str(row.get("recommended_action", "Monitor")),
+        churn_risk_pct=float(row.get("churn_risk_pct") or 0),
+        arr=float(row.get("arr") or 0),
+        arr_at_risk=float(row.get("arr_at_risk") or 0),
+        days_until_renewal=int(row.get("days_until_renewal") or 0),
+        renewal_window_label=str(row.get("renewal_window_label") or "unknown"),
+        tier=str(row.get("tier") or "Unknown"),
+        recommended_action=str(row.get("recommended_action") or "Monitor"),
         risk_drivers=drivers,
         risk_driver_summary=summary,
     )
