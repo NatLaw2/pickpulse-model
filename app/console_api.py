@@ -2023,6 +2023,7 @@ def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
 
     # In demo mode, auto-seed engagement signals if none exist yet so that
     # scoring produces a realistic risk distribution without a manual CLI step.
+    print(f"[demo_seed] trigger_live_scoring: DEMO_MODE={DEMO_MODE} tenant={tenant_id[:8]}…")  # TEMP
     if DEMO_MODE:
         auto_seed_if_needed(tenant_id=tenant_id)
 

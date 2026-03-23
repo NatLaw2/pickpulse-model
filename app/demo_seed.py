@@ -9,9 +9,10 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from .storage import repo
+from .storage.db import get_client
 
 logger = logging.getLogger("pickpulse.demo_seed")
 
@@ -56,18 +57,20 @@ def _build_signal_rows(
     tenant_id: str,
     today: str,
 ) -> List[Dict[str, Any]]:
-    accounts_sorted = sorted(accounts, key=lambda a: a["external_id"])
+    accounts_sorted = sorted(accounts, key=lambda a: a.get("external_id", ""))
     total = len(accounts_sorted)
     numeric_keys = [
         "days_since_last_login", "monthly_logins", "nps_score",
         "support_tickets", "days_until_renewal", "auto_renew_flag", "seats",
     ]
     rows = []
+    skipped_no_id = 0
     for rank, acct in enumerate(accounts_sorted):
-        ext_id = acct["external_id"]
+        ext_id = acct.get("external_id", "")
         cohort = _COHORTS[_cohort_index(rank, total)]
         account_uuid = acct.get("id")
         if not account_uuid:
+            skipped_no_id += 1
             continue
         for key in numeric_keys:
             base = cohort[key]
@@ -87,34 +90,58 @@ def _build_signal_rows(
                 "signal_value": val,
                 "signal_text": None,
             })
+    if skipped_no_id:
+        print(f"[demo_seed] WARNING: {skipped_no_id}/{total} accounts had no 'id' field — skipped")
     return rows
 
 
 def auto_seed_if_needed(tenant_id: str, source: Optional[str] = None) -> bool:
     """Seed demo signals if none exist for this tenant. Returns True if seeding occurred."""
-    existing = repo.bulk_latest_signals(tenant_id)
-    if existing:
-        return False  # signals already present
-
-    accounts = repo.list_accounts(source=source, limit=50_000, tenant_id=tenant_id)
-    if not accounts:
-        logger.info("demo_seed: no accounts found for tenant %s (source=%s)", tenant_id[:8], source)
-        return False
-
-    today = date.today().isoformat()
-    signal_rows = _build_signal_rows(accounts, tenant_id, today)
-    if not signal_rows:
-        return False
+    # TEMPORARY DIAGNOSTIC — print() used to guarantee visibility in Render logs
+    print(f"[demo_seed] auto_seed_if_needed called — tenant={tenant_id[:8]}… source={source}")
 
     try:
-        from .storage.db import get_client
+        existing = repo.bulk_latest_signals(tenant_id)
+        print(f"[demo_seed] existing signals count: {len(existing)}")
+        if existing:
+            print("[demo_seed] signals already present — skipping seed")
+            return False
+
+        accounts = repo.list_accounts(source=source, limit=50_000, tenant_id=tenant_id)
+        print(f"[demo_seed] accounts found: {len(accounts)}")
+        if not accounts:
+            print(f"[demo_seed] no accounts for tenant {tenant_id[:8]} (source={source}) — cannot seed")
+            return False
+
+        # Log first account to confirm id/external_id fields are present
+        sample = accounts[0]
+        print(f"[demo_seed] sample account keys: {list(sample.keys())}")
+        print(f"[demo_seed] sample account id={sample.get('id')!r} external_id={sample.get('external_id')!r}")
+
+        today = date.today().isoformat()
+        signal_rows = _build_signal_rows(accounts, tenant_id, today)
+        print(f"[demo_seed] signal rows prepared: {len(signal_rows)}")
+        if not signal_rows:
+            print("[demo_seed] ERROR: no signal rows built — all accounts may be missing 'id' field")
+            return False
+
         sb = get_client()
-        sb.table("account_signals_daily").upsert(
+        print(f"[demo_seed] attempting upsert of {len(signal_rows)} rows into account_signals_daily")
+        res = sb.table("account_signals_daily").upsert(
             signal_rows,
             on_conflict="tenant_id,account_id,signal_date,signal_key",
         ).execute()
-        logger.info("demo_seed: seeded %d signal rows for %d accounts", len(signal_rows), len(accounts))
-        return True
+        inserted = len(res.data) if res.data else 0
+        print(f"[demo_seed] upsert complete — rows returned by DB: {inserted}")
+        if inserted == 0:
+            print("[demo_seed] WARNING: upsert returned 0 rows — possible RLS block or schema mismatch")
+        else:
+            print(f"[demo_seed] SUCCESS: seeded {inserted} signal rows for {len(accounts)} accounts")
+        return inserted > 0
+
     except Exception as exc:
-        logger.warning("demo_seed: failed to seed signals: %s", exc)
+        import traceback
+        print(f"[demo_seed] EXCEPTION in auto_seed_if_needed: {exc}")
+        print(traceback.format_exc())
+        logger.warning("demo_seed: exception during seeding: %s", exc)
         return False
