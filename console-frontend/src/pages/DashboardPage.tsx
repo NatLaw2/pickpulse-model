@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2 } from 'lucide-react';
+import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2, ExternalLink } from 'lucide-react';
 import { api, type DashboardResponse } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { RevenueImpactCard } from '../components/RevenueImpactCard';
@@ -489,6 +489,17 @@ export function DashboardPage() {
                 >
                   <Copy size={14} />
                   {copied ? 'Copied!' : 'Copy Summary'}
+                </button>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([summaryData.html_body], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    window.open(url, '_blank', 'noopener');
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-[var(--color-border)] rounded-xl text-sm hover:bg-[var(--color-bg-primary)] transition-colors"
+                >
+                  <ExternalLink size={14} />
+                  Open in Browser
                 </button>
                 <button
                   onClick={() => setShowSummaryModal(false)}

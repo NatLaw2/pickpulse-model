@@ -132,30 +132,31 @@ def _build_html(
         renewal_days = acct.get("days_until_renewal", "—")
         renewal_label = f"{renewal_days}d" if isinstance(renewal_days, (int, float)) else renewal_days
         acct_rows += f"""<tr>
-              <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#1a1d26;border-bottom:1px solid #e5e7eb" bgcolor="{bg}">{acct.get("name") or acct.get("account_id") or acct.get("customer_id") or "—"}</td>
-              <td align="right" style="padding:10px 14px;font-size:13px;border-bottom:1px solid #e5e7eb" bgcolor="{bg}"><span style="color:{risk_color};font-weight:700">{risk_pct}%</span></td>
-              <td align="right" style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb" bgcolor="{bg}">{_fmt_currency(acct.get("arr", 0))}</td>
-              <td align="right" style="padding:10px 14px;font-size:13px;font-weight:700;color:#ef4444;border-bottom:1px solid #e5e7eb" bgcolor="{bg}">{_fmt_currency(acct.get("arr_at_risk", 0))}</td>
-              <td align="right" style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb" bgcolor="{bg}">{renewal_label}</td>
+              <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#1a1d26;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}">{acct.get("name") or acct.get("account_id") or acct.get("customer_id") or "—"}</td>
+              <td align="right" style="padding:10px 14px;font-size:13px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}"><span style="color:{risk_color};font-weight:700;font-family:Arial,sans-serif">{risk_pct}%</span></td>
+              <td align="right" style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}">{_fmt_currency(acct.get("arr", 0))}</td>
+              <td align="right" style="padding:10px 14px;font-size:13px;font-weight:700;color:#ef4444;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}">{_fmt_currency(acct.get("arr_at_risk", 0))}</td>
+              <td align="right" style="padding:10px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif" bgcolor="{bg}">{renewal_label}</td>
             </tr>"""
 
-    # Tier distribution rows
+    # Tier distribution rows — use Unicode filled square (&#9632;) instead of
+    # display:inline-block, which Outlook's Word renderer does not support.
     tier_colors = {"High Risk": "#ef4444", "Medium Risk": "#f59e0b", "Low Risk": "#10b981"}
     tier_rows = ""
     for tier, count in tier_counts.items():
         color = tier_colors.get(tier, "#6b7280")
         tier_rows += f"""<tr>
-              <td style="padding:8px 14px;font-size:13px;border-bottom:1px solid #e5e7eb">
-                <span style="display:inline-block;width:10px;height:10px;background:{color};border-radius:2px;margin-right:8px;vertical-align:middle"></span>{tier}
+              <td style="padding:8px 14px;font-size:13px;color:#374151;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">
+                <span style="color:{color};font-size:13px;margin-right:6px;font-family:Arial,sans-serif">&#9632;</span>{tier}
               </td>
-              <td align="right" style="padding:8px 14px;font-size:13px;font-weight:700;color:{color};border-bottom:1px solid #e5e7eb">{count}</td>
+              <td align="right" style="padding:8px 14px;font-size:13px;font-weight:700;color:{color};border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">{count}</td>
             </tr>"""
 
     # Risk drivers rows
     driver_rows = ""
     for d in risk_drivers:
         driver_rows += f"""<tr>
-              <td style="padding:6px 14px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6">&bull;&nbsp; {d}</td>
+              <td style="padding:6px 14px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;font-family:Arial,sans-serif">&#8226;&nbsp; {d}</td>
             </tr>"""
 
     # Conditional sections
@@ -165,16 +166,16 @@ def _build_html(
         <!-- Risk Distribution -->
         <tr>
           <td style="padding:0 0 24px 0">
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif">
               <tr>
-                <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26">Risk Distribution</td>
+                <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26;font-family:Arial,sans-serif">Risk Distribution</td>
               </tr>
               <tr>
                 <td>
-                  <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;font-family:Arial,sans-serif">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e5e7eb;font-family:Arial,sans-serif">
                     <tr bgcolor="#f8f9fb">
-                      <th align="left" style="padding:8px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600">Tier</th>
-                      <th align="right" style="padding:8px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600">Accounts</th>
+                      <th align="left" style="padding:8px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:Arial,sans-serif">Tier</th>
+                      <th align="right" style="padding:8px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:Arial,sans-serif">Accounts</th>
                     </tr>
                     {tier_rows}
                   </table>
@@ -190,19 +191,19 @@ def _build_html(
         <!-- Top Accounts -->
         <tr>
           <td style="padding:0 0 24px 0">
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif">
               <tr>
-                <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26">Top Accounts Requiring Attention</td>
+                <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26;font-family:Arial,sans-serif">Top Accounts Requiring Attention</td>
               </tr>
               <tr>
                 <td>
-                  <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;font-family:Arial,sans-serif">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e5e7eb;font-family:Arial,sans-serif">
                     <tr bgcolor="#f8f9fb">
-                      <th align="left" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600">Account</th>
-                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600">Risk %</th>
-                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600">ARR</th>
-                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600">ARR at Risk</th>
-                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600">Renewal</th>
+                      <th align="left" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:Arial,sans-serif">Account</th>
+                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:Arial,sans-serif">Risk %</th>
+                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:Arial,sans-serif">ARR</th>
+                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:Arial,sans-serif">ARR at Risk</th>
+                      <th align="right" style="padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:Arial,sans-serif">Renewal</th>
                     </tr>
                     {acct_rows}
                   </table>
@@ -218,13 +219,13 @@ def _build_html(
         <!-- Risk Drivers -->
         <tr>
           <td style="padding:0 0 24px 0">
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif">
               <tr>
-                <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26">Top Risk Drivers</td>
+                <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26;font-family:Arial,sans-serif">Top Risk Drivers</td>
               </tr>
               <tr>
                 <td>
-                  <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,sans-serif">
                     {driver_rows}
                   </table>
                 </td>
@@ -234,8 +235,14 @@ def _build_html(
         </tr>"""
 
     return f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+  <title>PickPulse Executive ARR Risk Brief</title>
+</head>
 <body style="margin:0;padding:0;font-family:Arial,sans-serif;background-color:#f5f6f8" bgcolor="#f5f6f8">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f6f8" style="background-color:#f5f6f8">
     <tr>
@@ -267,28 +274,34 @@ def _build_html(
                 <!-- Portfolio Summary -->
                 <tr>
                   <td style="padding:0 0 24px 0">
-                    <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif">
                       <tr>
-                        <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26">Portfolio Summary</td>
+                        <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26;font-family:Arial,sans-serif">Portfolio Summary</td>
                       </tr>
                       <tr>
                         <td>
-                          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;font-family:Arial,sans-serif">
+                          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #e5e7eb;font-family:Arial,sans-serif">
                             <tr bgcolor="#fef2f2">
-                              <td style="padding:14px;font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;border-bottom:1px solid #e5e7eb;width:50%">ARR at Risk</td>
-                              <td align="right" style="padding:14px;font-size:20px;font-weight:800;color:#ef4444;border-bottom:1px solid #e5e7eb">{_fmt_currency(total_arr_at_risk)}</td>
+                              <td style="padding:14px;font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;border-bottom:1px solid #e5e7eb;width:50%;font-family:Arial,sans-serif">ARR at Risk</td>
+                              <td align="right" style="padding:14px;font-size:20px;font-weight:800;color:#ef4444;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">{_fmt_currency(total_arr_at_risk)}</td>
                             </tr>
                             <tr bgcolor="#f0fdf4">
-                              <td style="padding:14px;font-size:12px;color:#166534;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;border-bottom:1px solid #e5e7eb">Projected Recoverable</td>
-                              <td align="right" style="padding:14px;border-bottom:1px solid #e5e7eb"><span style="font-size:20px;font-weight:800;color:#10b981">{_fmt_currency(projected_recoverable_arr)}</span><br><span style="font-size:11px;color:#6b7280">at {round(save_rate * 100)}% save rate</span></td>
+                              <td style="padding:14px;font-size:12px;color:#166534;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">Projected Recoverable</td>
+                              <td align="right" style="padding:14px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">
+                                <span style="display:block;font-size:20px;font-weight:800;color:#10b981;font-family:Arial,sans-serif">{_fmt_currency(projected_recoverable_arr)}</span>
+                                <span style="display:block;font-size:11px;color:#6b7280;font-family:Arial,sans-serif">at {round(save_rate * 100)}% save rate</span>
+                              </td>
                             </tr>
                             <tr>
-                              <td style="padding:14px;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;border-bottom:1px solid #e5e7eb">Urgent Accounts</td>
-                              <td align="right" style="padding:14px;border-bottom:1px solid #e5e7eb"><span style="font-size:20px;font-weight:800;color:#f59e0b">{high_risk_in_window}</span><br><span style="font-size:11px;color:#6b7280">High risk + renewing soon</span></td>
+                              <td style="padding:14px;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">Urgent Accounts</td>
+                              <td align="right" style="padding:14px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif">
+                                <span style="display:block;font-size:20px;font-weight:800;color:#f59e0b;font-family:Arial,sans-serif">{high_risk_in_window}</span>
+                                <span style="display:block;font-size:11px;color:#6b7280;font-family:Arial,sans-serif">High risk + renewing soon</span>
+                              </td>
                             </tr>
                             <tr>
-                              <td style="padding:14px;font-size:12px;color:#374151;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Renewing in 90 Days</td>
-                              <td align="right" style="padding:14px"><span style="font-size:20px;font-weight:800;color:#374151">{renewing_90d}</span></td>
+                              <td style="padding:14px;font-size:12px;color:#374151;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;font-family:Arial,sans-serif">Renewing in 90 Days</td>
+                              <td align="right" style="padding:14px;font-size:20px;font-weight:800;color:#374151;font-family:Arial,sans-serif">{renewing_90d}</td>
                             </tr>
                           </table>
                         </td>
@@ -304,12 +317,12 @@ def _build_html(
                 <!-- Footer -->
                 <tr>
                   <td style="border-top:1px solid #e5e7eb;padding-top:20px">
-                    <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif">
                       <tr>
-                        <td align="center" style="font-size:11px;color:#9ca0b0;padding-bottom:4px">Generated by PickPulse Intelligence &middot; {generated_at}</td>
+                        <td align="center" style="font-size:11px;color:#9ca0b0;padding-bottom:4px;font-family:Arial,sans-serif">Generated by PickPulse Intelligence &middot; {generated_at}</td>
                       </tr>
                       <tr>
-                        <td align="center" style="font-size:11px;color:#9ca0b0">This is an automated executive summary. Log in to PickPulse for full account details and playbook actions.</td>
+                        <td align="center" style="font-size:11px;color:#9ca0b0;font-family:Arial,sans-serif">This is an automated executive summary. Log in to PickPulse for full account details and playbook actions.</td>
                       </tr>
                     </table>
                   </td>
