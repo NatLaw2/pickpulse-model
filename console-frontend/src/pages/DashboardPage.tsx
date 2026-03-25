@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2, ExternalLink } from 'lucide-react';
-import { api, type DashboardResponse } from '../lib/api';
+import { api, type DashboardResponse, type ModelPerformance } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { RevenueImpactCard } from '../components/RevenueImpactCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
@@ -31,6 +31,7 @@ function featureLabel(raw: string): string {
 export function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [saveRate, setSaveRate] = useState(0.35);
+  const [performance, setPerformance] = useState<ModelPerformance | null>(null);
   const navigate = useNavigate();
   const { dataset } = useDataset();
   const { predictions } = usePredictions();
@@ -54,6 +55,11 @@ export function DashboardPage() {
     if (!predictions) return;
     fetchDashboard(saveRate);
   }, [fetchDashboard, saveRate, predictions]);
+
+  // Fetch model performance once per session (404 = no model yet, silently ignored)
+  useEffect(() => {
+    api.modelPerformance().then(setPerformance).catch(() => {/* no model yet */});
+  }, []);
 
   // Auto-generate executive summary when dashboard data loads with predictions
   useEffect(() => {
@@ -411,7 +417,7 @@ export function DashboardPage() {
 
           {/* Section 5: Portfolio Risk Drivers */}
           {riskDrivers.length > 0 && (
-            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
               <h3 className="text-sm font-semibold mb-4">Portfolio Risk Drivers</h3>
               <p className="text-xs text-[var(--color-text-secondary)] mb-4">
                 The features most influencing churn predictions across your portfolio
@@ -438,6 +444,89 @@ export function DashboardPage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+          {/* Section 6: Model Accuracy Trust Panel */}
+          {performance && performance.calibration_bins.length > 0 && (
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <h3 className="text-sm font-semibold">Model Accuracy</h3>
+                  <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                    Calibration curve — when the model predicts X% risk, does that match reality?
+                  </p>
+                </div>
+                <div className="flex items-center gap-5">
+                  {performance.auc != null && (
+                    <div className="text-center">
+                      <div className="text-xl font-bold" style={{ color: 'var(--color-accent)' }}>{performance.auc.toFixed(2)}</div>
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide">AUC</div>
+                    </div>
+                  )}
+                  {performance.lift_at_top10 != null && (
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-[var(--color-success)]">{performance.lift_at_top10.toFixed(1)}x</div>
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide">Lift@Top10%</div>
+                    </div>
+                  )}
+                  {performance.calibration_error != null && (
+                    <div className="text-center">
+                      <div
+                        className="text-xl font-bold"
+                        style={{ color: performance.calibration_error < 0.05 ? 'var(--color-success)' : 'var(--color-warning)' }}
+                      >
+                        {(performance.calibration_error * 100).toFixed(1)}%
+                      </div>
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide">Cal. Error</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Calibration bars: predicted (teal) vs actual (red) per bin */}
+              <div className="flex items-end gap-1 h-28">
+                {performance.calibration_bins.map((bin, i) => {
+                  const maxVal = Math.max(
+                    ...performance.calibration_bins.map((b) => Math.max(b.predicted_avg, b.actual_rate)),
+                    0.01
+                  );
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 flex items-end gap-px"
+                      title={`Bin ${Math.round(bin.bin_lo * 100)}–${Math.round(bin.bin_hi * 100)}%  |  Predicted: ${Math.round(bin.predicted_avg * 100)}%  |  Actual: ${Math.round(bin.actual_rate * 100)}%  |  n=${bin.n}`}
+                    >
+                      <div
+                        className="flex-1 rounded-t-sm opacity-60 transition-all"
+                        style={{ height: `${(bin.predicted_avg / maxVal) * 100}%`, background: 'var(--color-accent)' }}
+                      />
+                      <div
+                        className="flex-1 rounded-t-sm transition-all"
+                        style={{ height: `${(bin.actual_rate / maxVal) * 100}%`, background: 'var(--color-danger)' }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1 mb-3">
+                <span>Low predicted risk</span>
+                <span>High predicted risk</span>
+              </div>
+              <div className="flex items-center gap-5 text-[10px]">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm opacity-60" style={{ background: 'var(--color-accent)' }} />
+                  <span className="text-[var(--color-text-muted)]">Predicted probability</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-danger)' }} />
+                  <span className="text-[var(--color-text-muted)]">Actual churn rate</span>
+                </div>
+                {performance.n != null && (
+                  <span className="text-[var(--color-text-muted)] ml-auto">
+                    {performance.n.toLocaleString()} validation accounts
+                  </span>
+                )}
               </div>
             </div>
           )}

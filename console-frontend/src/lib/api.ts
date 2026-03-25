@@ -167,6 +167,9 @@ export const api = {
   cachedPredictions: () =>
     request<PredictResponse>(`/predict/${MOD}/cached`),
 
+  // Model performance / trust panel
+  modelPerformance: () => request<ModelPerformance>('/model/performance'),
+
   // Account status
   updateAccountStatus: (accountId: string, status: string) =>
     request<{ account_id: string; status: string }>(
@@ -604,6 +607,28 @@ export interface BusinessImpact {
 export interface FeatureImportance {
   feature: string;
   importance: number;
+}
+
+export interface CalibrationBin {
+  bin_lo: number;
+  bin_hi: number;
+  n: number;
+  predicted_avg: number;
+  actual_rate: number;
+  delta: number;
+}
+
+export interface ModelPerformance {
+  auc: number | null;
+  pr_auc: number | null;
+  brier: number | null;
+  calibration_error: number | null;
+  lift_at_top10: number | null;
+  capture_at_top10: number | null;
+  n: number | null;
+  calibration_bins: CalibrationBin[];
+  lift_table: Record<string, number>[];
+  evaluated_at: string | null;
 }
 
 export interface ChurnPrediction {

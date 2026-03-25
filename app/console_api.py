@@ -887,6 +887,41 @@ def get_evaluation(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     return metrics
 
 
+@app.get("/api/model/performance")
+def model_performance(tenant_id: str = Depends(get_tenant_id)):
+    """Return calibration curve and lift data for the prediction accuracy trust panel.
+
+    Reads from the churn_evaluation.json artifact produced at train time.
+    Returns 404 if no model has been trained yet.
+    """
+    state = _get_state(tenant_id)
+    metrics = state["metrics"].get("churn")
+    if not metrics:
+        eval_path = os.path.join(_tenant_output_dir(tenant_id), "churn_evaluation.json")
+        if os.path.exists(eval_path):
+            with open(eval_path) as f:
+                metrics = json.load(f)
+
+    if not metrics:
+        raise HTTPException(
+            status_code=404,
+            detail="No evaluation data. Train and evaluate a model first.",
+        )
+
+    return {
+        "auc": metrics.get("auc"),
+        "pr_auc": metrics.get("pr_auc"),
+        "brier": metrics.get("brier"),
+        "calibration_error": metrics.get("calibration_error"),
+        "lift_at_top10": metrics.get("lift_at_top10"),
+        "capture_at_top10": metrics.get("capture_at_top10"),
+        "n": metrics.get("n"),
+        "calibration_bins": metrics.get("calibration_bins", []),
+        "lift_table": metrics.get("lift_table", []),
+        "evaluated_at": metrics.get("evaluated_at"),
+    }
+
+
 @app.post("/api/evaluate/{module_name}/report")
 def generate_report(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
@@ -1375,6 +1410,23 @@ def update_account_status(account_id: str, status: str = Query(...), tenant_id: 
     store.update_account_status(tenant_id, account_id, status, module=MODULE_NAME)
     store.log_action(tenant_id, "account.status_change", entity_id=account_id,
                      metadata={"status": status})
+
+    # Record definitive outcome when a CSM marks an account as renewed or churned.
+    # Non-blocking — failures are logged by record_outcome() as warnings.
+    _OUTCOME_STATUS_MAP = {
+        "renewed": "renewed",
+        "archived_renewed": "renewed",
+        "churned": "churned",
+        "archived_cancelled": "churned",
+    }
+    if status in _OUTCOME_STATUS_MAP:
+        storage_repo.record_outcome(
+            external_id=account_id,
+            outcome_type=_OUTCOME_STATUS_MAP[status],
+            source="manual",
+            tenant_id=tenant_id,
+        )
+
     return {"account_id": account_id, "status": status}
 
 

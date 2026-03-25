@@ -438,3 +438,81 @@ def get_account_latest_score(
     except Exception as exc:
         logger.warning("get_account_latest_score: unavailable (%s) — returning None", exc)
         return None
+
+
+# ---------------------------------------------------------------------------
+# Outcome recording
+# ---------------------------------------------------------------------------
+
+_OUTCOME_TYPES = {"renewed", "churned", "expanded"}
+_OUTCOME_SOURCES = {"manual", "hubspot", "stripe", "system"}
+
+
+def record_outcome(
+    external_id: str,
+    outcome_type: str,
+    source: str = "manual",
+    notes: Optional[str] = None,
+    effective_date: Optional[str] = None,
+    tenant_id: str = DEFAULT_TENANT,
+) -> bool:
+    """Insert a canonical outcome row for an account.
+
+    Returns True if written, False if the account wasn't found or the write failed.
+    Failures are logged as warnings (non-fatal) so callers can proceed without
+    blocking on Supabase availability.
+    """
+    if outcome_type not in _OUTCOME_TYPES:
+        logger.warning("record_outcome: unknown outcome_type=%s — skipping", outcome_type)
+        return False
+
+    account_id = get_account_id(external_id, tenant_id=tenant_id)
+    if not account_id:
+        logger.warning(
+            "record_outcome: no account for external_id=%s tenant=%s", external_id, tenant_id
+        )
+        return False
+
+    today = date.today().isoformat()
+    try:
+        sb = get_client()
+        sb.table("account_outcomes").insert({
+            "tenant_id": tenant_id,
+            "account_id": account_id,
+            "outcome_type": outcome_type,
+            "effective_date": effective_date or today,
+            "source": source if source in _OUTCOME_SOURCES else "manual",
+            "notes": notes,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        return True
+    except Exception as exc:
+        logger.warning("record_outcome: insert failed (%s)", exc)
+        return False
+
+
+def list_outcomes(
+    external_id: Optional[str] = None,
+    limit: int = 100,
+    tenant_id: str = DEFAULT_TENANT,
+) -> List[Dict[str, Any]]:
+    """Return outcome rows for the tenant, optionally filtered to one account."""
+    try:
+        sb = get_client()
+        q = (
+            sb.table("account_outcomes")
+            .select("*")
+            .eq("tenant_id", tenant_id)
+            .order("effective_date", desc=True)
+            .limit(limit)
+        )
+        if external_id:
+            account_id = get_account_id(external_id, tenant_id=tenant_id)
+            if not account_id:
+                return []
+            q = q.eq("account_id", account_id)
+        res = q.execute()
+        return res.data or []
+    except Exception as exc:
+        logger.warning("list_outcomes: unavailable (%s) — returning empty list", exc)
+        return []
