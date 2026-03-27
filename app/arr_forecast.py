@@ -279,12 +279,17 @@ def compute_arr_forecast(
                 "expected_arr_lost": 0.0,
                 "expected_arr_retained": 0.0,
                 "account_count": 0,
+                # True if any account in this month used a month-level estimate
+                # rather than an exact days_until_renewal signal.
+                "has_month_estimates": False,
             }
         b = calendar_buckets[m]
         b["arr_renewing"] += a["arr"]
         b["expected_arr_lost"] += a["expected_arr_lost"]
         b["expected_arr_retained"] += a["expected_arr_retained"]
         b["account_count"] += 1
+        if a["renewal_date_precision"] == "month_estimate":
+            b["has_month_estimates"] = True
 
     renewal_calendar = sorted(calendar_buckets.values(), key=lambda x: x["month"])
 
@@ -318,11 +323,18 @@ def compute_arr_forecast(
     arr_excluded = current_arr - arr_in_forecast  # ARR with unknown future
     arr_coverage_pct = (arr_in_forecast / current_arr * 100) if current_arr > 0 else 0.0
 
+    n_month_estimates = sum(
+        1 for a in forecast_accounts if a["renewal_date_precision"] == "month_estimate"
+    )
+
     coverage = {
         "total_active_accounts": total_active_accounts,
         "accounts_in_forecast": len(forecast_accounts),
         "accounts_scored_no_renewal_date": n_no_renewal_date,
         "accounts_scored_no_arr": n_no_arr,
+        # How many accounts in the forecast used a month-level estimate rather
+        # than an exact days_until_renewal signal. Surfaces date quality to UI.
+        "n_month_estimates": n_month_estimates,
         "arr_in_forecast": round(arr_in_forecast, 2),
         "arr_excluded": round(arr_excluded, 2),
         "arr_coverage_pct": round(arr_coverage_pct, 1),

@@ -503,8 +503,30 @@ export function DashboardPage() {
                 </div>
               )}
 
-              {arrForecast && (
+              {arrForecast && arrForecast.coverage.accounts_in_forecast === 0 && (
+                <div className="py-8 text-center text-sm text-[var(--color-text-muted)]">
+                  No accounts with renewal dates found in the next {arrForecast.horizon_days} days.
+                  <br />
+                  <span className="text-xs">
+                    Add renewal dates via HubSpot sync or CSV to enable the ARR forecast.
+                    {arrForecast.coverage.accounts_scored_no_renewal_date > 0 && (
+                      ` (${arrForecast.coverage.accounts_scored_no_renewal_date} scored accounts have no renewal date signal.)`
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {arrForecast && arrForecast.coverage.accounts_in_forecast > 0 && (
                 <>
+                  {/* Low-coverage amber warning — shown prominently when < 50% of ARR is forecastable */}
+                  {arrForecast.arr_coverage_pct < 50 && (
+                    <div className="mb-4 px-3 py-2 rounded-lg text-xs text-[var(--color-warning)] border border-[var(--color-warning)] bg-[var(--color-warning)]/5">
+                      Low coverage: this forecast reflects only {arrForecast.arr_coverage_pct.toFixed(0)}% of your ARR.
+                      {' '}{formatCurrency(arrForecast.coverage.arr_excluded)} ARR has no renewal date and is excluded.
+                      Treat this as directional only.
+                    </div>
+                  )}
+
                   {/* Headline numbers */}
                   <div className="flex items-end gap-8 mb-5">
                     <div>
@@ -514,10 +536,11 @@ export function DashboardPage() {
                       <div className="text-3xl font-bold tracking-tight">
                         {formatCurrency(arrForecast.forecast.base)}
                       </div>
+                      {/* Fix: "Estimated" qualifier prevents reading delta as confirmed loss */}
                       <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                        {arrForecast.forecast.base >= arrForecast.current_arr ? '+' : ''}
+                        Estimated {arrForecast.forecast.base >= arrForecast.current_arr ? '+' : ''}
                         {formatCurrency(arrForecast.forecast.base - arrForecast.current_arr)}
-                        {' '}vs current {formatCurrency(arrForecast.current_arr)}
+                        {' '}from renewing cohort · current {formatCurrency(arrForecast.current_arr)}
                       </div>
                     </div>
                     <div className="flex-1 mb-1">
@@ -585,7 +608,7 @@ export function DashboardPage() {
                                 />
                               </div>
                               <div className="text-[9px] text-[var(--color-text-muted)] text-center mt-1">
-                                {month.month.slice(5)}
+                                {month.has_month_estimates ? '~' : ''}{month.month.slice(5)}
                               </div>
                             </div>
                           );
@@ -600,6 +623,12 @@ export function DashboardPage() {
                           <div className="w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-danger)', opacity: 0.75 }} />
                           <span className="text-[var(--color-text-muted)]">Expected at risk</span>
                         </div>
+                        {/* Estimated-month disclosure at calendar level */}
+                        {arrForecast.renewal_calendar.some((m) => m.has_month_estimates) && (
+                          <span className="ml-auto text-[var(--color-text-muted)] italic">
+                            ~ months use estimated renewal dates (contract_months_remaining)
+                          </span>
+                        )}
                       </div>
                     </div>
                   )}
@@ -629,14 +658,14 @@ export function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Coverage footer */}
+                  {/* Coverage footer — only shows excluded ARR warning if < 50% (already shown as amber banner above) */}
                   <div className="pt-3 border-t border-[var(--color-border)] space-y-1 text-[10px] text-[var(--color-text-muted)]">
                     <div>
                       Forecast covers {formatCurrency(arrForecast.coverage.arr_in_forecast)} of {formatCurrency(arrForecast.current_arr)} total ARR
                       {' '}({arrForecast.arr_coverage_pct.toFixed(0)}% · {arrForecast.coverage.accounts_in_forecast} of {arrForecast.coverage.total_active_accounts} accounts)
                     </div>
-                    {arrForecast.coverage.arr_excluded > 0 && (
-                      <div className="text-[var(--color-warning)]">
+                    {arrForecast.arr_coverage_pct >= 50 && arrForecast.coverage.arr_excluded > 0 && (
+                      <div>
                         {formatCurrency(arrForecast.coverage.arr_excluded)} ARR excluded — renewal date unknown
                       </div>
                     )}

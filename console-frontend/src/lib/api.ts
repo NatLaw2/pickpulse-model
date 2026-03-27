@@ -658,6 +658,7 @@ export interface ArrCalendarMonth {
   expected_arr_lost: number;
   expected_arr_retained: number;
   account_count: number;
+  has_month_estimates: boolean;
 }
 
 export interface ArrForecast {
@@ -682,6 +683,7 @@ export interface ArrForecast {
     accounts_in_forecast: number;
     accounts_scored_no_renewal_date: number;
     accounts_scored_no_arr: number;
+    n_month_estimates: number;
     arr_in_forecast: number;
     arr_excluded: number;
     arr_coverage_pct: number;
