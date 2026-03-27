@@ -922,6 +922,28 @@ def model_performance(tenant_id: str = Depends(get_tenant_id)):
     }
 
 
+@app.get("/api/model/production-accuracy")
+def get_production_accuracy(tenant_id: str = Depends(get_tenant_id)):
+    """Return production prediction accuracy: predictions matched to real outcomes.
+
+    Results are cached per-tenant and recomputed at most once every 24 hours.
+    Returns n_pairs=0 with null metrics when no matched pairs exist yet.
+    Use POST /api/model/production-accuracy/refresh to force an immediate recompute.
+    """
+    from app.reconciliation import get_or_refresh
+    return get_or_refresh(tenant_id)
+
+
+@app.post("/api/model/production-accuracy/refresh")
+def refresh_production_accuracy(tenant_id: str = Depends(get_tenant_id)):
+    """Force-recompute production accuracy metrics from live outcome data.
+
+    Bypasses the 24-hour cache and writes fresh results.
+    """
+    from app.reconciliation import get_or_refresh
+    return get_or_refresh(tenant_id, force=True)
+
+
 @app.post("/api/evaluate/{module_name}/report")
 def generate_report(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)

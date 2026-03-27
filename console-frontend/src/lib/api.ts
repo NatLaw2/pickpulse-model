@@ -167,8 +167,13 @@ export const api = {
   cachedPredictions: () =>
     request<PredictResponse>(`/predict/${MOD}/cached`),
 
-  // Model performance / trust panel
+  // Model performance / trust panel (training-time metrics)
   modelPerformance: () => request<ModelPerformance>('/model/performance'),
+
+  // Production accuracy — predictions matched to real outcomes
+  productionAccuracy: () => request<ProductionAccuracy>('/model/production-accuracy'),
+  refreshProductionAccuracy: () =>
+    request<ProductionAccuracy>('/model/production-accuracy/refresh', { method: 'POST' }),
 
   // Account status
   updateAccountStatus: (accountId: string, status: string) =>
@@ -629,6 +634,30 @@ export interface ModelPerformance {
   calibration_bins: CalibrationBin[];
   lift_table: Record<string, number>[];
   evaluated_at: string | null;
+}
+
+export interface ProductionAccuracy {
+  n_eligible_outcomes: number;
+  n_pairs: number;
+  n_unmatched: number;
+  n_churned: number;
+  n_renewed: number;
+  overall_churn_rate: number | null;
+  top_10_churn_rate: number | null;
+  lift_top_10: number | null;
+  precision: number | null;
+  recall: number | null;
+  threshold: number;
+  calibration: CalibrationBin[];
+  time_lag_stats: {
+    min: number;
+    max: number;
+    mean: number;
+    median: number;
+    p25: number;
+    p75: number;
+  } | null;
+  generated_at: string;
 }
 
 export interface ChurnPrediction {

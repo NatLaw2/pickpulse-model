@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2, ExternalLink } from 'lucide-react';
-import { api, type DashboardResponse, type ModelPerformance } from '../lib/api';
+import { api, type DashboardResponse, type ModelPerformance, type ProductionAccuracy } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { RevenueImpactCard } from '../components/RevenueImpactCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
@@ -32,6 +32,8 @@ export function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [saveRate, setSaveRate] = useState(0.35);
   const [performance, setPerformance] = useState<ModelPerformance | null>(null);
+  const [productionAccuracy, setProductionAccuracy] = useState<ProductionAccuracy | null>(null);
+  const [prodAccRefreshing, setProdAccRefreshing] = useState(false);
   const navigate = useNavigate();
   const { dataset } = useDataset();
   const { predictions } = usePredictions();
@@ -59,6 +61,11 @@ export function DashboardPage() {
   // Fetch model performance once per session (404 = no model yet, silently ignored)
   useEffect(() => {
     api.modelPerformance().then(setPerformance).catch(() => {/* no model yet */});
+  }, []);
+
+  // Fetch production accuracy (real outcome-matched metrics); 404/empty = no pairs yet
+  useEffect(() => {
+    api.productionAccuracy().then(setProductionAccuracy).catch(() => {});
   }, []);
 
   // Auto-generate executive summary when dashboard data loads with predictions
@@ -447,7 +454,7 @@ export function DashboardPage() {
               </div>
             </div>
           )}
-          {/* Section 6: Model Accuracy Trust Panel */}
+          {/* Section 6: Model Accuracy Trust Panel (training-time) */}
           {performance && performance.calibration_bins.length > 0 && (
             <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
               <div className="flex items-start justify-between mb-5">
@@ -528,6 +535,133 @@ export function DashboardPage() {
                   </span>
                 )}
               </div>
+            </div>
+          )}
+          {/* Section 7: Production Prediction Accuracy */}
+          {productionAccuracy !== null && (
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <h3 className="text-sm font-semibold">Production Prediction Accuracy</h3>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                    Calibration verified against real churn &amp; renewal outcomes
+                  </p>
+                </div>
+                <div className="flex items-center gap-5">
+                  {productionAccuracy.lift_top_10 != null && (
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-[var(--color-success)]">
+                        {productionAccuracy.lift_top_10.toFixed(1)}x
+                      </div>
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide">Lift@Top10%</div>
+                    </div>
+                  )}
+                  {productionAccuracy.precision != null && (
+                    <div className="text-center">
+                      <div className="text-xl font-bold" style={{ color: 'var(--color-accent)' }}>
+                        {Math.round(productionAccuracy.precision * 100)}%
+                      </div>
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide">Precision</div>
+                    </div>
+                  )}
+                  {productionAccuracy.recall != null && (
+                    <div className="text-center">
+                      <div className="text-xl font-bold" style={{ color: 'var(--color-accent)' }}>
+                        {Math.round(productionAccuracy.recall * 100)}%
+                      </div>
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide">Recall</div>
+                    </div>
+                  )}
+                  <button
+                    onClick={async () => {
+                      setProdAccRefreshing(true);
+                      try {
+                        const result = await api.refreshProductionAccuracy();
+                        setProductionAccuracy(result);
+                      } catch { /* non-fatal */ }
+                      setProdAccRefreshing(false);
+                    }}
+                    disabled={prodAccRefreshing}
+                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] border border-[var(--color-border)] rounded-lg px-2.5 py-1 transition-colors disabled:opacity-50"
+                  >
+                    {prodAccRefreshing ? 'Refreshing…' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+
+              {productionAccuracy.n_pairs === 0 ? (
+                <div className="text-center py-8 text-sm text-[var(--color-text-muted)]">
+                  No matched prediction-outcome pairs yet.
+                  <br />
+                  <span className="text-xs">Mark accounts as churned or renewed on the Accounts page to begin building production accuracy data.</span>
+                </div>
+              ) : (
+                <>
+                  {/* Calibration chart */}
+                  {productionAccuracy.calibration.length > 0 && (
+                    <>
+                      <div className="flex items-end gap-1 h-28">
+                        {productionAccuracy.calibration.map((bin, i) => {
+                          const maxVal = Math.max(
+                            ...productionAccuracy.calibration.map((b) => Math.max(b.predicted_avg, b.actual_rate)),
+                            0.01
+                          );
+                          return (
+                            <div
+                              key={i}
+                              className="flex-1 flex items-end gap-px"
+                              title={`${Math.round(bin.bin_lo * 100)}–${Math.round(bin.bin_hi * 100)}%  |  Predicted: ${Math.round(bin.predicted_avg * 100)}%  |  Actual: ${Math.round(bin.actual_rate * 100)}%  |  n=${bin.n}`}
+                            >
+                              <div
+                                className="flex-1 rounded-t-sm opacity-60 transition-all"
+                                style={{ height: `${(bin.predicted_avg / maxVal) * 100}%`, background: 'var(--color-accent)' }}
+                              />
+                              <div
+                                className="flex-1 rounded-t-sm transition-all"
+                                style={{ height: `${(bin.actual_rate / maxVal) * 100}%`, background: 'var(--color-danger)' }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1 mb-3">
+                        <span>Low predicted risk</span>
+                        <span>High predicted risk</span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Legend + coverage stats */}
+                  <div className="flex items-center gap-5 text-[10px]">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-sm opacity-60" style={{ background: 'var(--color-accent)' }} />
+                      <span className="text-[var(--color-text-muted)]">Predicted probability</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-danger)' }} />
+                      <span className="text-[var(--color-text-muted)]">Actual churn rate</span>
+                    </div>
+                    <span className="text-[var(--color-text-muted)] ml-auto">
+                      {productionAccuracy.n_pairs}/{productionAccuracy.n_eligible_outcomes} outcomes matched
+                      {productionAccuracy.n_unmatched > 0 && (
+                        <span title="Outcomes excluded because no prediction was found in the prior 90 days">
+                          {' · '}{productionAccuracy.n_unmatched} unmatched
+                        </span>
+                      )}
+                      {' · '}
+                      {productionAccuracy.n_churned} churned · {productionAccuracy.n_renewed} renewed
+                    </span>
+                  </div>
+
+                  {/* Time lag insight */}
+                  {productionAccuracy.time_lag_stats && (
+                    <div className="mt-3 pt-3 border-t border-[var(--color-border)] text-[10px] text-[var(--color-text-muted)]">
+                      Prediction horizon: median {productionAccuracy.time_lag_stats.median} days before outcome
+                      {' '}(p25: {productionAccuracy.time_lag_stats.p25}d · p75: {productionAccuracy.time_lag_stats.p75}d)
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </>
