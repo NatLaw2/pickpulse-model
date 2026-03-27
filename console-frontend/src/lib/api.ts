@@ -173,6 +173,11 @@ export const api = {
       `/arr/forecast?horizon_days=${horizonDays}&expansion_rate=${expansionRate}`
     ),
 
+  // Weekly Revenue Digest
+  weeklyDigestPreview: () => request<WeeklyDigest>('/digest/weekly/preview'),
+  sendWeeklyDigest: () =>
+    request<WeeklyDigest>('/digest/weekly', { method: 'POST' }),
+
   // Model performance / trust panel (training-time metrics)
   modelPerformance: () => request<ModelPerformance>('/model/performance'),
 
@@ -640,6 +645,61 @@ export interface ModelPerformance {
   calibration_bins: CalibrationBin[];
   lift_table: Record<string, number>[];
   evaluated_at: string | null;
+}
+
+export interface WeeklyDigestAccount {
+  account_id: string;
+  name: string | null;
+  arr: number;
+  churn_probability?: number;
+  expected_arr_at_risk?: number;
+  renewal_date?: string;
+  renewal_date_precision?: 'exact' | 'month_estimate';
+  score_delta?: number;
+  driver?: string;
+}
+
+export interface WeeklyDigestData {
+  as_of: string;
+  key_insight: string;
+  top_downside: WeeklyDigestAccount[];
+  arr_concentration: {
+    n_accounts: number;
+    top3_sum: number;
+    total_arr_at_risk: number;
+    top3_pct: number;
+  } | null;
+  wow_drivers: string[];
+  forecast_snapshot: {
+    horizon_date: string;
+    forecast_base: number;
+    arr_at_risk: number;
+    current_arr: number;
+    arr_coverage_pct: number;
+    accounts_in_forecast: number;
+    prior_forecast_base: number | null;
+    prior_forecast_date: string | null;
+    forecast_delta: number | null;
+    forecast_delta_pct: number | null;
+    lower_1sd: number;
+    upper_1sd: number;
+  };
+  growth_signals: WeeklyDigestAccount[];
+  coverage: {
+    total_active_accounts: number;
+    accounts_in_forecast: number;
+    accounts_scored_no_renewal_date: number;
+    arr_excluded: number;
+    arr_coverage_pct: number;
+  };
+}
+
+export interface WeeklyDigest {
+  subject: string;
+  html: string;
+  text: string;
+  digest_data: WeeklyDigestData;
+  sent_to: string[];
 }
 
 export interface ArrForecastAccount {

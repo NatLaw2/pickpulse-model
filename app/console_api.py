@@ -922,6 +922,30 @@ def model_performance(tenant_id: str = Depends(get_tenant_id)):
     }
 
 
+@app.get("/api/digest/weekly/preview")
+def weekly_digest_preview(tenant_id: str = Depends(get_tenant_id)):
+    """Generate the weekly revenue digest and return it for browser preview.
+
+    Never sends email. Safe to call repeatedly — does update the WoW snapshot.
+    Returns subject, html, text, and the structured digest_data object.
+    """
+    from app.weekly_digest import generate_weekly_digest
+    return generate_weekly_digest(tenant_id=tenant_id, send=False)
+
+
+@app.post("/api/digest/weekly")
+def send_weekly_digest(tenant_id: str = Depends(get_tenant_id)):
+    """Generate and send the weekly revenue digest to configured recipients.
+
+    Requires SMTP_HOST env var and notification recipients to be configured.
+    Returns the same payload as the preview endpoint, plus sent_to list.
+    generate_weekly_digest(send=True) is the stable entry point for future
+    cron triggers — no changes to this function needed to enable scheduling.
+    """
+    from app.weekly_digest import generate_weekly_digest
+    return generate_weekly_digest(tenant_id=tenant_id, send=True)
+
+
 @app.get("/api/arr/forecast")
 def arr_forecast(
     horizon_days: int = 90,
