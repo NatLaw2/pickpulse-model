@@ -37,6 +37,7 @@ export function DashboardPage() {
   const [arrForecast, setArrForecast] = useState<ArrForecast | null>(null);
   const [expansionRate, setExpansionRate] = useState(0.0);
   const [forecastLoading, setForecastLoading] = useState(false);
+  const [showModelHealth, setShowModelHealth] = useState(false);
   const navigate = useNavigate();
   const { dataset } = useDataset();
   const { predictions } = usePredictions();
@@ -544,7 +545,7 @@ export function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex-1 mb-1">
-                      {/* Model uncertainty range bar */}
+                      {/* Model uncertainty range: line + dot */}
                       {arrForecast.forecast.std_dev > 0 && (() => {
                         const lo = arrForecast.forecast.lower_1sd;
                         const hi = arrForecast.forecast.upper_1sd;
@@ -553,23 +554,23 @@ export function DashboardPage() {
                         const basePct = ((base - lo) / range) * 100;
                         return (
                           <div>
-                            <div className="text-[10px] text-[var(--color-text-muted)] mb-1.5 uppercase tracking-wide">
+                            <div className="text-[10px] text-[var(--color-text-muted)] mb-2 uppercase tracking-wide">
                               Model uncertainty range
                             </div>
-                            <div className="relative h-5 bg-[var(--color-border)] rounded-full overflow-hidden">
+                            {/* Track: horizontal line with end ticks and a dot at base */}
+                            <div className="relative h-4 flex items-center mx-1">
+                              <div className="absolute inset-x-0 h-px bg-[var(--color-border)]" />
+                              <div className="absolute left-0 w-px h-2.5 bg-[var(--color-text-muted)]" style={{ transform: 'translateX(-50%)' }} />
+                              <div className="absolute right-0 w-px h-2.5 bg-[var(--color-text-muted)]" style={{ transform: 'translateX(50%)' }} />
                               <div
-                                className="absolute inset-y-0 left-0 right-0 rounded-full"
-                                style={{ background: 'linear-gradient(90deg, var(--color-danger) 0%, var(--color-warning) 40%, var(--color-success) 100%)', opacity: 0.25 }}
-                              />
-                              <div
-                                className="absolute inset-y-0 w-0.5 bg-[var(--color-text)] rounded-full"
-                                style={{ left: `${basePct}%` }}
+                                className="absolute w-2.5 h-2.5 rounded-full bg-[var(--color-accent)] border-2 border-white shadow-sm"
+                                style={{ left: `${basePct}%`, transform: 'translateX(-50%)' }}
                                 title={`Base: ${formatCurrency(base)}`}
                               />
                             </div>
-                            <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1">
+                            <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1.5">
                               <span>{formatCurrency(lo)}</span>
-                              <span className="text-[var(--color-text-secondary)]">±1σ range</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)] opacity-70">±1σ · not a guaranteed bound</span>
                               <span>{formatCurrency(hi)}</span>
                             </div>
                           </div>
@@ -683,6 +684,19 @@ export function DashboardPage() {
             </div>
           )}
 
+          {/* Model Health toggle — collapses sections 6 & 7 off the primary view */}
+          {(performance || productionAccuracy !== null) && (
+            <button
+              onClick={() => setShowModelHealth(v => !v)}
+              className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1 self-start"
+            >
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-150 ${showModelHealth ? 'rotate-90' : ''}`} />
+              Model Health
+            </button>
+          )}
+
+          {showModelHealth && (
+            <>
           {/* Section 6: Model Accuracy Trust Panel (training-time) */}
           {performance && performance.calibration_bins.length > 0 && (
             <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
@@ -892,6 +906,8 @@ export function DashboardPage() {
                 </>
               )}
             </div>
+          )}
+            </>
           )}
         </>
       )}
