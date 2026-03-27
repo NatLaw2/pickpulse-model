@@ -625,15 +625,6 @@ export interface FeatureImportance {
   importance: number;
 }
 
-export interface CalibrationBin {
-  bin_lo: number;
-  bin_hi: number;
-  n: number;
-  predicted_avg: number;
-  actual_rate: number;
-  delta: number;
-}
-
 export interface ModelPerformance {
   auc: number | null;
   pr_auc: number | null;
