@@ -167,6 +167,12 @@ export const api = {
   cachedPredictions: () =>
     request<PredictResponse>(`/predict/${MOD}/cached`),
 
+  // ARR Trajectory Engine
+  arrForecast: (horizonDays = 90, expansionRate = 0.0) =>
+    request<ArrForecast>(
+      `/arr/forecast?horizon_days=${horizonDays}&expansion_rate=${expansionRate}`
+    ),
+
   // Model performance / trust panel (training-time metrics)
   modelPerformance: () => request<ModelPerformance>('/model/performance'),
 
@@ -634,6 +640,54 @@ export interface ModelPerformance {
   calibration_bins: CalibrationBin[];
   lift_table: Record<string, number>[];
   evaluated_at: string | null;
+}
+
+export interface ArrForecastAccount {
+  account_id: string;
+  name: string | null;
+  arr: number;
+  churn_probability: number;
+  expected_arr_at_risk: number;
+  renewal_date: string;
+  renewal_date_precision: 'exact' | 'month_estimate';
+}
+
+export interface ArrCalendarMonth {
+  month: string;           // "YYYY-MM"
+  arr_renewing: number;
+  expected_arr_lost: number;
+  expected_arr_retained: number;
+  account_count: number;
+}
+
+export interface ArrForecast {
+  as_of: string;
+  horizon_days: number;
+  horizon_date: string;
+  current_arr: number;
+  forecast: {
+    base: number;
+    lower_1sd: number;
+    upper_1sd: number;
+    std_dev: number;
+  };
+  arr_at_risk: number;
+  arr_renewing: number;
+  expansion_arr: number;
+  expansion_rate: number;
+  renewal_calendar: ArrCalendarMonth[];
+  top_at_risk: ArrForecastAccount[];
+  coverage: {
+    total_active_accounts: number;
+    accounts_in_forecast: number;
+    accounts_scored_no_renewal_date: number;
+    accounts_scored_no_arr: number;
+    arr_in_forecast: number;
+    arr_excluded: number;
+    arr_coverage_pct: number;
+  };
+  arr_coverage_pct: number;
+  assumptions: string[];
 }
 
 export interface ProductionAccuracy {

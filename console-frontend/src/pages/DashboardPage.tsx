@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2, ExternalLink } from 'lucide-react';
-import { api, type DashboardResponse, type ModelPerformance, type ProductionAccuracy } from '../lib/api';
+import { api, type DashboardResponse, type ModelPerformance, type ProductionAccuracy, type ArrForecast, type ArrCalendarMonth } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { RevenueImpactCard } from '../components/RevenueImpactCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
@@ -34,6 +34,9 @@ export function DashboardPage() {
   const [performance, setPerformance] = useState<ModelPerformance | null>(null);
   const [productionAccuracy, setProductionAccuracy] = useState<ProductionAccuracy | null>(null);
   const [prodAccRefreshing, setProdAccRefreshing] = useState(false);
+  const [arrForecast, setArrForecast] = useState<ArrForecast | null>(null);
+  const [expansionRate, setExpansionRate] = useState(0.0);
+  const [forecastLoading, setForecastLoading] = useState(false);
   const navigate = useNavigate();
   const { dataset } = useDataset();
   const { predictions } = usePredictions();
@@ -67,6 +70,15 @@ export function DashboardPage() {
   useEffect(() => {
     api.productionAccuracy().then(setProductionAccuracy).catch(() => {});
   }, []);
+
+  // Fetch ARR forecast on load and whenever expansion rate changes
+  useEffect(() => {
+    setForecastLoading(true);
+    api.arrForecast(90, expansionRate)
+      .then(setArrForecast)
+      .catch(() => {})
+      .finally(() => setForecastLoading(false));
+  }, [expansionRate]);
 
   // Auto-generate executive summary when dashboard data loads with predictions
   useEffect(() => {
@@ -454,6 +466,194 @@ export function DashboardPage() {
               </div>
             </div>
           )}
+          {/* Section 5b: ARR Trajectory Engine */}
+          {(arrForecast || forecastLoading) && (
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <h3 className="text-sm font-semibold">ARR Forecast · Next 90 Days</h3>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                    Expected revenue based on renewal timing and current risk scores
+                  </p>
+                </div>
+                {arrForecast && (
+                  <div className="flex items-center gap-4">
+                    {/* Expansion rate control */}
+                    <label className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)]">
+                      Expansion
+                      <select
+                        value={expansionRate}
+                        onChange={(e) => setExpansionRate(parseFloat(e.target.value))}
+                        className="border border-[var(--color-border)] rounded px-1.5 py-0.5 text-[10px] bg-white"
+                      >
+                        <option value={0.0}>0% (none)</option>
+                        <option value={0.05}>5%</option>
+                        <option value={0.10}>10%</option>
+                        <option value={0.15}>15%</option>
+                        <option value={0.20}>20%</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {forecastLoading && !arrForecast && (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-[var(--color-text-muted)]" />
+                </div>
+              )}
+
+              {arrForecast && (
+                <>
+                  {/* Headline numbers */}
+                  <div className="flex items-end gap-8 mb-5">
+                    <div>
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide mb-1">
+                        Expected ARR · {arrForecast.horizon_date}
+                      </div>
+                      <div className="text-3xl font-bold tracking-tight">
+                        {formatCurrency(arrForecast.forecast.base)}
+                      </div>
+                      <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                        {arrForecast.forecast.base >= arrForecast.current_arr ? '+' : ''}
+                        {formatCurrency(arrForecast.forecast.base - arrForecast.current_arr)}
+                        {' '}vs current {formatCurrency(arrForecast.current_arr)}
+                      </div>
+                    </div>
+                    <div className="flex-1 mb-1">
+                      {/* Model uncertainty range bar */}
+                      {arrForecast.forecast.std_dev > 0 && (() => {
+                        const lo = arrForecast.forecast.lower_1sd;
+                        const hi = arrForecast.forecast.upper_1sd;
+                        const base = arrForecast.forecast.base;
+                        const range = hi - lo || 1;
+                        const basePct = ((base - lo) / range) * 100;
+                        return (
+                          <div>
+                            <div className="text-[10px] text-[var(--color-text-muted)] mb-1.5 uppercase tracking-wide">
+                              Model uncertainty range
+                            </div>
+                            <div className="relative h-5 bg-[var(--color-border)] rounded-full overflow-hidden">
+                              <div
+                                className="absolute inset-y-0 left-0 right-0 rounded-full"
+                                style={{ background: 'linear-gradient(90deg, var(--color-danger) 0%, var(--color-warning) 40%, var(--color-success) 100%)', opacity: 0.25 }}
+                              />
+                              <div
+                                className="absolute inset-y-0 w-0.5 bg-[var(--color-text)] rounded-full"
+                                style={{ left: `${basePct}%` }}
+                                title={`Base: ${formatCurrency(base)}`}
+                              />
+                            </div>
+                            <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1">
+                              <span>{formatCurrency(lo)}</span>
+                              <span className="text-[var(--color-text-secondary)]">±1σ range</span>
+                              <span>{formatCurrency(hi)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Renewal calendar */}
+                  {arrForecast.renewal_calendar.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide mb-2">
+                        Renewal calendar
+                      </div>
+                      <div className="flex items-end gap-2 h-20">
+                        {arrForecast.renewal_calendar.map((month: ArrCalendarMonth, i: number) => {
+                          const maxArr = Math.max(
+                            ...arrForecast.renewal_calendar.map((m) => m.arr_renewing),
+                            1
+                          );
+                          const totalH = (month.arr_renewing / maxArr) * 100;
+                          const lostH = (month.expected_arr_lost / maxArr) * 100;
+                          const retainedH = totalH - lostH;
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-stretch gap-0">
+                              <div className="flex flex-col justify-end h-16">
+                                <div
+                                  className="rounded-t-sm transition-all"
+                                  style={{ height: `${lostH}%`, background: 'var(--color-danger)', opacity: 0.75 }}
+                                  title={`Expected lost: ${formatCurrency(month.expected_arr_lost)}`}
+                                />
+                                <div
+                                  className="rounded-b-sm transition-all"
+                                  style={{ height: `${retainedH}%`, background: 'var(--color-success)', opacity: 0.6 }}
+                                  title={`Expected retained: ${formatCurrency(month.expected_arr_retained)}`}
+                                />
+                              </div>
+                              <div className="text-[9px] text-[var(--color-text-muted)] text-center mt-1">
+                                {month.month.slice(5)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex items-center gap-4 text-[10px] mt-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-success)', opacity: 0.6 }} />
+                          <span className="text-[var(--color-text-muted)]">Expected retained</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-danger)', opacity: 0.75 }} />
+                          <span className="text-[var(--color-text-muted)]">Expected at risk</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Top at-risk accounts */}
+                  {arrForecast.top_at_risk.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide mb-2">
+                        Highest expected ARR impact
+                      </div>
+                      <div className="divide-y divide-[var(--color-border)]">
+                        {arrForecast.top_at_risk.slice(0, 5).map((acct, i) => (
+                          <div key={i} className="flex items-center justify-between py-1.5 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="truncate font-medium">{acct.name || acct.account_id}</span>
+                              {acct.renewal_date_precision === 'month_estimate' && (
+                                <span className="text-[10px] text-[var(--color-text-muted)] shrink-0">~month</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4 shrink-0 text-right">
+                              <span className="text-[var(--color-text-muted)]">{Math.round(acct.churn_probability * 100)}% risk</span>
+                              <span className="font-medium text-[var(--color-danger)]">{formatCurrency(acct.expected_arr_at_risk)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Coverage footer */}
+                  <div className="pt-3 border-t border-[var(--color-border)] space-y-1 text-[10px] text-[var(--color-text-muted)]">
+                    <div>
+                      Forecast covers {formatCurrency(arrForecast.coverage.arr_in_forecast)} of {formatCurrency(arrForecast.current_arr)} total ARR
+                      {' '}({arrForecast.arr_coverage_pct.toFixed(0)}% · {arrForecast.coverage.accounts_in_forecast} of {arrForecast.coverage.total_active_accounts} accounts)
+                    </div>
+                    {arrForecast.coverage.arr_excluded > 0 && (
+                      <div className="text-[var(--color-warning)]">
+                        {formatCurrency(arrForecast.coverage.arr_excluded)} ARR excluded — renewal date unknown
+                      </div>
+                    )}
+                    {arrForecast.expansion_arr > 0 && (
+                      <div>
+                        Includes {formatCurrency(arrForecast.expansion_arr)} estimated expansion ({(arrForecast.expansion_rate * 100).toFixed(0)}% on low-risk accounts)
+                      </div>
+                    )}
+                    <div className="italic">
+                      Statistical forecast range assumes independent account churn. Correlated events are not modeled.
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Section 6: Model Accuracy Trust Panel (training-time) */}
           {performance && performance.calibration_bins.length > 0 && (
             <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">

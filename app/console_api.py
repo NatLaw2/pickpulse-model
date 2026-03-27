@@ -922,6 +922,36 @@ def model_performance(tenant_id: str = Depends(get_tenant_id)):
     }
 
 
+@app.get("/api/arr/forecast")
+def arr_forecast(
+    horizon_days: int = 90,
+    expansion_rate: float = 0.0,
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Return the ARR trajectory forecast for the next horizon_days.
+
+    Args:
+        horizon_days:   Look-ahead window (default 90). Must be 1–365.
+        expansion_rate: Fractional upsell applied to low-risk renewing accounts
+                        (churn_prob < 30%). Default 0.0 (no expansion assumed).
+                        Example: 0.10 = 10% ARR growth on qualifying renewals.
+
+    Returns base forecast, model uncertainty range (±1σ), renewal calendar,
+    top at-risk accounts, coverage stats, and an auditable assumptions array.
+    """
+    if not (1 <= horizon_days <= 365):
+        raise HTTPException(status_code=422, detail="horizon_days must be between 1 and 365.")
+    if not (0.0 <= expansion_rate <= 1.0):
+        raise HTTPException(status_code=422, detail="expansion_rate must be between 0.0 and 1.0.")
+
+    from app.arr_forecast import compute_arr_forecast
+    return compute_arr_forecast(
+        tenant_id=tenant_id,
+        horizon_days=horizon_days,
+        expansion_rate=expansion_rate,
+    )
+
+
 @app.get("/api/model/production-accuracy")
 def get_production_accuracy(tenant_id: str = Depends(get_tenant_id)):
     """Return production prediction accuracy: predictions matched to real outcomes.
