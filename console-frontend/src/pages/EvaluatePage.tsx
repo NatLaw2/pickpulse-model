@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ReferenceLine } from 'recharts';
-import { FileText, Info } from 'lucide-react';
-import { api, type EvalMetrics } from '../lib/api';
+import { FileText, Info, TrendingDown, TrendingUp } from 'lucide-react';
+import { api, type EvalMetrics, type ModelInsights } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { formatCurrency } from '../lib/format';
 
 export function EvaluatePage({ embedded }: { embedded?: boolean } = {}) {
   const [metrics, setMetrics] = useState<EvalMetrics | null>(null);
+  const [insights, setInsights] = useState<ModelInsights | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     api.evaluate().then(setMetrics).catch((e) => { setMetrics(null); setError(e.message); });
+    api.modelInsights().then(setInsights).catch(() => setInsights(null));
   }, []);
 
   const calData = metrics?.calibration_bins?.map((b) => ({
@@ -104,6 +106,79 @@ export function EvaluatePage({ embedded }: { embedded?: boolean } = {}) {
                   <div className="text-xl font-bold">{metrics.business_impact.positives_in_top_decile} / {metrics.business_impact.total_positives}</div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* What the Model Learned */}
+          {insights && (insights.churn_drivers.length > 0 || insights.health_signals.length > 0) && (
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-sm font-semibold">What the Model Learned</h3>
+                <span className="text-[var(--color-text-muted)]" title="Plain-language translation of the model's feature importance — which signals most strongly predict churn or retention in your dataset."><Info size={14} /></span>
+              </div>
+              {insights.top_insight && (
+                <p className="text-sm text-[var(--color-text-secondary)] mb-5">{insights.top_insight}</p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Churn drivers */}
+                {insights.churn_drivers.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <TrendingDown size={13} className="text-[var(--color-danger)]" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-danger)]">Top Churn Drivers</span>
+                    </div>
+                    <div className="space-y-3">
+                      {insights.churn_drivers.map((d) => (
+                        <div key={d.rank}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-sm font-medium">{d.label}</span>
+                            <span className="text-xs text-[var(--color-text-muted)]">{d.group}</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-[var(--color-bg-primary)] rounded-full overflow-hidden mb-1">
+                            <div
+                              className="h-full rounded-full bg-[var(--color-danger)]"
+                              style={{ width: `${Math.round(d.importance_normalized * 100)}%`, opacity: 0.7 + d.importance_normalized * 0.3 }}
+                            />
+                          </div>
+                          <p className="text-xs text-[var(--color-text-muted)]">{d.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Health signals */}
+                {insights.health_signals.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <TrendingUp size={13} className="text-[var(--color-success)]" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-success)]">Retention Signals</span>
+                    </div>
+                    <div className="space-y-3">
+                      {insights.health_signals.map((d) => (
+                        <div key={d.rank}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-sm font-medium">{d.label}</span>
+                            <span className="text-xs text-[var(--color-text-muted)]">{d.group}</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-[var(--color-bg-primary)] rounded-full overflow-hidden mb-1">
+                            <div
+                              className="h-full rounded-full bg-[var(--color-success)]"
+                              style={{ width: `${Math.round(d.importance_normalized * 100)}%`, opacity: 0.7 + d.importance_normalized * 0.3 }}
+                            />
+                          </div>
+                          <p className="text-xs text-[var(--color-text-muted)]">{d.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {insights.lift_statement && (
+                <p className="mt-5 pt-4 border-t border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
+                  {insights.lift_statement}
+                </p>
+              )}
             </div>
           )}
 
