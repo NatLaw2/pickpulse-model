@@ -752,6 +752,22 @@ export interface ModelInsightDriver {
   importance_normalized: number;
 }
 
+export interface BehavioralDiffItem {
+  label: string;
+  direction: 'up' | 'down';
+  summary: string;
+  churned_avg: number;
+  retained_avg: number;
+  format_type: 'pct' | 'ratio' | 'points';
+}
+
+export interface BehavioralDiff {
+  items: BehavioralDiffItem[];
+  interpretation: string | null;
+  n_churned: number;
+  n_retained: number;
+}
+
 export interface ModelInsights {
   module: string;
   model_type: string;
@@ -761,6 +777,7 @@ export interface ModelInsights {
   health_signals: ModelInsightDriver[];
   top_insight: string | null;
   lift_statement: string | null;
+  behavioral_diff: BehavioralDiff | null;
   generated_at: string;
 }
 

@@ -1,16 +1,19 @@
 """Model Insights — portfolio-level explainability for CRO / PE readership.
 
 Answers: "What did the model learn about churn in this dataset?"
+         "What did churned accounts actually do differently?"
 
 Reads feature_importance from the trained model's metadata.json artifact
-and translates raw feature names into plain business language. No ML
-jargon, no raw column names in the output.
+and translates raw feature names into plain business language. Also computes
+quantified behavioral differences between churned and retained accounts from
+the scored CSV artifact. No ML jargon, no raw column names in the output.
 
 Output sections:
-  churn_drivers   — top features that elevate churn risk, ranked
-  health_signals  — top features that correlate with retention/renewal
-  top_insight     — one-sentence summary of the model's strongest signal
-  lift_statement  — lift in the top risk group (from lift table)
+  churn_drivers      — top features that elevate churn risk, ranked
+  health_signals     — top features that correlate with retention/renewal
+  top_insight        — one-sentence summary of the model's strongest signal
+  lift_statement     — lift in the top risk group (from lift table)
+  behavioral_diff    — churned vs retained avg comparison, 3-5 key signals
 
 Design constraints:
   - No multipliers or percentages unless derived from real data
@@ -388,7 +391,8 @@ def _empty_insights(metadata: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def load_insights_for_tenant(tenant_id: str) -> Optional[Dict[str, Any]]:
-    """Load metadata.json for the tenant's churn model and compute insights.
+    """Load metadata.json for the tenant's churn model and compute insights,
+    then merge in behavioral diff from the scored CSV artifact.
 
     Returns None if no model has been trained yet.
     Uses the same artifact path convention as console_api.py.
@@ -403,7 +407,198 @@ def load_insights_for_tenant(tenant_id: str) -> Optional[Dict[str, Any]]:
             return None
         with open(meta_path) as f:
             metadata = json.load(f)
-        return compute_model_insights(metadata)
+        insights = compute_model_insights(metadata)
+        insights["behavioral_diff"] = _load_behavioral_diff(tenant_id)
+        return insights
     except Exception as exc:
         logger.warning("model_insights: load failed for tenant %s (%s)", tenant_id, exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Behavioral diff — churned vs retained quantified comparison
+# ---------------------------------------------------------------------------
+
+# Features to compare, in priority order.
+# (feature_name, display_label, format_type)
+#   format_type:
+#     "pct"    — % change: "↓ 42% lower login activity"
+#     "ratio"  — multiplier: "↑ 2.3× more support ticket volume"
+#     "points" — absolute diff: "↓ 3.1 points lower NPS score"
+_BEHAVIORAL_FEATURES: List[tuple] = [
+    ("monthly_logins",        "login activity",           "pct"),
+    ("engagement_score",      "overall engagement",       "pct"),
+    ("nps_score",             "NPS score",                "points"),
+    ("support_tickets",       "support ticket volume",    "ratio"),
+    ("days_since_last_login", "days since last login",    "pct"),
+    ("arr",                   "account value (ARR)",      "pct"),
+    ("seats",                 "seat utilization",         "pct"),
+]
+
+_MAX_DIFF_ITEMS = 5
+_MIN_RETAINED_N = 5  # skip if too few samples
+
+
+def compute_behavioral_diff(
+    scored_df: "Any",  # pd.DataFrame — avoid hard import at module level
+    label_col: str = "churned",
+) -> Dict[str, Any]:
+    """Compute churned vs retained behavioral differences from the scored DataFrame.
+
+    Args:
+        scored_df: DataFrame produced by evaluate_model's scored CSV output.
+                   Must contain label_col plus at least some of the numeric
+                   feature columns listed in _BEHAVIORAL_FEATURES.
+        label_col: Binary label column name (1 = churned, 0 = retained).
+
+    Returns:
+        Dict with keys: items, interpretation, n_churned, n_retained.
+    """
+    import pandas as pd  # local import — pandas not used elsewhere in this module
+
+    churned = scored_df[scored_df[label_col] == 1]
+    retained = scored_df[scored_df[label_col] == 0]
+
+    n_c, n_r = len(churned), len(retained)
+    if n_c < _MIN_RETAINED_N or n_r < _MIN_RETAINED_N:
+        return {"items": [], "interpretation": None, "n_churned": n_c, "n_retained": n_r}
+
+    raw_items: List[Dict[str, Any]] = []
+
+    for feat, label, fmt in _BEHAVIORAL_FEATURES:
+        if feat not in scored_df.columns:
+            continue
+
+        c_vals = churned[feat].dropna()
+        r_vals = retained[feat].dropna()
+        if len(c_vals) < 2 or len(r_vals) < 2:
+            continue
+
+        c_mean = float(c_vals.mean())
+        r_mean = float(r_vals.mean())
+
+        if r_mean == 0:
+            continue
+
+        magnitude: float
+        summary: str
+        direction: str
+
+        if fmt == "pct":
+            pct = (c_mean - r_mean) / abs(r_mean) * 100
+            if abs(pct) < 8:
+                continue  # noise threshold
+            direction = "up" if pct > 0 else "down"
+            arrow = "↑" if direction == "up" else "↓"
+            word = "higher" if direction == "up" else "lower"
+            summary = f"{arrow} {abs(round(pct))}% {word} {label}"
+            magnitude = abs(pct)
+
+        elif fmt == "ratio":
+            if r_mean == 0:
+                continue
+            ratio = c_mean / r_mean
+            if ratio < 1.15:
+                continue  # not meaningfully different
+            direction = "up"
+            summary = f"↑ {ratio:.1f}× more {label}"
+            magnitude = (ratio - 1) * 100  # normalise for sorting
+
+        elif fmt == "points":
+            diff = c_mean - r_mean
+            if abs(diff) < 0.5:
+                continue
+            direction = "up" if diff > 0 else "down"
+            arrow = "↑" if direction == "up" else "↓"
+            word = "higher" if direction == "up" else "lower"
+            summary = f"{arrow} {abs(round(diff, 1))} points {word} {label}"
+            magnitude = abs(diff)
+
+        else:
+            continue
+
+        raw_items.append({
+            "label": label,
+            "feature": feat,
+            "direction": direction,
+            "summary": summary,
+            "churned_avg": round(c_mean, 2),
+            "retained_avg": round(r_mean, 2),
+            "format_type": fmt,
+            "_magnitude": magnitude,
+        })
+
+    # Sort by magnitude descending, cap at _MAX_DIFF_ITEMS
+    raw_items.sort(key=lambda x: x["_magnitude"], reverse=True)
+    raw_items = raw_items[:_MAX_DIFF_ITEMS]
+
+    # Strip internal sorting field
+    items = [{k: v for k, v in item.items() if k != "_magnitude"} for item in raw_items]
+
+    interpretation = _generate_behavioral_interpretation(raw_items, n_c, n_r)
+
+    return {
+        "items": items,
+        "interpretation": interpretation,
+        "n_churned": n_c,
+        "n_retained": n_r,
+    }
+
+
+def _generate_behavioral_interpretation(
+    items: List[Dict[str, Any]],
+    n_churned: int,
+    n_retained: int,
+) -> Optional[str]:
+    """Generate one plain-language sentence summarising the behavioral diff."""
+    if not items:
+        return None
+
+    top = items[0]
+    engagement_labels = {"login activity", "overall engagement", "seat utilization", "days since last login"}
+    friction_labels = {"support ticket volume"}
+
+    if len(items) >= 2:
+        second = items[1]
+        # Detect the dominant theme
+        both_engagement = top["label"] in engagement_labels and second["label"] in engagement_labels
+        top_friction = top["label"] in friction_labels
+        if both_engagement:
+            theme = "disengagement"
+        elif top_friction:
+            theme = "product friction"
+        else:
+            theme = "behavioral disengagement"
+        return (
+            f"Across {n_churned} churned accounts, the clearest pattern was "
+            f"{top['label']} and {second['label']} — consistent with {theme} "
+            f"in the months before renewal."
+        )
+
+    return (
+        f"Across {n_churned} churned accounts, the strongest behavioral signal was "
+        f"{top['label']}."
+    )
+
+
+def _load_behavioral_diff(tenant_id: str) -> Optional[Dict[str, Any]]:
+    """Load the scored CSV for the tenant and compute behavioral diff.
+
+    Returns None if the scored CSV does not exist yet.
+    """
+    import pandas as pd
+
+    try:
+        data_dir = os.environ.get("DATA_DIR", "data")
+        scored_path = os.path.join(data_dir, "outputs", tenant_id, "churn_scored.csv")
+        if not os.path.exists(scored_path):
+            return None
+        df = pd.read_csv(scored_path)
+        label_col = "churned"
+        if label_col not in df.columns:
+            return None
+        df[label_col] = df[label_col].astype(int)
+        return compute_behavioral_diff(df, label_col)
+    except Exception as exc:
+        logger.warning("behavioral_diff: load failed for tenant %s (%s)", tenant_id, exc)
         return None

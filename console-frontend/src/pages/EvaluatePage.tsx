@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 import { FileText, Info, TrendingDown, TrendingUp } from 'lucide-react';
-import { api, type EvalMetrics, type ModelInsights } from '../lib/api';
+import { api, type EvalMetrics, type ModelInsights, type BehavioralDiffItem } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { formatCurrency } from '../lib/format';
 
@@ -179,6 +179,45 @@ export function EvaluatePage({ embedded }: { embedded?: boolean } = {}) {
                   {insights.lift_statement}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Behavioral Diff — What Churned Accounts Did Differently */}
+          {insights?.behavioral_diff && insights.behavioral_diff.items.length > 0 && (
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-sm font-semibold">What Churned Accounts Did Differently</h3>
+                <span className="text-[var(--color-text-muted)]" title="Computed from actual churned vs retained accounts in your dataset — not modeled estimates."><Info size={14} /></span>
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)] mb-5">
+                Compared to retained accounts, churned accounts showed:
+              </p>
+              <div className="space-y-3 mb-5">
+                {insights.behavioral_diff.items.map((item: BehavioralDiffItem) => (
+                  <div key={item.label} className="flex items-start gap-3">
+                    <span
+                      className="mt-0.5 text-base font-bold leading-none"
+                      style={{ color: item.direction === 'down' ? 'var(--color-danger)' : 'var(--color-warning)' }}
+                    >
+                      {item.summary.charAt(0)}
+                    </span>
+                    <div>
+                      <span className="text-sm font-medium">{item.summary.slice(2)}</span>
+                      <span className="text-xs text-[var(--color-text-muted)] ml-2">
+                        ({item.churned_avg.toLocaleString(undefined, { maximumFractionDigits: 1 })} churned vs {item.retained_avg.toLocaleString(undefined, { maximumFractionDigits: 1 })} retained)
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {insights.behavioral_diff.interpretation && (
+                <p className="pt-4 border-t border-[var(--color-border)] text-xs text-[var(--color-text-secondary)] italic">
+                  {insights.behavioral_diff.interpretation}
+                </p>
+              )}
+              <p className="mt-3 text-[10px] text-[var(--color-text-muted)]">
+                Based on {insights.behavioral_diff.n_churned} churned and {insights.behavioral_diff.n_retained} retained accounts in the training dataset.
+              </p>
             </div>
           )}
 
