@@ -976,6 +976,23 @@ def arr_forecast(
     )
 
 
+@app.get("/api/model/insights")
+def model_insights(tenant_id: str = Depends(get_tenant_id)):
+    """Return plain-language model explainability for the trained churn model.
+
+    Translates feature importances into business-readable drivers and health
+    signals. Returns 404 if no model has been trained yet.
+
+    Intended audience: CRO, PE, board — not data scientists.
+    Raw feature names are never exposed in the response.
+    """
+    from app.model_insights import load_insights_for_tenant
+    insights = load_insights_for_tenant(tenant_id)
+    if insights is None:
+        raise HTTPException(status_code=404, detail="No trained model found for this tenant.")
+    return insights
+
+
 @app.get("/api/model/production-accuracy")
 def get_production_accuracy(tenant_id: str = Depends(get_tenant_id)):
     """Return production prediction accuracy: predictions matched to real outcomes.

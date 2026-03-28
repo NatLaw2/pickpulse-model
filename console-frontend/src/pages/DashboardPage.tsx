@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2, ExternalLink } from 'lucide-react';
-import { api, type DashboardResponse, type ModelPerformance, type ProductionAccuracy, type ArrForecast, type ArrCalendarMonth } from '../lib/api';
+import { api, type DashboardResponse, type ModelPerformance, type ProductionAccuracy, type ArrForecast, type ArrCalendarMonth, type ModelInsights } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { RevenueImpactCard } from '../components/RevenueImpactCard';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
@@ -38,6 +38,7 @@ export function DashboardPage() {
   const [expansionRate, setExpansionRate] = useState(0.0);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [showModelHealth, setShowModelHealth] = useState(false);
+  const [modelInsights, setModelInsights] = useState<ModelInsights | null>(null);
   const navigate = useNavigate();
   const { dataset } = useDataset();
   const { predictions } = usePredictions();
@@ -70,6 +71,11 @@ export function DashboardPage() {
   // Fetch production accuracy (real outcome-matched metrics); 404/empty = no pairs yet
   useEffect(() => {
     api.productionAccuracy().then(setProductionAccuracy).catch(() => {});
+  }, []);
+
+  // Fetch model insights (plain-language feature importance); 404 = no model yet
+  useEffect(() => {
+    api.modelInsights().then(setModelInsights).catch(() => {});
   }, []);
 
   // Fetch ARR forecast on load and whenever expansion rate changes
@@ -684,8 +690,8 @@ export function DashboardPage() {
             </div>
           )}
 
-          {/* Model Health toggle — collapses sections 6 & 7 off the primary view */}
-          {(performance || productionAccuracy !== null) && (
+          {/* Model Health toggle — collapses model insights + accuracy panels */}
+          {(performance || productionAccuracy !== null || modelInsights !== null) && (
             <button
               onClick={() => setShowModelHealth(v => !v)}
               className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1 self-start"
@@ -697,6 +703,98 @@ export function DashboardPage() {
 
           {showModelHealth && (
             <>
+          {/* Model Insights — plain-language explainability */}
+          {modelInsights && (modelInsights.churn_drivers.length > 0 || modelInsights.health_signals.length > 0) && (
+            <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold">What the Model Learned</h3>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                  Derived from feature importance — translated for business readability
+                </p>
+              </div>
+
+              {/* Top insight sentence */}
+              {modelInsights.top_insight && (
+                <p className="text-sm text-[var(--color-text)] mb-4 italic border-l-2 pl-3"
+                   style={{ borderColor: 'var(--color-accent)' }}>
+                  {modelInsights.top_insight}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* Churn drivers */}
+                {modelInsights.churn_drivers.length > 0 && (
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-danger)] mb-3">
+                      Top Churn Risk Drivers
+                    </div>
+                    <div className="space-y-3">
+                      {modelInsights.churn_drivers.map((driver) => (
+                        <div key={driver.rank} className="flex gap-2.5">
+                          <div className="w-5 h-5 rounded-full bg-red-50 border border-red-200 flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="text-[9px] font-bold text-red-500">{driver.rank}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-[var(--color-text)]">{driver.label}</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-1 py-px shrink-0">{driver.group}</span>
+                            </div>
+                            <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5 leading-relaxed">{driver.description}</p>
+                            {/* Importance bar */}
+                            <div className="mt-1.5 h-1 rounded-full bg-red-100 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-red-400"
+                                style={{ width: `${driver.importance_normalized * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Health signals */}
+                {modelInsights.health_signals.length > 0 && (
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-success)] mb-3">
+                      Retention & Health Signals
+                    </div>
+                    <div className="space-y-3">
+                      {modelInsights.health_signals.map((signal) => (
+                        <div key={signal.rank} className="flex gap-2.5">
+                          <div className="w-5 h-5 rounded-full bg-green-50 border border-green-200 flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="text-[9px] font-bold text-green-600">{signal.rank}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-[var(--color-text)]">{signal.label}</span>
+                              <span className="text-[9px] text-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-1 py-px shrink-0">{signal.group}</span>
+                            </div>
+                            <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5 leading-relaxed">{signal.description}</p>
+                            <div className="mt-1.5 h-1 rounded-full bg-green-100 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-green-400"
+                                style={{ width: `${signal.importance_normalized * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Lift statement */}
+              {modelInsights.lift_statement && (
+                <p className="mt-4 pt-3 border-t border-[var(--color-border)] text-[11px] text-[var(--color-text-muted)]">
+                  {modelInsights.lift_statement}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Section 6: Model Accuracy Trust Panel (training-time) */}
           {performance && performance.calibration_bins.length > 0 && (
             <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">

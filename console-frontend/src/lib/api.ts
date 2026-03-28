@@ -180,6 +180,7 @@ export const api = {
 
   // Model performance / trust panel (training-time metrics)
   modelPerformance: () => request<ModelPerformance>('/model/performance'),
+  modelInsights: () => request<ModelInsights>('/model/insights'),
 
   // Production accuracy — predictions matched to real outcomes
   productionAccuracy: () => request<ProductionAccuracy>('/model/production-accuracy'),
@@ -741,6 +742,26 @@ export interface ArrForecast {
   };
   arr_coverage_pct: number;
   assumptions: string[];
+}
+
+export interface ModelInsightDriver {
+  rank: number;
+  label: string;
+  description: string;
+  group: string;
+  importance_normalized: number;
+}
+
+export interface ModelInsights {
+  module: string;
+  model_type: string;
+  trained_at: string | null;
+  n_features_total: number;
+  churn_drivers: ModelInsightDriver[];
+  health_signals: ModelInsightDriver[];
+  top_insight: string | null;
+  lift_statement: string | null;
+  generated_at: string;
 }
 
 export interface ProductionAccuracy {
