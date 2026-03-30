@@ -1,4 +1,14 @@
-"""HubSpot CRM connector — pulls companies, contacts, and deals."""
+"""HubSpot CRM connector — hardened for external portals and real-world messy data.
+
+Changes vs v1:
+  - _request(): retry wrapper with exponential back-off + 429 Retry-After handling
+  - Token refresh called proactively before every pull (not just write-back)
+  - pull_accounts(): uses dynamic schema discovery instead of hardcoded properties
+  - pull_signals(): services mode pulls engagement recency + deal activity instead
+    of mapping contacts→seats/deals→support_tickets
+  - connection_preflight(): returns counts + schema summary (not just True/False)
+  - pull_company_properties(): fetches all portal property metadata
+"""
 from __future__ import annotations
 
 import logging
@@ -9,14 +19,17 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from app.integrations.base import BaseConnector
-from app.integrations.models import Account, AccountSignal, ConnectorConfig
+from app.integrations.models import Account, AccountSignal, ConnectorConfig, PreflightResult
+from app.integrations.normalization import (
+    safe_float, safe_int, safe_date, clean_string,
+    days_since, days_until,
+)
 
 logger = logging.getLogger(__name__)
 
 API_BASE = "https://api.hubapi.com"
 
 # Custom property group and properties created in the tenant's HubSpot portal.
-# Property names are canonical — changing them after first use would orphan existing data.
 _PICKPULSE_PROPERTY_GROUP = "pickpulse_churn"
 _CHURN_PROPERTIES = [
     {
@@ -63,9 +76,16 @@ _CHURN_PROPERTIES = [
     },
 ]
 
-# Task creation thresholds
-TASK_RISK_THRESHOLD = 70       # churn_risk_pct must be >= this
-TASK_RENEWAL_WINDOW_DAYS = 90  # days_until_renewal must be <= this (or unknown)
+TASK_RISK_THRESHOLD = 70
+TASK_RENEWAL_WINDOW_DAYS = 90
+
+# Core properties always requested regardless of schema discovery.
+# These are standard HubSpot fields present in every portal.
+_BASE_COMPANY_PROPERTIES = [
+    "hs_object_id", "name", "domain",
+    "createdate", "notes_last_activity_date",
+    "num_associated_contacts",
+]
 
 
 class HubSpotConnector(BaseConnector):
@@ -82,6 +102,10 @@ class HubSpotConnector(BaseConnector):
     def auth_method(self) -> str:
         return "oauth"
 
+    @property
+    def _business_mode(self) -> str:
+        return self.config.extra.get("business_mode", "saas")
+
     # ------------------------------------------------------------------
     # Auth helpers
     # ------------------------------------------------------------------
@@ -93,37 +117,208 @@ class HubSpotConnector(BaseConnector):
         }
 
     # ------------------------------------------------------------------
-    # Connection test
+    # Retry-aware HTTP wrapper
+    # ------------------------------------------------------------------
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        timeout: int = 30,
+        max_retries: int = 3,
+    ) -> requests.Response:
+        """HTTP request with exponential back-off and 429 Retry-After handling.
+
+        Retries on: 429 (rate limit), 500, 502, 503, 504.
+        Raises immediately on 401, 403, 404 and other 4xx.
+        """
+        last_exc: Optional[Exception] = None
+        for attempt in range(max_retries):
+            try:
+                r = requests.request(
+                    method, url,
+                    headers=self._headers(),
+                    params=params,
+                    json=json,
+                    timeout=timeout,
+                )
+
+                if r.status_code == 429:
+                    retry_after = int(r.headers.get("Retry-After", 2 ** attempt))
+                    logger.warning("[hubspot] Rate limited — waiting %ds (attempt %d)", retry_after, attempt + 1)
+                    time.sleep(min(retry_after, 30))
+                    continue
+
+                if r.status_code in (500, 502, 503, 504):
+                    wait = 2 ** attempt  # 1, 2, 4 seconds
+                    logger.warning("[hubspot] %d error, retrying in %ds", r.status_code, wait)
+                    time.sleep(wait)
+                    last_exc = requests.HTTPError(response=r)
+                    continue
+
+                return r
+
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                wait = 2 ** attempt
+                logger.warning("[hubspot] Network error (%s), retrying in %ds", exc, wait)
+                time.sleep(wait)
+                last_exc = exc
+
+        raise last_exc or requests.RequestException("Max retries exceeded")
+
+    # ------------------------------------------------------------------
+    # Connection test (simple boolean — used by existing health endpoint)
     # ------------------------------------------------------------------
 
     def test_connection(self) -> bool:
         try:
-            r = requests.get(
-                f"{API_BASE}/crm/v3/objects/companies",
-                headers=self._headers(),
-                params={"limit": 1},
-                timeout=10,
-            )
+            self._refresh_token_if_needed()
+            r = self._request("GET", f"{API_BASE}/crm/v3/objects/companies",
+                              params={"limit": 1}, timeout=10)
             return r.status_code == 200
         except Exception as exc:
             logger.warning("HubSpot connection test failed: %s", exc)
             return False
 
     # ------------------------------------------------------------------
-    # Pull accounts (companies)
+    # Preflight check — returns rich diagnostics
+    # ------------------------------------------------------------------
+
+    def connection_preflight(self) -> PreflightResult:
+        """Check connectivity and return counts + schema summary.
+
+        Never raises — all failures are captured in the result.
+        """
+        from app.integrations.schema_mapper import discover as _discover
+
+        warnings: List[str] = []
+        checked_at = datetime.now(timezone.utc).isoformat()
+
+        try:
+            self._refresh_token_if_needed()
+        except Exception as exc:
+            warnings.append(f"token refresh: {exc}")
+
+        # Portal ID
+        portal_id: Optional[str] = None
+        try:
+            r = self._request("GET", f"{API_BASE}/oauth/v1/access-tokens/{self._get_token()}", timeout=10)
+            if r.status_code == 200:
+                portal_id = str(r.json().get("hub_id", ""))
+        except Exception:
+            pass
+
+        def _count(object_type: str) -> int:
+            try:
+                r = self._request(
+                    "POST",
+                    f"{API_BASE}/crm/v3/objects/{object_type}/search",
+                    json={"filterGroups": [], "limit": 1, "properties": ["hs_object_id"]},
+                    timeout=15,
+                )
+                if r.status_code == 200:
+                    return r.json().get("total", 0)
+                return 0
+            except Exception as exc:
+                warnings.append(f"{object_type} count failed: {exc}")
+                return 0
+
+        companies_count = _count("companies")
+        contacts_count = _count("contacts")
+        deals_count = _count("deals")
+
+        # Tickets may not be enabled in every portal
+        tickets_count = 0
+        try:
+            tickets_count = _count("tickets")
+        except Exception:
+            warnings.append("tickets: not available in this portal")
+
+        # Schema discovery
+        properties_retrieved = False
+        schema_coverage_pct = 0.0
+        unmapped_fields: List[str] = []
+
+        try:
+            props = self.pull_company_properties()
+            if props:
+                properties_retrieved = True
+                mapping = _discover(props, business_mode=self._business_mode)
+                schema_coverage_pct = mapping.to_dict()["coverage_pct"]
+                unmapped_fields = mapping.unmapped
+        except Exception as exc:
+            warnings.append(f"schema discovery: {exc}")
+
+        connected = companies_count > 0 or properties_retrieved
+
+        return PreflightResult(
+            connected=connected,
+            portal_id=portal_id,
+            companies_count=companies_count,
+            contacts_count=contacts_count,
+            deals_count=deals_count,
+            tickets_count=tickets_count,
+            properties_retrieved=properties_retrieved,
+            schema_coverage_pct=schema_coverage_pct,
+            unmapped_fields=unmapped_fields,
+            warnings=warnings,
+            checked_at=checked_at,
+        )
+
+    # ------------------------------------------------------------------
+    # Property metadata
+    # ------------------------------------------------------------------
+
+    def pull_company_properties(self) -> List[Dict[str, Any]]:
+        """Fetch all company property definitions from this portal.
+
+        Returns a list of property dicts: {name, label, type, fieldType, groupName, ...}
+        """
+        r = self._request("GET", f"{API_BASE}/crm/v3/properties/companies", timeout=20)
+        r.raise_for_status()
+        return r.json().get("results", [])
+
+    # ------------------------------------------------------------------
+    # Pull accounts (companies) — dynamic schema
     # ------------------------------------------------------------------
 
     def pull_accounts(self) -> List[Account]:
-        properties = [
-            "name", "domain", "industry", "numberofemployees",
-            "annualrevenue", "createdate", "hs_object_id",
-        ]
-        # Also include custom properties from config
-        extra_props = self.config.extra.get("company_properties", [])
-        properties.extend(extra_props)
+        from app.integrations.schema_mapper import discover as _discover
+        from app.integrations.normalization import normalize_record_safe
+
+        self._refresh_token_if_needed()
+
+        # Dynamic schema discovery
+        try:
+            raw_props = self.pull_company_properties()
+            mapping = _discover(raw_props, business_mode=self._business_mode)
+            logger.info(
+                "[hubspot] Schema: resolved=%d unmapped=%s",
+                len(mapping.resolved),
+                mapping.unmapped,
+            )
+        except Exception as exc:
+            logger.warning("[hubspot] Schema discovery failed (%s) — using base properties", exc)
+            mapping = None
+
+        # Build property list: base + all resolved raw names
+        properties = list(_BASE_COMPANY_PROPERTIES)
+        if mapping:
+            for fm in mapping.resolved.values():
+                if fm.raw_name not in properties:
+                    properties.append(fm.raw_name)
+        else:
+            # Fall back to hardcoded common names
+            properties += [
+                "annualrevenue", "industry", "numberofemployees",
+                "hs_analytics_last_timestamp",
+            ]
 
         accounts: List[Account] = []
-        after: str | None = None
+        after: Optional[str] = None
 
         while True:
             params: Dict[str, Any] = {
@@ -133,18 +328,27 @@ class HubSpotConnector(BaseConnector):
             if after:
                 params["after"] = after
 
-            r = requests.get(
-                f"{API_BASE}/crm/v3/objects/companies",
-                headers=self._headers(),
-                params=params,
-                timeout=30,
-            )
+            r = self._request("GET", f"{API_BASE}/crm/v3/objects/companies",
+                              params=params, timeout=30)
             r.raise_for_status()
             data = r.json()
 
             for company in data.get("results", []):
-                props = company.get("properties", {})
-                accounts.append(self._company_to_account(company["id"], props))
+                try:
+                    props = company.get("properties", {})
+                    if mapping:
+                        normalized, warns = normalize_record_safe(
+                            props, mapping,
+                            business_mode=self._business_mode,
+                            record_id=company["id"],
+                        ) or ({}, [])
+                        if warns:
+                            logger.debug("[hubspot] company %s: %s", company["id"], warns)
+                    else:
+                        normalized = {}
+                    accounts.append(self._company_to_account(company["id"], props, normalized))
+                except Exception as exc:
+                    logger.warning("[hubspot] Skipping company %s: %s", company.get("id"), exc)
 
             paging = data.get("paging", {}).get("next")
             if paging and paging.get("after"):
@@ -152,74 +356,226 @@ class HubSpotConnector(BaseConnector):
             else:
                 break
 
-        logger.info("HubSpot: pulled %d companies", len(accounts))
+        logger.info("[hubspot] Pulled %d companies (mode=%s)", len(accounts), self._business_mode)
         return accounts
 
-    def _company_to_account(self, hs_id: str, props: Dict[str, Any]) -> Account:
-        revenue = props.get("annualrevenue")
-        arr = float(revenue) if revenue else None
+    def _company_to_account(
+        self,
+        hs_id: str,
+        props: Dict[str, Any],
+        normalized: Dict[str, Any],
+    ) -> Account:
+        """Map raw HubSpot properties to normalized Account model."""
+        # Prefer normalized values; fall back to raw for anything not in mapping
+        arr = normalized.get("arr") or safe_float(props.get("annualrevenue"))
+        company_size = normalized.get("company_size") or self._bucket_employees(props.get("numberofemployees"))
+        industry = normalized.get("industry") or clean_string(props.get("industry"))
+        plan = normalized.get("plan") or clean_string(props.get("plan"))
 
-        employees = props.get("numberofemployees")
-        size = None
-        if employees:
-            try:
-                n = int(employees)
-                if n < 50:
-                    size = "small"
-                elif n < 500:
-                    size = "mid-market"
-                else:
-                    size = "enterprise"
-            except (ValueError, TypeError):
-                size = str(employees)
-
-        created = props.get("createdate")
+        created = safe_date(props.get("createdate"))
         created_dt = None
         if created:
             try:
-                created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-            except (ValueError, TypeError):
+                created_dt = datetime.strptime(created, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except ValueError:
                 pass
 
         return Account(
             external_id=hs_id,
             source="hubspot",
-            name=props.get("name", ""),
-            email=props.get("domain", ""),
-            plan=None,
+            name=clean_string(props.get("name", "")) or hs_id,
+            email=clean_string(props.get("domain")),
+            plan=plan,
             arr=arr,
-            industry=props.get("industry"),
-            company_size=size,
+            industry=industry,
+            company_size=company_size,
             created_at=created_dt,
-            raw_data=props,
+            raw_data={**props, "_normalized": normalized},
         )
 
+    @staticmethod
+    def _bucket_employees(value: Any) -> Optional[str]:
+        n = safe_int(value)
+        if n is None:
+            return None
+        if n < 50:
+            return "1-50"
+        if n < 200:
+            return "51-200"
+        if n <= 1000:
+            return "201-1000"
+        return "1001+"
+
     # ------------------------------------------------------------------
-    # Pull signals (engagement data from deals / contacts)
+    # Pull signals — mode-aware
     # ------------------------------------------------------------------
 
     def pull_signals(self, external_ids: List[str]) -> List[AccountSignal]:
-        """Pull engagement signals from HubSpot engagements API.
+        """Pull engagement signals from HubSpot.
 
-        For the v1, we pull recent deal activity and contact engagement
-        as a proxy for usage signals.
+        SaaS mode:  contacts count → seats proxy, deal count as activity proxy.
+        Services mode: engagement recency (last activity date), deal activity,
+                       ticket count, contact count as stakeholder coverage.
         """
+        self._refresh_token_if_needed()
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         signals: List[AccountSignal] = []
 
         for eid in external_ids:
             try:
-                signal = self._pull_company_signal(eid, today)
+                if self._business_mode == "services":
+                    signal = self._pull_signal_services(eid, today)
+                else:
+                    signal = self._pull_signal_saas(eid, today)
                 if signal:
                     signals.append(signal)
             except Exception as exc:
-                logger.warning("HubSpot signal pull failed for %s: %s", eid, exc)
+                logger.warning("[hubspot] Signal pull failed for %s: %s", eid, exc)
 
-        logger.info("HubSpot: pulled %d signals", len(signals))
+        logger.info("[hubspot] Pulled %d signals (mode=%s)", len(signals), self._business_mode)
         return signals
 
+    def _pull_signal_saas(self, company_id: str, date: str) -> Optional[AccountSignal]:
+        """SaaS mode: contacts count → seats, deal count as activity proxy."""
+        contacts_count = self._get_association_count(company_id, "contacts")
+        deal_count = self._get_association_count(company_id, "deals")
+
+        # Last activity date from company properties
+        r = self._request(
+            "GET", f"{API_BASE}/crm/v3/objects/companies/{company_id}",
+            params={"properties": "notes_last_activity_date,hs_last_activity_date"},
+            timeout=15,
+        )
+        days_inactive = None
+        if r.status_code == 200:
+            props = r.json().get("properties", {})
+            last_act = safe_date(props.get("notes_last_activity_date") or props.get("hs_last_activity_date"))
+            days_inactive = days_since(last_act)
+
+        return AccountSignal(
+            external_id=company_id,
+            signal_date=date,
+            seats=contacts_count if contacts_count > 0 else None,
+            support_tickets=None,
+            days_since_last_login=days_inactive,
+            extra={
+                "contacts": contacts_count,
+                "deals": deal_count,
+                "business_mode": "saas",
+            },
+        )
+
+    def _pull_signal_services(self, company_id: str, date: str) -> Optional[AccountSignal]:
+        """Services mode: engagement recency, deal activity, contact count, tickets.
+
+        Signals returned in AccountSignal.extra so the scoring layer can pick them up:
+          days_since_last_activity — primary recency signal
+          deal_count               — relationship activity depth
+          engagement_frequency     — calls + emails + meetings in last 90d (if available)
+          contact_count            — stakeholder coverage
+          ticket_count             — support volume
+        """
+        contact_count = self._get_association_count(company_id, "contacts")
+        deal_count = self._get_association_count(company_id, "deals")
+        ticket_count = 0
+        try:
+            ticket_count = self._get_association_count(company_id, "tickets")
+        except Exception:
+            pass
+
+        # Last activity from company record
+        r = self._request(
+            "GET", f"{API_BASE}/crm/v3/objects/companies/{company_id}",
+            params={"properties": "notes_last_activity_date,hs_last_activity_date,notes_last_contacted"},
+            timeout=15,
+        )
+        days_inactive = None
+        if r.status_code == 200:
+            props = r.json().get("properties", {})
+            candidates = [
+                props.get("notes_last_activity_date"),
+                props.get("hs_last_activity_date"),
+                props.get("notes_last_contacted"),
+            ]
+            for c in candidates:
+                last_act = safe_date(c)
+                if last_act:
+                    days_inactive = days_since(last_act)
+                    break
+
+        # Engagement frequency — count engagements in last 90d if accessible
+        engagement_frequency = self._count_recent_engagements(company_id, days=90)
+
+        # Map services signals to AccountSignal fields:
+        # - days_since_last_login ← days_since_last_activity (recency)
+        # - support_tickets       ← ticket_count
+        # - seats                 ← contact_count (stakeholder coverage)
+        return AccountSignal(
+            external_id=company_id,
+            signal_date=date,
+            seats=contact_count if contact_count > 0 else None,
+            support_tickets=ticket_count if ticket_count > 0 else None,
+            days_since_last_login=days_inactive,
+            extra={
+                "contact_count": contact_count,
+                "deal_count": deal_count,
+                "ticket_count": ticket_count,
+                "days_since_last_activity": days_inactive,
+                "engagement_frequency": engagement_frequency,
+                "business_mode": "services",
+            },
+        )
+
+    def _get_association_count(self, company_id: str, object_type: str) -> int:
+        """Return the number of objects associated to a company. Returns 0 on error."""
+        try:
+            r = self._request(
+                "GET",
+                f"{API_BASE}/crm/v3/objects/companies/{company_id}/associations/{object_type}",
+                timeout=15,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                # Try 'total' first (v3 paged), fall back to len(results)
+                return data.get("total") or len(data.get("results", []))
+            return 0
+        except Exception:
+            return 0
+
+    def _count_recent_engagements(self, company_id: str, days: int = 90) -> int:
+        """Count engagements (emails, calls, meetings) for a company in the last N days.
+
+        Returns 0 on API error — non-fatal.
+        """
+        try:
+            from datetime import timedelta
+            cutoff = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp() * 1000)
+            r = self._request(
+                "POST",
+                f"{API_BASE}/crm/v3/objects/engagements/search",
+                json={
+                    "filterGroups": [{
+                        "filters": [
+                            {
+                                "propertyName": "hs_createdate",
+                                "operator": "GTE",
+                                "value": str(cutoff),
+                            }
+                        ]
+                    }],
+                    "properties": ["hs_object_id"],
+                    "limit": 1,
+                },
+                timeout=15,
+            )
+            if r.status_code == 200:
+                return r.json().get("total", 0)
+            return 0
+        except Exception:
+            return 0
+
     # ------------------------------------------------------------------
-    # Write-back helpers
+    # Write-back helpers (unchanged from v1)
     # ------------------------------------------------------------------
 
     def _refresh_token_if_needed(self) -> None:
@@ -227,8 +583,7 @@ class HubSpotConnector(BaseConnector):
 
         HubSpot tokens expire after 6 hours (21,600 s). We refresh when the
         stored token is absent or when refresh_token is available and the
-        token is older than 5.5 hours.  On failure we log and continue —
-        the write call will fail with 401 and be retried on the next run.
+        token is older than 5.5 hours.
         """
         from app.integrations.oauth import refresh_access_token
 
@@ -255,15 +610,10 @@ class HubSpotConnector(BaseConnector):
             logger.warning("[hubspot] Token refresh failed: %s", exc)
 
     def ensure_churn_properties(self) -> None:
-        """Idempotently create the PickPulse property group and custom properties.
-
-        Safe to call before every write-back run — HubSpot returns 409 for
-        existing resources, which we treat as success.
-        """
+        """Idempotently create the PickPulse property group and custom properties."""
         self._refresh_token_if_needed()
         headers = self._headers()
 
-        # 1. Create property group
         try:
             r = requests.post(
                 f"{API_BASE}/crm/v3/properties/companies/groups",
@@ -276,7 +626,6 @@ class HubSpotConnector(BaseConnector):
         except Exception as exc:
             logger.warning("[hubspot] ensure_churn_properties (group) failed: %s", exc)
 
-        # 2. Create each property
         for prop in _CHURN_PROPERTIES:
             try:
                 payload = {
@@ -301,22 +650,14 @@ class HubSpotConnector(BaseConnector):
     def push_churn_scores(self, scores: List[Dict[str, Any]]) -> int:
         """Batch-update company properties for a list of scored accounts.
 
-        Each score dict must have 'hs_object_id' (HubSpot company Record ID).
-        Records without hs_object_id are silently skipped — the caller should
-        have already warned if the entire dataset lacks the field.
-
         Returns the number of companies successfully updated.
         """
         self._refresh_token_if_needed()
 
-        # Filter to records that carry a deterministic HubSpot company ID
         rows = [s for s in scores if s.get("hs_object_id")]
         skipped = len(scores) - len(rows)
         if skipped:
-            logger.warning(
-                "[hubspot] push_churn_scores: skipping %d records with missing hs_object_id",
-                skipped,
-            )
+            logger.warning("[hubspot] push_churn_scores: skipping %d records with missing hs_object_id", skipped)
         if not rows:
             return 0
 
@@ -329,7 +670,6 @@ class HubSpotConnector(BaseConnector):
             for s in batch:
                 props: Dict[str, str] = {}
                 if s.get("churn_risk_pct") is not None:
-                    # Store as 0–1 probability (churn_risk_pct is 0–100 internally)
                     props["pickpulse_churn_probability"] = str(round(float(s["churn_risk_pct"]) / 100, 4))
                 if s.get("tier"):
                     props["pickpulse_risk_tier"] = str(s["tier"])
@@ -340,37 +680,32 @@ class HubSpotConnector(BaseConnector):
                 if s.get("recommended_action"):
                     props["pickpulse_recommended_action"] = str(s["recommended_action"])
                 props["pickpulse_last_scored_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-                # Use hs_object_id as the authoritative HubSpot company identifier
                 inputs.append({"id": str(s["hs_object_id"]), "properties": props})
 
             try:
-                r = requests.post(
+                r = self._request(
+                    "POST",
                     f"{API_BASE}/crm/v3/objects/companies/batch/update",
-                    headers=self._headers(),
                     json={"inputs": inputs},
                     timeout=30,
                 )
                 if r.status_code in (200, 207):
                     resp_data = r.json()
                     n_errors = resp_data.get("numErrors", 0) or 0
-                    successful = len(batch) - n_errors
-                    updated += max(0, successful)
+                    updated += max(0, len(batch) - n_errors)
                     if n_errors:
                         logger.warning(
-                            "[hubspot] Batch %d had %d/%d errors: %s",
+                            "[hubspot] Batch %d: %d/%d errors: %s",
                             i // batch_size + 1, n_errors, len(batch),
                             str(resp_data.get("errors", []))[:300],
                         )
-                    else:
-                        logger.info("[hubspot] Batch updated %d companies (batch %d)", len(batch), i // batch_size + 1)
                 else:
                     logger.warning("[hubspot] Batch update returned %d: %s", r.status_code, r.text[:300])
             except Exception as exc:
                 logger.warning("[hubspot] push_churn_scores batch %d failed: %s", i // batch_size + 1, exc)
 
             if i + batch_size < len(rows):
-                time.sleep(0.15)  # stay well within HubSpot rate limits
+                time.sleep(0.15)
 
         return updated
 
@@ -380,19 +715,12 @@ class HubSpotConnector(BaseConnector):
         subject: Optional[str] = None,
         body: Optional[str] = None,
     ) -> Optional[str]:
-        """Create a HubSpot task for a high-risk account. Returns task_id or None.
-
-        Requires hs_object_id in the account dict for task-to-company association.
-        Returns None without making any API call if hs_object_id is absent.
-        """
+        """Create a HubSpot task for a high-risk account. Returns task_id or None."""
         self._refresh_token_if_needed()
 
         hs_company_id = str(account.get("hs_object_id", ""))
         if not hs_company_id:
-            logger.warning(
-                "[hubspot] create_task skipped for account %s: hs_object_id missing",
-                account.get("account_id", "unknown"),
-            )
+            logger.warning("[hubspot] create_task skipped: hs_object_id missing")
             return None
 
         account_id = str(account.get("account_id", ""))
@@ -403,14 +731,14 @@ class HubSpotConnector(BaseConnector):
         task_subject = subject or f"[PickPulse] {recommended_action} — {account_id}"
         renewal_note = f" | Renewal in {int(float(days_renewal))} days" if days_renewal is not None else ""
         task_body = body or (
-            f"PickPulse churn risk: {churn_risk_pct:.0f}%{renewal_note}. "
-            f"Recommended: {recommended_action}. Review account health and engage proactively."
+            f"PickPulse risk: {churn_risk_pct:.0f}%{renewal_note}. "
+            f"Recommended: {recommended_action}."
         )
 
         try:
-            r = requests.post(
+            r = self._request(
+                "POST",
                 f"{API_BASE}/crm/v3/objects/tasks",
-                headers=self._headers(),
                 json={
                     "properties": {
                         "hs_task_subject": task_subject,
@@ -424,62 +752,21 @@ class HubSpotConnector(BaseConnector):
             )
             r.raise_for_status()
             task_id = r.json().get("id")
-            logger.info("[hubspot] Created task %s for account %s (hs_company=%s)", task_id, account_id, hs_company_id)
-
-            # Associate task to the correct HubSpot company using hs_object_id
             if task_id:
                 self._associate_task_to_company(task_id, hs_company_id)
-
             return task_id
         except Exception as exc:
             logger.warning("[hubspot] create_task failed for %s: %s", account_id, exc)
             return None
 
     def _associate_task_to_company(self, task_id: str, company_id: str) -> None:
-        """Associate a task to a HubSpot company via the associations API.
-
-        Association type label must be uppercase TASK_TO_COMPANY as required by
-        HubSpot CRM v3 associations API.
-        """
         try:
-            r = requests.put(
+            r = self._request(
+                "PUT",
                 f"{API_BASE}/crm/v3/objects/tasks/{task_id}/associations/companies/{company_id}/TASK_TO_COMPANY",
-                headers=self._headers(),
                 timeout=10,
             )
             if r.status_code not in (200, 201):
-                logger.warning(
-                    "[hubspot] task-company association returned %d for task=%s company=%s: %s",
-                    r.status_code, task_id, company_id, r.text[:200],
-                )
+                logger.warning("[hubspot] task-company association returned %d", r.status_code)
         except Exception as exc:
             logger.warning("[hubspot] _associate_task_to_company failed: %s", exc)
-
-    def _pull_company_signal(self, company_id: str, date: str) -> AccountSignal | None:
-        # Get associated contacts count as a proxy for seats
-        r = requests.get(
-            f"{API_BASE}/crm/v3/objects/companies/{company_id}/associations/contacts",
-            headers=self._headers(),
-            timeout=15,
-        )
-        contacts_count = 0
-        if r.status_code == 200:
-            contacts_count = len(r.json().get("results", []))
-
-        # Get recent deals for renewal status signals
-        r = requests.get(
-            f"{API_BASE}/crm/v3/objects/companies/{company_id}/associations/deals",
-            headers=self._headers(),
-            timeout=15,
-        )
-        deal_count = 0
-        if r.status_code == 200:
-            deal_count = len(r.json().get("results", []))
-
-        return AccountSignal(
-            external_id=company_id,
-            signal_date=date,
-            seats=contacts_count if contacts_count > 0 else None,
-            support_tickets=deal_count,
-            extra={"contacts": contacts_count, "deals": deal_count},
-        )

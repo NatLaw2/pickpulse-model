@@ -2097,6 +2097,124 @@ def check_integration_health(provider: str, tenant_id: str = Depends(get_tenant_
     return integration_service.check_health(tenant_id, provider)
 
 
+@app.get("/api/integrations/{provider}/preflight")
+def integration_preflight(provider: str, tenant_id: str = Depends(get_tenant_id)):
+    """Run a connection preflight check and return object counts + schema coverage.
+
+    Returns a PreflightResult: companies/contacts/deals/tickets counts, whether
+    property metadata was retrieved, schema coverage %, and any unmapped fields.
+    Never raises — all failures are captured in the result's warnings list.
+    """
+    if provider != "hubspot":
+        raise HTTPException(status_code=400, detail="Preflight is only supported for hubspot")
+
+    from app.integrations.registry import get_connector_for_integration
+
+    integration = None
+    if integration_service:
+        integration = integration_service.get_integration(tenant_id=tenant_id, provider=provider)
+    if not integration:
+        raise HTTPException(status_code=404, detail="HubSpot not connected for this tenant")
+
+    try:
+        connector = get_connector_for_integration(integration["id"])
+        if not connector:
+            raise HTTPException(status_code=404, detail="Could not load HubSpot connector")
+        result = connector.connection_preflight()
+        return result.dict()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("[preflight] %s: %s", provider, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/integrations/{provider}/schema")
+def integration_schema(
+    provider: str,
+    mode: str = Query("saas", regex="^(saas|services)$"),
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Return dynamic schema mapping for the connected portal.
+
+    Pulls all property metadata from the portal and matches against canonical
+    field aliases. Returns resolved mappings with confidence scores, alternates,
+    and unmapped fields.
+    """
+    if provider != "hubspot":
+        raise HTTPException(status_code=400, detail="Schema discovery is only supported for hubspot")
+
+    from app.integrations.registry import get_connector_for_integration
+    from app.integrations.schema_mapper import discover as _discover
+
+    integration = None
+    if integration_service:
+        integration = integration_service.get_integration(tenant_id=tenant_id, provider=provider)
+    if not integration:
+        raise HTTPException(status_code=404, detail="HubSpot not connected for this tenant")
+
+    try:
+        connector = get_connector_for_integration(integration["id"])
+        if not connector:
+            raise HTTPException(status_code=404, detail="Could not load HubSpot connector")
+        raw_props = connector.pull_company_properties()
+        mapping = _discover(raw_props, business_mode=mode)
+        return mapping.to_dict()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("[schema] %s: %s", provider, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/integrations/{provider}/data-quality")
+def integration_data_quality(provider: str, tenant_id: str = Depends(get_tenant_id)):
+    """Return a data quality audit of the most recently synced accounts.
+
+    Computes per-field coverage (% non-null) and classifies each field as
+    usable (≥70%), low_coverage (30–70%), or too_sparse (<30%).
+    """
+    if provider != "hubspot":
+        raise HTTPException(status_code=400, detail="Data quality is only supported for hubspot")
+
+    from app.storage import repo
+    from app.integrations.normalization import audit_records
+
+    accounts = repo.list_accounts(limit=5000, tenant_id=tenant_id)
+    if not accounts:
+        return {
+            "n_records": 0,
+            "message": "No accounts synced yet — run a sync first",
+            "field_stats": {},
+            "usable_fields": [],
+            "low_coverage_fields": [],
+            "sparse_fields": [],
+            "overall_coverage_pct": 0.0,
+        }
+
+    # Pull normalized data from raw_data._normalized if present
+    scored_fields = [
+        "arr", "company_size", "renewal_date", "days_until_renewal",
+        "contract_months_remaining", "industry", "plan", "nps_score",
+        "days_since_last_login", "days_since_last_activity",
+    ]
+    records = []
+    for acct in accounts:
+        raw = acct.get("raw_data") or {}
+        normalized = raw.get("_normalized") or {}
+        # Supplement with top-level account fields
+        record = {
+            "arr": acct.get("arr") or normalized.get("arr"),
+            "company_size": acct.get("company_size") or normalized.get("company_size"),
+            "industry": acct.get("industry") or normalized.get("industry"),
+            "plan": acct.get("plan") or normalized.get("plan"),
+            **{f: normalized.get(f) for f in scored_fields if f not in ("arr", "company_size", "industry", "plan")},
+        }
+        records.append(record)
+
+    return audit_records(records, fields=scored_fields)
+
+
 @app.get("/api/integrations/{provider}/events")
 def get_integration_events(provider: str, limit: int = Query(50), tenant_id: str = Depends(get_tenant_id)):
     """Get audit events for a provider."""

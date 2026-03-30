@@ -8,6 +8,11 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class BusinessMode(str, Enum):
+    saas = "saas"
+    services = "services"
+
+
 # ---------------------------------------------------------------------------
 # Connector config / status
 # ---------------------------------------------------------------------------
@@ -26,6 +31,7 @@ class ConnectorConfig(BaseModel):
     api_key: Optional[str] = None
     extra: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool = False
+    business_mode: BusinessMode = BusinessMode.saas
 
 
 class ConnectorInfo(BaseModel):
@@ -88,6 +94,26 @@ class ChurnScore(BaseModel):
     urgency_score: Optional[float] = None
     recommended_action: Optional[str] = None
     renewal_window_label: Optional[str] = None
+    confidence_level: Optional[str] = None  # "high" | "medium" | "low"
+    scored_features: int = 0  # how many model features had real data
+
+
+# ---------------------------------------------------------------------------
+# Preflight / schema / data quality
+# ---------------------------------------------------------------------------
+
+class PreflightResult(BaseModel):
+    connected: bool
+    portal_id: Optional[str] = None
+    companies_count: int = 0
+    contacts_count: int = 0
+    deals_count: int = 0
+    tickets_count: int = 0
+    properties_retrieved: bool = False
+    schema_coverage_pct: float = 0.0
+    unmapped_fields: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    checked_at: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
