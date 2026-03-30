@@ -281,6 +281,15 @@ class HubSpotConnector(BaseConnector):
         r.raise_for_status()
         return r.json().get("results", [])
 
+    def pull_deal_pipelines(self) -> List[Dict[str, Any]]:
+        """Fetch all deal pipelines with their stages.
+
+        Returns a list of pipeline dicts: {id, label, stages: [{id, label, metadata}]}
+        """
+        r = self._request("GET", f"{API_BASE}/crm/v3/pipelines/deals", timeout=20)
+        r.raise_for_status()
+        return r.json().get("results", [])
+
     # ------------------------------------------------------------------
     # Pull accounts (companies) — dynamic schema
     # ------------------------------------------------------------------

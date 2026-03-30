@@ -753,6 +753,27 @@ def train_module(module_name: str, val_frac: float = Query(0.2), tenant_id: str 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    # Viability gate — only blocks if a completed audit explicitly says "blocked".
+    # Tenants using CSV uploads (no HubSpot audit) are unaffected.
+    try:
+        from app.integrations.label_auditor import load_audit as _load_viability
+        _viability = _load_viability(tenant_id)
+        if _viability and _viability.get("viability") == "blocked":
+            raise HTTPException(
+                status_code=412,
+                detail={
+                    "message": "Training blocked: insufficient labeled data in connected HubSpot portal.",
+                    "viability": "blocked",
+                    "rationale": _viability.get("decision", {}).get("rationale", ""),
+                    "next_steps": _viability.get("decision", {}).get("next_steps", []),
+                    "audit_at": _viability.get("audit_at"),
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Never let the viability check block CSV-based training
+
     run_id = str(uuid.uuid4())
     artifact_dir = mod.get_artifact_dir(tenant_id, run_id=run_id)
     store.create_model_run(tenant_id, module_name, run_id, artifact_dir)
@@ -2165,6 +2186,107 @@ def integration_schema(
     except Exception as exc:
         logger.warning("[schema] %s: %s", provider, exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/integrations/{provider}/viability-audit")
+def run_viability_audit(provider: str, tenant_id: str = Depends(get_tenant_id)):
+    """Run the Phase 0 pre-training viability audit for a connected HubSpot portal.
+
+    Executes three label-source scan paths (company properties, deal pipelines,
+    lifecycle stages), selects the best candidate, counts labeled examples, and
+    assesses reliability. Returns a ViabilityReport with a viability decision:
+      proceed       — ≥100 positive examples, balanced, reliable
+      exploratory   — marginal but trainable (confidence downgraded)
+      insufficient  — below exploratory threshold
+      blocked       — <20 examples or no label source found
+
+    Stores the result to disk so training can gate on it.
+    """
+    if provider != "hubspot":
+        raise HTTPException(status_code=400, detail="Viability audit is only supported for hubspot")
+
+    from app.integrations.registry import get_connector_for_integration
+    from app.integrations.label_discovery import discover_candidates
+    from app.integrations.label_auditor import run_audit, save_audit
+
+    integration = None
+    if integration_service:
+        integration = integration_service.get_integration(tenant_id=tenant_id, provider=provider)
+    if not integration:
+        raise HTTPException(status_code=404, detail="HubSpot not connected for this tenant")
+
+    connector = get_connector_for_integration(integration["id"])
+    if not connector:
+        raise HTTPException(status_code=404, detail="Could not load HubSpot connector")
+
+    try:
+        # Pull metadata needed for discovery (two API calls, fast)
+        company_props = connector.pull_company_properties()
+        deal_pipelines = connector.pull_deal_pipelines()
+
+        # Discover label source candidates
+        candidates = discover_candidates(company_props, deal_pipelines)
+
+        if not candidates:
+            report = {
+                "viability": "blocked",
+                "label_source": None,
+                "counts": {
+                    "positive_examples": 0, "negative_examples": 0,
+                    "unlabeled_companies": 0, "total_labeled": 0,
+                    "class_ratio": None, "oldest_outcome": None, "most_recent_outcome": None,
+                },
+                "reliability": {"score": 0.0, "issues": ["No label source candidates found in this portal"]},
+                "decision": {
+                    "viability": "blocked",
+                    "rationale": "No property or deal pipeline was identified as a churn/non-renewal label source.",
+                    "confidence_mode": None,
+                    "next_steps": [
+                        "Add a company property to track churn/renewal status (e.g. a boolean 'churned' field)",
+                        "Or create a renewal deal pipeline with distinct Closed Won and Closed Lost stages",
+                    ],
+                },
+                "audit_at": datetime.now(timezone.utc).isoformat(),
+                "tenant_id": tenant_id,
+            }
+            save_audit(tenant_id, report)
+            return report
+
+        # Audit the top candidate (highest confidence)
+        best_candidate = candidates[0]
+        report = run_audit(connector, best_candidate, tenant_id)
+
+        # Surface all candidates as alternates in the report
+        report["candidate_alternates"] = [c.to_dict() for c in candidates[1:5]]
+
+        save_audit(tenant_id, report)
+        return report
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("[viability-audit] %s tenant=%s: %s", provider, tenant_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/integrations/{provider}/viability-audit")
+def get_viability_audit(provider: str, tenant_id: str = Depends(get_tenant_id)):
+    """Return the most recently stored ViabilityReport for this tenant.
+
+    Returns 404 if no audit has been run yet.
+    """
+    if provider != "hubspot":
+        raise HTTPException(status_code=400, detail="Viability audit is only supported for hubspot")
+
+    from app.integrations.label_auditor import load_audit
+
+    report = load_audit(tenant_id)
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail="No viability audit found. Run POST /api/integrations/hubspot/viability-audit first.",
+        )
+    return report
 
 
 @app.get("/api/integrations/{provider}/data-quality")
