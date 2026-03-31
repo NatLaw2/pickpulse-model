@@ -66,14 +66,6 @@ FEATURE_TRANSLATIONS: Dict[str, _T] = {
         "group": "Engagement",
         "churn_direction": "high",
     },
-    "engagement_score": {
-        "churn_label": "Low engagement score",
-        "churn_desc": "A composite signal of activity patterns — low scores flag disengagement",
-        "health_label": "High engagement score",
-        "health_desc": "Highly engaged accounts churn significantly less across all tiers",
-        "group": "Engagement",
-        "churn_direction": "low",
-    },
     "seats": {
         "churn_label": "Low seat utilization",
         "churn_desc": "Underutilized seats relative to contract size signal disengagement",
@@ -132,30 +124,6 @@ FEATURE_TRANSLATIONS: Dict[str, _T] = {
         "health_desc": "Auto-renewing accounts are lower-friction at renewal time",
         "group": "Contract",
         "churn_direction": "low",
-    },
-    "renewal_window_30d": {
-        "churn_label": "30-day renewal window",
-        "churn_desc": "Accounts renewing within 30 days require immediate attention",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Contract",
-        "churn_direction": "flag",
-    },
-    "renewal_window_90d": {
-        "churn_label": "90-day renewal window",
-        "churn_desc": "Accounts entering the 90-day renewal window need proactive outreach",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Contract",
-        "churn_direction": "flag",
-    },
-    "renewal_risk_multiplier": {
-        "churn_label": "Compound renewal risk",
-        "churn_desc": "A derived signal combining contract timing and engagement factors",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Contract",
-        "churn_direction": "high",
     },
     # Renewal status (one-hot encoded)
     "renewal_status_cancelled": {

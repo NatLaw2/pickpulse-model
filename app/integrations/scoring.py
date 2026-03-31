@@ -134,6 +134,7 @@ def score_accounts(
         compute_confidence_level,
     )
     shap_vals_arr = None
+    raw_drivers_all: list = []
     if os.path.exists(base_model_path) and os.path.exists(shap_bg_path):
         try:
             import numpy as _np
@@ -141,15 +142,24 @@ def score_accounts(
             shap_background = _np.load(shap_bg_path)
             explainer = build_explainer(base_model, shap_background)
             shap_vals_arr = compute_shap_values(explainer, X)
+            # Pre-compute raw drivers for all accounts; label in one LLM batch below
+            raw_drivers_all = [
+                extract_top_drivers(shap_vals_arr[i], feat_names, n=5)
+                for i in range(len(shap_vals_arr))
+            ]
         except Exception as _exc:
             logger.warning("SHAP computation failed in score_accounts: %s", _exc)
+
+    # LLM labeling — single batch call for all unique features across all accounts
+    from app.engine.driver_labels import label_drivers_batch
+    labeled_drivers_all = label_drivers_batch(raw_drivers_all) if raw_drivers_all else []
 
     # Build scores
     now = datetime.now(timezone.utc)
     scores: List[ChurnScore] = []
 
-    for i, row in df.iterrows():
-        prob = float(probs[i])
+    for row_i, (_, row) in enumerate(df.iterrows()):
+        prob = float(probs[row_i])
         tier = module.tiers.classify(prob)
         arr = row.get("arr")
         arr_at_risk = round(prob * arr, 2) if arr and pd.notna(arr) else None
@@ -162,10 +172,9 @@ def score_accounts(
         action = compute_recommended_action(prob * 100, renewal_label, dsl)
 
         # SHAP drivers + confidence for this account
-        drivers: list = []
+        drivers: list = labeled_drivers_all[row_i] if row_i < len(labeled_drivers_all) else []
         confidence_level: str | None = None
         if shap_vals_arr is not None:
-            drivers = extract_top_drivers(shap_vals_arr[i], feat_names, n=5)
             # Count non-null features from original row (proxy for data completeness)
             row_dict = row.to_dict()
             n_valued = sum(

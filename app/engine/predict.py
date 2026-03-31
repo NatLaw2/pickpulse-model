@@ -127,23 +127,32 @@ def predict(
             )
             explainer = build_explainer(base_model, shap_background)
             shap_vals = compute_shap_values(explainer, X)
-            result["top_drivers"] = [
+            raw_drivers = [
                 extract_top_drivers(shap_vals[i], feature_names, n=5)
                 for i in range(len(shap_vals))
             ]
-            # Confidence: fraction of model features with real data per row
+            # LLM labeling — one batch call for all unique features in this run
+            from app.engine.driver_labels import label_drivers_batch
+            result["top_drivers"] = label_drivers_batch(raw_drivers)
+            # Confidence: fraction of original row fields that had real (non-null)
+            # data before prepare_features imputed them.  Uses the same measure as
+            # score_accounts() in scoring.py for consistency across code paths.
+            _id_col = module.id_column
+            _ts_col = module.timestamp_column
+            _skip = {_id_col, _ts_col, module.label_column}
             result["confidence_level"] = [
                 compute_confidence_level(
-                    int(np.sum(np.abs(shap_vals[i]) > 1e-9)),
+                    int(df.iloc[i].drop(labels=[c for c in _skip if c in df.columns], errors="ignore").notna().sum()),
                     len(feature_names),
                 )
-                for i in range(len(shap_vals))
+                for i in range(len(result))
             ]
         except Exception as exc:
             logger.warning("SHAP driver extraction failed: %s", exc)
             result["top_drivers"] = [[] for _ in range(len(result))]
             result["confidence_level"] = ["low"] * len(result)
     else:
+        # No SHAP artifacts — still run rule-based labels on empty driver lists
         result["top_drivers"] = [[] for _ in range(len(result))]
         result["confidence_level"] = ["low"] * len(result)
 
