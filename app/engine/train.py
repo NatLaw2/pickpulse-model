@@ -197,6 +197,25 @@ def train_model(
     np.save(shap_bg_path, X_background)
     print(f"[train] Saved SHAP background ({n_bg} samples) -> {shap_bg_path}")
 
+    # Global SHAP directions — mean SHAP sign across the background set.
+    # Positive mean → this feature pushes predictions toward churn (increases_risk).
+    # Negative mean → this feature pushes predictions toward retention (decreases_risk).
+    # Stored in metadata.json so model_insights.py can label global drivers without
+    # per-account SHAP at request time.
+    shap_directions: Dict[str, str] = {}
+    try:
+        from app.engine.shap_utils import build_explainer, compute_shap_values as _csvals
+        _bg_expl = build_explainer(base_model, X_background)
+        _bg_shap = _csvals(_bg_expl, X_background)
+        _mean_shap = _bg_shap.mean(axis=0)
+        shap_directions = {
+            fname: ("increases_risk" if float(_mean_shap[i]) >= 0 else "decreases_risk")
+            for i, fname in enumerate(feature_names)
+        }
+        print(f"[train] SHAP directions computed for {len(shap_directions)} features")
+    except Exception as _exc:
+        print(f"[train] SHAP direction computation skipped: {_exc}")
+
     feature_meta_path = os.path.join(artifact_dir, "feature_meta.json")
     # Convert numpy types for JSON serialization
     serializable_meta = _make_serializable(feature_meta)
@@ -240,6 +259,7 @@ def train_model(
         "val_metrics": val_metrics,
         "feature_importance": importance,
         "feature_stats": feature_stats,
+        "shap_directions": shap_directions,
         "artifact_paths": {
             "model": model_path,
             "base_model": base_model_path,

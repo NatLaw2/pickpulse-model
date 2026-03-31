@@ -3,30 +3,33 @@
 Answers: "What did the model learn about churn in this dataset?"
          "What did churned accounts actually do differently?"
 
-Reads feature_importance from the trained model's metadata.json artifact
-and translates raw feature names into plain business language. Also computes
-quantified behavioral differences between churned and retained accounts from
-the scored CSV artifact. No ML jargon, no raw column names in the output.
+Phase 3 design — fully dynamic, model-driven:
 
-Output sections:
-  churn_drivers      — top features that elevate churn risk, ranked
-  health_signals     — top features that correlate with retention/renewal
-  top_insight        — one-sentence summary of the model's strongest signal
-  lift_statement     — lift in the top risk group (from lift table)
-  behavioral_diff    — churned vs retained avg comparison, 3-5 key signals
+  Source of truth is the trained model, not a predefined feature list.
 
-Design constraints:
-  - No multipliers or percentages unless derived from real data
-  - No raw feature names exposed in API response
-  - Direction (churn vs. protective) uses domain knowledge, not model sign,
-    because GradientBoosting importances are unsigned
-  - Unknown features are omitted cleanly rather than shown as raw names
+  churn_drivers / health_signals
+    Ranked by feature_importance from metadata.json.
+    Direction ("increases_risk" vs "decreases_risk") from shap_directions —
+    mean SHAP sign across the background set, computed at training time.
+    Labels from driver_labels.clean_feature_name(feature, direction).
+    Supplementary descriptions from _FEATURE_DESCRIPTIONS where available;
+    generic fallback otherwise.  No feature is silently dropped.
+
+  behavioral_diff
+    Compares churned vs retained averages for the model's actual top features
+    (from feature_importance), not a hardcoded SaaS feature list.
+    Format type (pct / ratio / points / days) inferred from feature name.
+    Labels from driver_labels.clean_feature_name().
+
+API response shape is stable — same fields as pre-Phase 3.
+Raw feature names never appear in user-facing output.
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -34,238 +37,163 @@ logger = logging.getLogger(__name__)
 
 MAX_CHURN_DRIVERS = 5
 MAX_HEALTH_SIGNALS = 3
+_MIN_COHORT_N = 5       # skip behavioral diff if either cohort is too small
+_MAX_DIFF_ITEMS = 5
+_MAX_BEHAV_FEATURES = 12  # scan top-N model features for behavioral diff
 
 
 # ---------------------------------------------------------------------------
-# Feature translation table
-# Each entry: (churn_label, churn_desc, health_label, health_desc, group, churn_direction)
-#   churn_direction:
-#     "high"  — high feature value = more churn risk (e.g. support_tickets)
-#     "low"   — low feature value = more churn risk  (e.g. monthly_logins)
-#     "flag"  — binary flag; presence = churn signal
-#   churn_label/health_label: None = skip for that list
+# Supplementary description text
+# Provides the explanatory "why" sentence for known feature families.
+# Labels and direction come from driver_labels (Phase 2); descriptions are
+# additive context, not the source of truth.
+# Unknown features get a generic description — they are never silently dropped.
 # ---------------------------------------------------------------------------
 
-_T = Dict[str, Any]
-
-FEATURE_TRANSLATIONS: Dict[str, _T] = {
-    # Engagement
-    "monthly_logins": {
-        "churn_label": "Declining engagement",
-        "churn_desc": "Accounts with low activity frequency show signs of disengagement",
-        "health_label": "Consistent engagement",
-        "health_desc": "High activity frequency is a strong predictor of renewal",
-        "group": "Engagement",
-        "churn_direction": "low",
-    },
+_FEATURE_DESCRIPTIONS: Dict[str, Dict[str, str]] = {
+    # Engagement / activity
     "days_since_last_login": {
-        "churn_label": "Extended inactivity",
-        "churn_desc": "Accounts not recently active are at higher disengagement risk",
-        "health_label": "Recent active engagement",
-        "health_desc": "Accounts that engaged recently show significantly lower churn rates",
-        "group": "Engagement",
-        "churn_direction": "high",
+        "increases_risk": "Accounts not recently active are at higher disengagement risk",
+        "decreases_risk": "Accounts that engaged recently show significantly lower churn rates",
     },
-    "seats": {
-        "churn_label": "Low utilization",
-        "churn_desc": "Underutilized capacity relative to contract size signals disengagement",
-        "health_label": "Strong utilization",
-        "health_desc": "Accounts at full allocation are more embedded and harder to displace",
-        "group": "Engagement",
-        "churn_direction": "low",
+    "days_since_last_activity": {
+        "increases_risk": "Accounts with no recent activity are showing signs of disengagement",
+        "decreases_risk": "Accounts with recent activity are more likely to renew",
+    },
+    "monthly_logins": {
+        "increases_risk": "Accounts with low activity frequency show signs of disengagement",
+        "decreases_risk": "Consistent engagement frequency is a strong predictor of renewal",
     },
     # Support
     "support_tickets": {
-        "churn_label": "High support volume",
-        "churn_desc": "Elevated ticket counts signal unresolved friction or product issues",
-        "health_label": "Low support friction",
-        "health_desc": "Accounts with minimal support issues tend to renew without intervention",
-        "group": "Support",
-        "churn_direction": "high",
+        "increases_risk": "Elevated ticket counts signal unresolved friction or delivery issues",
+        "decreases_risk": "Accounts with minimal support issues tend to renew without intervention",
     },
-    # CRM relationship signals (HubSpot-derived, applicable to any business type)
+    # CRM relationship
     "contact_count": {
-        "churn_label": "Limited stakeholder coverage",
-        "churn_desc": "Accounts with few contacts have shallower relationships and lower resilience to churn",
-        "health_label": "Broad stakeholder coverage",
-        "health_desc": "Accounts with multiple contacts are more embedded and harder to displace",
-        "group": "Relationship",
-        "churn_direction": "low",
+        "increases_risk": "Accounts with fewer contacts have shallower relationships and lower retention resilience",
+        "decreases_risk": "Accounts with multiple contacts are more embedded and harder to displace",
     },
     "deal_count": {
-        "churn_label": "Low deal engagement",
-        "churn_desc": "Limited deal activity may indicate a stalled or disengaged relationship",
-        "health_label": "Active deal engagement",
-        "health_desc": "Ongoing deal activity reflects a healthy and expanding relationship",
-        "group": "Relationship",
-        "churn_direction": "low",
+        "increases_risk": "Low deal activity may indicate a stalled or disengaged commercial relationship",
+        "decreases_risk": "Ongoing deal activity reflects a healthy and expanding relationship",
     },
-    "days_since_last_activity": {
-        "churn_label": "Extended inactivity",
-        "churn_desc": "Accounts with no recent activity are showing signs of disengagement",
-        "health_label": "Recent active engagement",
-        "health_desc": "Accounts with recent activity are more likely to renew",
-        "group": "Engagement",
-        "churn_direction": "high",
-    },
-    # Customer sentiment
+    # Sentiment
     "nps_score": {
-        "churn_label": "Low NPS score",
-        "churn_desc": "Low satisfaction scores are a leading indicator of churn risk",
-        "health_label": "High customer satisfaction",
-        "health_desc": "Promoters (NPS ≥ 8) have significantly lower churn rates",
-        "group": "Sentiment",
-        "churn_direction": "low",
+        "increases_risk": "Low satisfaction scores are a leading indicator of churn risk",
+        "decreases_risk": "High satisfaction correlates strongly with renewal and expansion",
     },
-    # Contract & renewal
+    # Financial
     "arr": {
-        "churn_label": "Revenue at risk",
-        "churn_desc": "Account revenue size is weighted in risk scoring",
-        "health_label": "Strong revenue base",
-        "health_desc": "Higher-value accounts typically receive dedicated success resources",
-        "group": "Financial",
-        "churn_direction": "low",
+        "increases_risk": "High-value accounts at risk represent significant revenue exposure",
+        "decreases_risk": "Higher-value accounts typically receive dedicated success resources",
     },
+    # Contract timing
     "days_until_renewal": {
-        "churn_label": "Renewal proximity",
-        "churn_desc": "Accounts approaching renewal require active engagement",
-        "health_label": "Renewal runway",
-        "health_desc": "Accounts with ample runway have more time to resolve issues",
-        "group": "Contract",
-        "churn_direction": "low",
+        "increases_risk": "Accounts approaching renewal require active engagement",
+        "decreases_risk": "Accounts with ample runway have more time to resolve issues",
     },
     "contract_months_remaining": {
-        "churn_label": "Short contract runway",
-        "churn_desc": "Accounts with few months remaining are entering the active churn window",
-        "health_label": "Multi-year contract",
-        "health_desc": "Longer contracts are associated with deeper product integration",
-        "group": "Contract",
-        "churn_direction": "low",
+        "increases_risk": "Accounts with few months remaining are entering the active churn window",
+        "decreases_risk": "Longer contracts are associated with deeper relationship integration",
     },
     "auto_renew_flag": {
-        "churn_label": "Auto-renew not enabled",
-        "churn_desc": "Accounts without auto-renewal require active confirmation to retain",
-        "health_label": "Auto-renew enabled",
-        "health_desc": "Auto-renewing accounts are lower-friction at renewal time",
-        "group": "Contract",
-        "churn_direction": "low",
+        "increases_risk": "Accounts without auto-renewal require active confirmation to retain",
+        "decreases_risk": "Auto-renewing accounts are lower-friction at renewal time",
     },
-    # Renewal status (one-hot encoded)
-    "renewal_status_cancelled": {
-        "churn_label": "Cancelled renewal status",
-        "churn_desc": "Accounts with a cancelled flag are the strongest single churn predictor",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Contract",
-        "churn_direction": "flag",
+    # Utilization
+    "seats": {
+        "increases_risk": "Underutilized capacity relative to contract size signals disengagement",
+        "decreases_risk": "Accounts at full allocation are more embedded and harder to displace",
     },
-    "renewal_status_in_notice": {
-        "churn_label": "In cancellation notice",
-        "churn_desc": "Accounts actively in notice period are at immediate churn risk",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Contract",
-        "churn_direction": "flag",
+}
+
+# Prefix-match fallbacks: a feature starting with these prefixes uses this entry.
+# Handles OHE columns like "renewal_status_cancelled", "plan_Enterprise", etc.
+_FEATURE_DESC_PREFIXES: Dict[str, Dict[str, str]] = {
+    "renewal_status": {
+        "increases_risk": "Contract status is one of the strongest single indicators of churn risk",
+        "decreases_risk": "Active renewal status indicates the account is on a retention track",
     },
-    "renewal_status_unknown": {
-        "churn_label": "Unknown renewal status",
-        "churn_desc": "Accounts with no renewal status on record have higher unpredictability",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Contract",
-        "churn_direction": "flag",
+    "plan_": {
+        "increases_risk": "Plan tier is a meaningful predictor of churn patterns in this dataset",
+        "decreases_risk": "This plan tier is associated with stronger retention rates",
     },
-    "renewal_status_active": {
-        "churn_label": None,
-        "churn_desc": None,
-        "health_label": "Active renewal status",
-        "health_desc": "Accounts with confirmed active status are on a retention track",
-        "group": "Contract",
-        "churn_direction": "low",
+    "company_size": {
+        "increases_risk": "This company size segment shows elevated churn patterns in this dataset",
+        "decreases_risk": "This company size segment is associated with stronger retention",
     },
-    # Plan tier
-    "plan_Free Trial": {
-        "churn_label": "Free trial accounts",
-        "churn_desc": "Trial accounts have higher conversion uncertainty than paid tiers",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Account Type",
-        "churn_direction": "flag",
+    "arr_tier": {
+        "increases_risk": "Account value tier is a risk factor in this dataset",
+        "decreases_risk": "This account value segment is associated with lower churn rates",
     },
-    "plan_Starter": {
-        "churn_label": "Entry-level plan",
-        "churn_desc": "Starter-tier accounts show higher churn rates than mid and high tiers",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Account Type",
-        "churn_direction": "flag",
-    },
-    "plan_Professional": {
-        "churn_label": None,
-        "churn_desc": None,
-        "health_label": "Professional plan",
-        "health_desc": "Professional-tier accounts show stronger retention and expansion rates",
-        "group": "Account Type",
-        "churn_direction": "low",
-    },
-    "plan_Enterprise": {
-        "churn_label": None,
-        "churn_desc": None,
-        "health_label": "Enterprise plan",
-        "health_desc": "Enterprise accounts typically have dedicated success coverage and longer contracts",
-        "group": "Account Type",
-        "churn_direction": "low",
-    },
-    # Company size
-    "company_size_51-200": {
-        "churn_label": "Mid-market accounts",
-        "churn_desc": "Mid-market companies show distinctive churn patterns in this dataset",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Firmographic",
-        "churn_direction": "flag",
-    },
-    "company_size_1-50": {
-        "churn_label": "Small company accounts",
-        "churn_desc": "Smaller companies may have more budget volatility at renewal",
-        "health_label": None,
-        "health_desc": None,
-        "group": "Firmographic",
-        "churn_direction": "flag",
-    },
-    "company_size_201-1000": {
-        "churn_label": None,
-        "churn_desc": None,
-        "health_label": "Enterprise-scale accounts",
-        "health_desc": "Larger organizations tend to have higher renewal rates and longer contracts",
-        "group": "Firmographic",
-        "churn_direction": "low",
+    "industry_": {
+        "increases_risk": "This industry segment shows elevated churn in this dataset",
+        "decreases_risk": "This industry segment is associated with stronger retention",
     },
 }
 
 
-def _translate(feature_name: str) -> Optional[_T]:
-    """Return the translation entry for a feature name, or None if unknown."""
-    # Exact match first
-    if feature_name in FEATURE_TRANSLATIONS:
-        return FEATURE_TRANSLATIONS[feature_name]
-    # Prefix match for dynamically generated OHE columns not in the table
-    for key, entry in FEATURE_TRANSLATIONS.items():
-        if feature_name.startswith(key + "_") or feature_name == key:
-            return entry
-    return None
+def _get_description(feature: str, direction: str) -> str:
+    """Return a description sentence for a feature+direction pair.
 
+    Tries exact match, then prefix match, then generic fallback.
+    Never returns None — every feature gets a description.
+    """
+    entry = _FEATURE_DESCRIPTIONS.get(feature)
+    if entry:
+        return entry.get(direction, entry.get("increases_risk", ""))
+
+    # Prefix match
+    for prefix, desc_map in _FEATURE_DESC_PREFIXES.items():
+        if feature.startswith(prefix):
+            return desc_map.get(direction, desc_map.get("increases_risk", ""))
+
+    # Generic fallback — direction-aware but generic
+    if direction == "increases_risk":
+        return "This factor is associated with elevated churn risk in the trained dataset"
+    return "This factor is associated with improved retention in the trained dataset"
+
+
+def _get_label(feature: str, direction: str) -> str:
+    """Return a clean business-readable label using the Phase 2 driver_labels system."""
+    from app.engine.driver_labels import clean_feature_name
+    return clean_feature_name(feature, direction)
+
+
+def _get_direction(feature: str, shap_directions: Dict[str, str]) -> str:
+    """Return 'increases_risk' | 'decreases_risk' for a feature.
+
+    Source: shap_directions from metadata.json (computed at training time as mean
+    SHAP sign across the background set).  Falls back to 'increases_risk' for
+    features not in the dict (safe default — shows as a churn driver).
+    """
+    return shap_directions.get(feature, "increases_risk")
+
+
+# ---------------------------------------------------------------------------
+# Global insights computation
+# ---------------------------------------------------------------------------
 
 def compute_model_insights(metadata: Dict[str, Any]) -> Dict[str, Any]:
     """Derive plain-language model insights from a training metadata artifact.
 
+    Source of truth: feature_importance and shap_directions from metadata.json.
+    Labels from driver_labels; descriptions from _FEATURE_DESCRIPTIONS.
+    Direction from shap_directions (mean SHAP sign at training time).
+
+    No feature is silently dropped — features not in any lookup table get
+    a generic label and description.
+
     Args:
         metadata: Content of metadata.json produced by train.train_model().
 
-    Returns structured insights dict with churn_drivers, health_signals,
-    top_insight, lift_statement, and provenance fields.
+    Returns:
+        Structured insights dict with churn_drivers, health_signals,
+        top_insight, lift_statement, and provenance fields.
     """
     importance_list: List[Dict[str, Any]] = metadata.get("feature_importance", [])
+    shap_directions: Dict[str, str] = metadata.get("shap_directions", {})
     model_type: str = metadata.get("model_type", "unknown")
     val_metrics: Dict[str, Any] = metadata.get("val_metrics") or {}
     lift_table: List[Dict[str, Any]] = val_metrics.get("lift_table", [])
@@ -273,56 +201,53 @@ def compute_model_insights(metadata: Dict[str, Any]) -> Dict[str, Any]:
     if not importance_list:
         return _empty_insights(metadata)
 
-    # Normalize importance scores to [0, 1] relative to the top feature.
+    # Normalise importance to [0, 1] relative to the top feature
     max_imp = max(abs(f["importance"]) for f in importance_list) or 1.0
     normed = [
         {**f, "importance_normalized": round(abs(f["importance"]) / max_imp, 3)}
         for f in importance_list
     ]
 
-    # Build churn_drivers and health_signals
     churn_drivers: List[Dict[str, Any]] = []
     health_signals: List[Dict[str, Any]] = []
     seen_labels: set = set()
 
     for entry in normed:
         fname = entry["feature"]
-        translation = _translate(fname)
-        if translation is None:
-            continue  # unknown feature — omit rather than show raw name
-
         imp_norm = entry["importance_normalized"]
+        direction = _get_direction(fname, shap_directions)
 
-        # Churn drivers
-        if translation.get("churn_label") and len(churn_drivers) < MAX_CHURN_DRIVERS:
-            label = translation["churn_label"]
+        label = _get_label(fname, direction)
+        description = _get_description(fname, direction)
+
+        if direction == "increases_risk" and len(churn_drivers) < MAX_CHURN_DRIVERS:
             if label not in seen_labels:
                 seen_labels.add(label)
                 churn_drivers.append({
                     "rank": len(churn_drivers) + 1,
                     "label": label,
-                    "description": translation["churn_desc"],
-                    "group": translation["group"],
+                    "description": description,
+                    "feature": fname,   # kept for traceability; not shown in UI
+                    "group": _infer_group(fname),
                     "importance_normalized": imp_norm,
                 })
 
-        # Health signals (separate pass — may use same feature from other angle)
-        if translation.get("health_label") and len(health_signals) < MAX_HEALTH_SIGNALS:
-            health_label = translation["health_label"]
-            if health_label not in seen_labels:
-                seen_labels.add(health_label)
+        elif direction == "decreases_risk" and len(health_signals) < MAX_HEALTH_SIGNALS:
+            if label not in seen_labels:
+                seen_labels.add(label)
                 health_signals.append({
                     "rank": len(health_signals) + 1,
-                    "label": health_label,
-                    "description": translation["health_desc"],
-                    "group": translation["group"],
+                    "label": label,
+                    "description": description,
+                    "feature": fname,
+                    "group": _infer_group(fname),
                     "importance_normalized": imp_norm,
                 })
 
-    # Top insight — derived from actual top-ranked drivers
-    top_insight = _generate_top_insight(churn_drivers, health_signals)
+        if len(churn_drivers) >= MAX_CHURN_DRIVERS and len(health_signals) >= MAX_HEALTH_SIGNALS:
+            break
 
-    # Lift statement — derived from lift table (real data, no fake numbers)
+    top_insight = _generate_top_insight(churn_drivers, health_signals)
     lift_statement = _generate_lift_statement(lift_table)
 
     return {
@@ -338,16 +263,35 @@ def compute_model_insights(metadata: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _infer_group(feature: str) -> str:
+    """Infer a display group from a feature name without hardcoded assumptions."""
+    f = feature.lower()
+    if any(k in f for k in ("login", "activity", "logins", "engagement")):
+        return "Engagement"
+    if any(k in f for k in ("ticket", "support", "case")):
+        return "Support"
+    if any(k in f for k in ("nps", "satisfaction", "csat")):
+        return "Sentiment"
+    if any(k in f for k in ("arr", "mrr", "revenue", "acv")):
+        return "Financial"
+    if any(k in f for k in ("renewal", "contract", "auto_renew", "days_until")):
+        return "Contract"
+    if any(k in f for k in ("contact", "deal", "stakeholder")):
+        return "Relationship"
+    if any(k in f for k in ("seat", "utiliz", "license")):
+        return "Utilization"
+    if any(k in f for k in ("plan_", "tier", "company_size", "industry_")):
+        return "Firmographic"
+    return "Account Signal"
+
+
 def _generate_top_insight(
     churn_drivers: List[Dict[str, Any]],
     health_signals: List[Dict[str, Any]],
-) -> str:
+) -> Optional[str]:
     if not churn_drivers:
         return "No feature importance data available for this model."
-
-    top = churn_drivers[0]["label"].lower()
     if len(churn_drivers) >= 2:
-        second = churn_drivers[1]["label"].lower()
         return (
             f"{churn_drivers[0]['label']} and {churn_drivers[1]['label'].lower()} "
             f"are the strongest predictors of churn in this dataset."
@@ -356,7 +300,6 @@ def _generate_top_insight(
 
 
 def _generate_lift_statement(lift_table: List[Dict[str, Any]]) -> Optional[str]:
-    """Derive a lift statement from the real lift table. Returns None if no data."""
     if not lift_table:
         return None
     top_decile = lift_table[0]
@@ -383,137 +326,165 @@ def _empty_insights(metadata: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def load_insights_for_tenant(tenant_id: str) -> Optional[Dict[str, Any]]:
-    """Load metadata.json for the tenant's churn model and compute insights,
-    then merge in behavioral diff from the scored CSV artifact.
-
-    Returns None if no model has been trained yet.
-    Uses the same artifact path convention as console_api.py.
-    """
-    from app.engine.config import get_module
-
-    try:
-        mod = get_module("churn")
-        artifact_dir = mod.get_artifact_dir(tenant_id)
-        meta_path = os.path.join(artifact_dir, "metadata.json")
-        if not os.path.exists(meta_path):
-            return None
-        with open(meta_path) as f:
-            metadata = json.load(f)
-        insights = compute_model_insights(metadata)
-        insights["behavioral_diff"] = _load_behavioral_diff(tenant_id)
-        return insights
-    except Exception as exc:
-        logger.warning("model_insights: load failed for tenant %s (%s)", tenant_id, exc)
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Behavioral diff — churned vs retained quantified comparison
+#
+# Phase 3: no longer driven by _BEHAVIORAL_FEATURES (hardcoded SaaS list).
+# Instead reads the model's actual top features from feature_importance,
+# checks which exist in the scored CSV, and computes from those.
 # ---------------------------------------------------------------------------
 
-# Features to compare, in priority order.
-# (feature_name, display_label, format_type)
-#   format_type:
-#     "pct"    — % change: "↓ 42% lower login activity"
-#     "ratio"  — multiplier: "↑ 2.3× more support ticket volume"
-#     "points" — absolute diff: "↓ 3.1 points lower NPS score"
-_BEHAVIORAL_FEATURES: List[tuple] = [
-    ("monthly_logins",        "login activity",           "pct"),
-    ("engagement_score",      "overall engagement",       "pct"),
-    ("nps_score",             "NPS score",                "points"),
-    ("support_tickets",       "support ticket volume",    "ratio"),
-    ("days_since_last_login", "days since last login",    "pct"),
-    ("arr",                   "account value (ARR)",      "pct"),
-    ("seats",                 "seat utilization",         "pct"),
-]
+def _infer_format_type(feature: str) -> str:
+    """Infer a diff format from the feature name.
 
-_MAX_DIFF_ITEMS = 5
-_MIN_RETAINED_N = 5  # skip if too few samples
+    "days"   → "days"   (show absolute difference in days)
+    counts   → "ratio"  (churned / retained multiplier)
+    scores   → "points" (absolute difference on the score scale)
+    monetary → "pct"    (percentage difference)
+    default  → "pct"
+    """
+    f = feature.lower()
+    if "days" in f:
+        return "days"
+    if any(k in f for k in ("ticket", "count", "deal", "contact", "logins", "seats", "seat")):
+        return "ratio"
+    if any(k in f for k in ("nps", "score", "csat")):
+        return "points"
+    return "pct"
+
+
+def _is_binary_column(series: "Any") -> bool:
+    """Return True if series contains only 0s and 1s (OHE or flag column)."""
+    unique = set(series.dropna().unique())
+    return unique.issubset({0, 1, 0.0, 1.0})
 
 
 def compute_behavioral_diff(
-    scored_df: "Any",  # pd.DataFrame — avoid hard import at module level
+    scored_df: "Any",
     label_col: str = "churned",
+    feature_importance: Optional[List[Dict[str, Any]]] = None,
+    shap_directions: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """Compute churned vs retained behavioral differences from the scored DataFrame.
+    """Compute churned vs retained behavioral differences.
+
+    Uses the model's actual top features (from feature_importance) rather than
+    a hardcoded SaaS feature list.  Labels come from driver_labels.
 
     Args:
-        scored_df: DataFrame produced by evaluate_model's scored CSV output.
-                   Must contain label_col plus at least some of the numeric
-                   feature columns listed in _BEHAVIORAL_FEATURES.
-        label_col: Binary label column name (1 = churned, 0 = retained).
-
-    Returns:
-        Dict with keys: items, interpretation, n_churned, n_retained.
+        scored_df:          DataFrame from evaluate_model scored CSV output.
+        label_col:          Binary label column (1 = churned, 0 = retained).
+        feature_importance: Ranked feature list from metadata.json.
+                            If None, uses any numeric column found in scored_df.
+        shap_directions:    Per-feature direction from metadata.json.
+                            Used to frame diff direction labels correctly.
     """
-    import pandas as pd  # local import — pandas not used elsewhere in this module
+    import pandas as pd
+    from app.engine.driver_labels import clean_feature_name
 
     churned = scored_df[scored_df[label_col] == 1]
     retained = scored_df[scored_df[label_col] == 0]
 
     n_c, n_r = len(churned), len(retained)
-    if n_c < _MIN_RETAINED_N or n_r < _MIN_RETAINED_N:
+    if n_c < _MIN_COHORT_N or n_r < _MIN_COHORT_N:
         return {"items": [], "interpretation": None, "n_churned": n_c, "n_retained": n_r}
+
+    # Build candidate feature list: model's top features in importance order,
+    # filtered to columns present in the scored CSV.
+    if feature_importance:
+        candidates = [
+            f["feature"] for f in feature_importance[:_MAX_BEHAV_FEATURES]
+            if f["feature"] in scored_df.columns
+        ]
+    else:
+        # No importance data — use any numeric column
+        candidates = [
+            c for c in scored_df.columns
+            if c not in (label_col, "account_id", "probability", "tier",
+                         "rank", "churn_risk_pct", "urgency_score",
+                         "renewal_window_label", "arr_at_risk",
+                         "recommended_action", "account_status",
+                         "top_drivers", "confidence_level")
+            and pd.api.types.is_numeric_dtype(scored_df[c])
+        ]
 
     raw_items: List[Dict[str, Any]] = []
 
-    for feat, label, fmt in _BEHAVIORAL_FEATURES:
+    for feat in candidates:
         if feat not in scored_df.columns:
             continue
+        if not pd.api.types.is_numeric_dtype(scored_df[feat]):
+            continue
+        if _is_binary_column(scored_df[feat]):
+            continue  # OHE / flag columns — averages aren't meaningful to display
 
         c_vals = churned[feat].dropna()
         r_vals = retained[feat].dropna()
+
         if len(c_vals) < 2 or len(r_vals) < 2:
             continue
 
         c_mean = float(c_vals.mean())
         r_mean = float(r_vals.mean())
 
-        if r_mean == 0:
+        if r_mean == 0 and c_mean == 0:
             continue
+
+        fmt = _infer_format_type(feat)
+        direction = (shap_directions or {}).get(feat, "increases_risk")
+        display_label = clean_feature_name(feat, direction)
 
         magnitude: float
         summary: str
-        direction: str
+        diff_direction: str
 
-        if fmt == "pct":
-            pct = (c_mean - r_mean) / abs(r_mean) * 100
-            if abs(pct) < 8:
-                continue  # noise threshold
-            direction = "up" if pct > 0 else "down"
-            arrow = "↑" if direction == "up" else "↓"
-            word = "higher" if direction == "up" else "lower"
-            summary = f"{arrow} {abs(round(pct))}% {word} {label}"
-            magnitude = abs(pct)
-
-        elif fmt == "ratio":
-            if r_mean == 0:
+        if fmt == "ratio":
+            base = max(abs(r_mean), 0.001)
+            ratio = c_mean / base
+            if abs(ratio - 1.0) < 0.15:
                 continue
-            ratio = c_mean / r_mean
-            if ratio < 1.15:
-                continue  # not meaningfully different
-            direction = "up"
-            summary = f"↑ {ratio:.1f}× more {label}"
-            magnitude = (ratio - 1) * 100  # normalise for sorting
+            diff_direction = "up" if ratio > 1 else "down"
+            arrow = "↑" if diff_direction == "up" else "↓"
+            if diff_direction == "up":
+                summary = f"↑ {ratio:.1f}× higher in churned accounts"
+            else:
+                summary = f"↓ {1/ratio:.1f}× lower in churned accounts"
+            magnitude = abs(ratio - 1.0) * 100
 
         elif fmt == "points":
             diff = c_mean - r_mean
             if abs(diff) < 0.5:
                 continue
-            direction = "up" if diff > 0 else "down"
-            arrow = "↑" if direction == "up" else "↓"
-            word = "higher" if direction == "up" else "lower"
-            summary = f"{arrow} {abs(round(diff, 1))} points {word} {label}"
+            diff_direction = "up" if diff > 0 else "down"
+            arrow = "↑" if diff_direction == "up" else "↓"
+            word = "higher" if diff_direction == "up" else "lower"
+            summary = f"{arrow} {abs(round(diff, 1))} points {word} in churned accounts"
             magnitude = abs(diff)
 
-        else:
-            continue
+        elif fmt == "days":
+            diff = c_mean - r_mean
+            if abs(diff) < 1.0:
+                continue
+            diff_direction = "up" if diff > 0 else "down"
+            arrow = "↑" if diff_direction == "up" else "↓"
+            word = "more" if diff_direction == "up" else "fewer"
+            summary = f"{arrow} {abs(round(diff))} days {word} in churned accounts"
+            magnitude = abs(diff)
+
+        else:  # "pct"
+            base = max(abs(r_mean), 0.001)
+            pct = (c_mean - r_mean) / base * 100
+            if abs(pct) < 8:
+                continue
+            diff_direction = "up" if pct > 0 else "down"
+            arrow = "↑" if diff_direction == "up" else "↓"
+            word = "higher" if diff_direction == "up" else "lower"
+            summary = f"{arrow} {abs(round(pct))}% {word} in churned accounts"
+            magnitude = abs(pct)
 
         raw_items.append({
-            "label": label,
+            "label": display_label,
             "feature": feat,
-            "direction": direction,
+            "direction": diff_direction,
             "summary": summary,
             "churned_avg": round(c_mean, 2),
             "retained_avg": round(r_mean, 2),
@@ -523,12 +494,12 @@ def compute_behavioral_diff(
 
     # Sort by magnitude descending, cap at _MAX_DIFF_ITEMS
     raw_items.sort(key=lambda x: x["_magnitude"], reverse=True)
-    raw_items = raw_items[:_MAX_DIFF_ITEMS]
+    items = [
+        {k: v for k, v in item.items() if k != "_magnitude"}
+        for item in raw_items[:_MAX_DIFF_ITEMS]
+    ]
 
-    # Strip internal sorting field
-    items = [{k: v for k, v in item.items() if k != "_magnitude"} for item in raw_items]
-
-    interpretation = _generate_behavioral_interpretation(raw_items, n_c, n_r)
+    interpretation = _generate_behavioral_interpretation(items, n_c, n_r)
 
     return {
         "items": items,
@@ -543,42 +514,76 @@ def _generate_behavioral_interpretation(
     n_churned: int,
     n_retained: int,
 ) -> Optional[str]:
-    """Generate one plain-language sentence summarising the behavioral diff."""
+    """Generate one plain-language sentence summarising the behavioral diff.
+
+    Phase 3: no hardcoded feature name sets — uses the labels from items directly.
+    """
     if not items:
         return None
 
     top = items[0]
-    engagement_labels = {"login activity", "overall engagement", "seat utilization", "days since last login"}
-    friction_labels = {"support ticket volume"}
 
     if len(items) >= 2:
         second = items[1]
-        # Detect the dominant theme
-        both_engagement = top["label"] in engagement_labels and second["label"] in engagement_labels
-        top_friction = top["label"] in friction_labels
-        if both_engagement:
-            theme = "disengagement"
-        elif top_friction:
-            theme = "product friction"
-        else:
-            theme = "behavioral disengagement"
         return (
-            f"Across {n_churned} churned accounts, the clearest pattern was "
-            f"{top['label']} and {second['label']} — consistent with {theme} "
-            f"in the months before renewal."
+            f"Across {n_churned} churned accounts, the two clearest behavioral "
+            f"differences were {top['label'].lower()} and {second['label'].lower()}."
         )
 
     return (
-        f"Across {n_churned} churned accounts, the strongest behavioral signal was "
-        f"{top['label']}."
+        f"Across {n_churned} churned accounts, the strongest behavioral signal "
+        f"was {top['label'].lower()}."
     )
 
 
-def _load_behavioral_diff(tenant_id: str) -> Optional[Dict[str, Any]]:
-    """Load the scored CSV for the tenant and compute behavioral diff.
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
-    Returns None if the scored CSV does not exist yet.
+def load_insights_for_tenant(tenant_id: str) -> Optional[Dict[str, Any]]:
+    """Load metadata.json for the tenant's churn model and compute insights.
+
+    Also merges in behavioral diff from the scored CSV artifact.
+    Returns None if no model has been trained yet.
     """
+    from app.engine.config import get_module
+
+    try:
+        mod = get_module("churn")
+        # Prefer versioned artifact path (current model run) if available
+        from app.storage import store
+        current_run = store.get_current_model_run(tenant_id, "churn")
+        if current_run and current_run.get("artifact_path"):
+            artifact_dir = current_run["artifact_path"]
+        else:
+            artifact_dir = mod.get_artifact_dir(tenant_id)
+
+        meta_path = os.path.join(artifact_dir, "metadata.json")
+        if not os.path.exists(meta_path):
+            return None
+
+        with open(meta_path) as f:
+            metadata = json.load(f)
+
+        insights = compute_model_insights(metadata)
+        insights["behavioral_diff"] = _load_behavioral_diff(
+            tenant_id,
+            feature_importance=metadata.get("feature_importance"),
+            shap_directions=metadata.get("shap_directions"),
+        )
+        return insights
+
+    except Exception as exc:
+        logger.warning("model_insights: load failed for tenant %s (%s)", tenant_id, exc)
+        return None
+
+
+def _load_behavioral_diff(
+    tenant_id: str,
+    feature_importance: Optional[List[Dict[str, Any]]] = None,
+    shap_directions: Optional[Dict[str, str]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Load the scored CSV and compute behavioral diff using model's top features."""
     import pandas as pd
 
     try:
@@ -586,12 +591,19 @@ def _load_behavioral_diff(tenant_id: str) -> Optional[Dict[str, Any]]:
         scored_path = os.path.join(data_dir, "outputs", tenant_id, "churn_scored.csv")
         if not os.path.exists(scored_path):
             return None
+
         df = pd.read_csv(scored_path)
         label_col = "churned"
         if label_col not in df.columns:
             return None
+
         df[label_col] = df[label_col].astype(int)
-        return compute_behavioral_diff(df, label_col)
+        return compute_behavioral_diff(
+            df,
+            label_col=label_col,
+            feature_importance=feature_importance,
+            shap_directions=shap_directions,
+        )
     except Exception as exc:
         logger.warning("behavioral_diff: load failed for tenant %s (%s)", tenant_id, exc)
         return None
