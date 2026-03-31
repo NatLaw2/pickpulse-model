@@ -363,6 +363,15 @@ export function PredictPage() {
                           >
                             {riskLabel(row.churn_risk_pct)} {row.churn_risk_pct}%
                           </span>
+                          {row.confidence_level && (
+                            <span className={`block text-[9px] font-medium mt-0.5 text-right ${
+                              row.confidence_level === 'high' ? 'text-green-600' :
+                              row.confidence_level === 'medium' ? 'text-amber-600' :
+                              'text-[var(--color-text-muted)]'
+                            }`}>
+                              {row.confidence_level} conf
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right font-mono text-xs">{row.urgency_score}</td>
                         <td className="py-3 px-4">

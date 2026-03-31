@@ -1,8 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Loader2, Mail, Calendar, BookOpen, PhoneForwarded } from 'lucide-react';
-import { api, type ChurnPrediction, type ExplainResponse, type DraftEmailRequest } from '../lib/api';
+import { X, Loader2, Mail, Calendar, BookOpen, PhoneForwarded, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { api, type ChurnPrediction, type ExplainResponse, type DraftEmailRequest, type TopDriver } from '../lib/api';
 import { riskColor, riskLabel } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
+
+function confidenceColor(level: string): string {
+  if (level === 'high') return 'var(--color-success)';
+  if (level === 'medium') return 'var(--color-warning)';
+  return 'var(--color-text-muted)';
+}
+
+function confidenceBg(level: string): string {
+  if (level === 'high') return 'bg-green-50 text-green-700';
+  if (level === 'medium') return 'bg-amber-50 text-amber-700';
+  return 'bg-gray-100 text-[var(--color-text-muted)]';
+}
 
 type Tone = 'friendly' | 'direct' | 'executive';
 
@@ -234,8 +246,15 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
               <div className="text-lg font-bold" style={{ color: riskColor(prediction.churn_risk_pct) }}>
                 {prediction.churn_risk_pct}%
               </div>
-              <div className="text-[10px]" style={{ color: riskColor(prediction.churn_risk_pct) }}>
-                {riskLabel(prediction.churn_risk_pct)} Risk
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <span className="text-[10px]" style={{ color: riskColor(prediction.churn_risk_pct) }}>
+                  {riskLabel(prediction.churn_risk_pct)} Risk
+                </span>
+                {explainData?.confidence_level && (
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${confidenceBg(explainData.confidence_level)}`}>
+                    {explainData.confidence_level} conf
+                  </span>
+                )}
               </div>
             </div>
             <div className="bg-[var(--color-bg-primary)] rounded-xl p-3">
@@ -268,13 +287,13 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
           </div>
         </div>
 
-        {/* Risk Drivers */}
+        {/* Signal Analysis */}
         <div>
-          <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-3">Risk Drivers</h4>
+          <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-3">Signal Analysis</h4>
           {explainLoading && (
             <div className="flex items-center gap-2 py-4 text-xs text-[var(--color-text-muted)]">
               <Loader2 size={14} className="animate-spin" />
-              Loading risk analysis...
+              Analyzing account signals...
             </div>
           )}
           {explainError && (
@@ -282,28 +301,88 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
               {explainError}
             </div>
           )}
-          {explainData && (
-            <div className="space-y-2">
-              {explainData.risk_drivers.map((driver, i) => (
-                <div
-                  key={i}
-                  className={`flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs ${
-                    i < 2
-                      ? 'bg-red-50 border border-red-100'
-                      : 'bg-[var(--color-bg-primary)]'
-                  }`}
-                >
-                  <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] flex-shrink-0" />
-                  <span className={i < 2 ? 'text-[var(--color-text-primary)] font-semibold' : 'text-[var(--color-text-primary)]'}>{driver}</span>
+          {explainData && (() => {
+            const structuredDrivers: TopDriver[] = explainData.top_drivers ?? [];
+            const riskSignals = structuredDrivers.filter(d => d.direction === 'increases_risk');
+            const protectiveSignals = structuredDrivers.filter(d => d.direction === 'decreases_risk');
+
+            if (structuredDrivers.length > 0) {
+              return (
+                <div className="space-y-4">
+                  {riskSignals.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-[var(--color-text-muted)] flex items-center gap-1 mb-2">
+                        <AlertTriangle size={10} className="text-[var(--color-danger)]" />
+                        Signals driving risk
+                      </p>
+                      <div className="space-y-1.5">
+                        {riskSignals.map((d, i) => (
+                          <div
+                            key={i}
+                            className={`flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs ${
+                              i === 0
+                                ? 'bg-red-50 border border-red-100'
+                                : 'bg-[var(--color-bg-primary)]'
+                            }`}
+                          >
+                            <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] flex-shrink-0" />
+                            <span className={i === 0 ? 'text-[var(--color-text-primary)] font-semibold' : 'text-[var(--color-text-primary)]'}>
+                              {d.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {protectiveSignals.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-[var(--color-text-muted)] flex items-center gap-1 mb-2">
+                        <ShieldCheck size={10} className="text-green-600" />
+                        Working in their favor
+                      </p>
+                      <div className="space-y-1.5">
+                        {protectiveSignals.map((d, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs bg-green-50 border border-green-100"
+                          >
+                            <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                            <span className="text-[var(--color-text-primary)]">{d.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
-              {explainData.risk_driver_summary && (
-                <p className="text-[10px] text-[var(--color-text-muted)] mt-2 italic px-1">
-                  {explainData.risk_driver_summary}
-                </p>
-              )}
-            </div>
-          )}
+              );
+            }
+
+            // Fallback: heuristic string drivers (old model artifacts)
+            return (
+              <div className="space-y-2">
+                {explainData.risk_drivers.map((driver, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs ${
+                      i < 2
+                        ? 'bg-red-50 border border-red-100'
+                        : 'bg-[var(--color-bg-primary)]'
+                    }`}
+                  >
+                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] flex-shrink-0" />
+                    <span className={i < 2 ? 'text-[var(--color-text-primary)] font-semibold' : 'text-[var(--color-text-primary)]'}>
+                      {driver}
+                    </span>
+                  </div>
+                ))}
+                {explainData.risk_driver_summary && (
+                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2 italic px-1">
+                    {explainData.risk_driver_summary}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Recommended Action */}

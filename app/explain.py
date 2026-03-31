@@ -5,7 +5,7 @@ import json
 import logging
 import os
 from datetime import datetime, date, time, timedelta, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -55,6 +55,13 @@ router = APIRouter(prefix="/api/predictions", tags=["explain"])
 # ---------------------------------------------------------------------------
 # Response models
 # ---------------------------------------------------------------------------
+class TopDriver(BaseModel):
+    feature: str
+    label: str
+    direction: str  # "increases_risk" | "decreases_risk"
+    shap_value: float
+
+
 class ExplainResponse(BaseModel):
     account_id: str
     churn_risk_pct: float
@@ -64,8 +71,10 @@ class ExplainResponse(BaseModel):
     renewal_window_label: str
     tier: str
     recommended_action: str
-    risk_drivers: List[str]
+    risk_drivers: List[str]       # kept for email-drafting backward compat
     risk_driver_summary: str
+    top_drivers: List[TopDriver] = []   # structured SHAP drivers (preferred)
+    confidence_level: str = ""          # "high" | "medium" | "low"
 
 
 # ---------------------------------------------------------------------------
@@ -239,17 +248,46 @@ def explain_account(
         except Exception:
             pass  # Fall back to prediction dict
 
-    # Load model feature weights for importance-ranked drivers
-    feature_weights: Dict[str, float] = {}
-    try:
-        from .engine import store
-        current_run = store.get_current_model_run(tenant_id, "churn")
-        if current_run and current_run.get("artifact_path"):
-            feature_weights = _load_feature_weights(current_run["artifact_path"])
-    except Exception:
-        pass
+    # -----------------------------------------------------------------------
+    # Prefer SHAP-based top_drivers already stored in the prediction row.
+    # These are direction-aware and labeled (from Phase 1–2 pipeline).
+    # Fall back to heuristic generation only for older artifacts.
+    # -----------------------------------------------------------------------
+    top_drivers_raw: Any = row.get("top_drivers") or []
+    if isinstance(top_drivers_raw, str):
+        try:
+            top_drivers_raw = json.loads(top_drivers_raw) or []
+        except Exception:
+            top_drivers_raw = []
 
-    drivers = generate_risk_drivers(full_row, feature_weights=feature_weights or None)
+    top_drivers: List[TopDriver] = []
+    if isinstance(top_drivers_raw, list) and top_drivers_raw:
+        for d in top_drivers_raw:
+            if isinstance(d, dict) and d.get("feature") and d.get("label"):
+                top_drivers.append(TopDriver(
+                    feature=str(d.get("feature", "")),
+                    label=str(d.get("label", "")),
+                    direction=str(d.get("direction", "increases_risk")),
+                    shap_value=float(d.get("shap_value", 0.0)),
+                ))
+
+    confidence_level: str = str(row.get("confidence_level") or "")
+
+    if top_drivers:
+        # Derive flat driver list from structured labels (for email compat)
+        drivers = [d.label for d in top_drivers]
+    else:
+        # Legacy fallback: importance-weighted heuristic
+        feature_weights: Dict[str, float] = {}
+        try:
+            from .engine import store
+            current_run = store.get_current_model_run(tenant_id, "churn")
+            if current_run and current_run.get("artifact_path"):
+                feature_weights = _load_feature_weights(current_run["artifact_path"])
+        except Exception:
+            pass
+        drivers = generate_risk_drivers(full_row, feature_weights=feature_weights or None)
+
     summary = build_risk_driver_summary(drivers)
 
     return ExplainResponse(
@@ -263,6 +301,8 @@ def explain_account(
         recommended_action=str(row.get("recommended_action") or "Monitor"),
         risk_drivers=drivers,
         risk_driver_summary=summary,
+        top_drivers=top_drivers,
+        confidence_level=confidence_level,
     )
 
 

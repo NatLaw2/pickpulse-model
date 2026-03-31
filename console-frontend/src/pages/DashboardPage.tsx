@@ -12,16 +12,19 @@ import { riskColor } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
 
 const FEATURE_LABELS: Record<string, string> = {
-  days_since_last_login: 'Login Recency',
-  monthly_logins: 'Monthly Usage',
+  days_since_last_login: 'Engagement Recency',
+  days_since_last_activity: 'Engagement Recency',
+  monthly_logins: 'Monthly Engagement',
   support_tickets: 'Support Volume',
-  nps_score: 'NPS Score',
+  nps_score: 'Customer Satisfaction',
   contract_months_remaining: 'Contract Length',
   days_until_renewal: 'Renewal Proximity',
   auto_renew_flag: 'Auto-Renew Status',
-  seats: 'Seat Count',
+  seats: 'Seat Utilization',
   arr: 'Account Value',
   company_size: 'Company Size',
+  contact_count: 'Stakeholder Coverage',
+  deal_count: 'Deal Engagement',
 };
 
 function featureLabel(raw: string): string {
@@ -703,6 +706,16 @@ export function DashboardPage() {
 
           {showModelHealth && (
             <>
+          {/* Stale model notice — shown when shap_directions absent (pre-Phase 3 artifact) */}
+          {modelInsights && modelInsights.has_shap_directions === false && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+              <AlertTriangle size={13} className="shrink-0 text-amber-500" />
+              <span>
+                <strong>Retrain recommended:</strong> this model predates dynamic signal analysis. Retrain to enable per-account SHAP explanations and confidence scoring.
+              </span>
+            </div>
+          )}
+
           {/* Model Insights — plain-language explainability */}
           {modelInsights && (modelInsights.churn_drivers.length > 0 || modelInsights.health_signals.length > 0) && (
             <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">

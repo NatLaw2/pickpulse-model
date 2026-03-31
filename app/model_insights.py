@@ -571,6 +571,9 @@ def load_insights_for_tenant(tenant_id: str) -> Optional[Dict[str, Any]]:
             feature_importance=metadata.get("feature_importance"),
             shap_directions=metadata.get("shap_directions"),
         )
+        # Signal whether this model artifact includes SHAP direction metadata.
+        # Frontend uses this to show a retrain recommendation for stale models.
+        insights["has_shap_directions"] = bool(metadata.get("shap_directions"))
         return insights
 
     except Exception as exc:

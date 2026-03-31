@@ -779,6 +779,7 @@ export interface ModelInsights {
   lift_statement: string | null;
   behavioral_diff: BehavioralDiff | null;
   generated_at: string;
+  has_shap_directions?: boolean;
 }
 
 export interface ProductionAccuracy {
@@ -805,6 +806,13 @@ export interface ProductionAccuracy {
   generated_at: string;
 }
 
+export interface TopDriver {
+  feature: string;
+  label: string;
+  direction: 'increases_risk' | 'decreases_risk';
+  shap_value: number;
+}
+
 export interface ChurnPrediction {
   account_id: string;
   name?: string;
@@ -819,6 +827,8 @@ export interface ChurnPrediction {
   recommended_action: string;
   tier: string;
   rank: number;
+  top_drivers?: TopDriver[];
+  confidence_level?: string;
 }
 
 export interface DraftEmailRequest {
@@ -851,8 +861,10 @@ export interface ExplainResponse {
   renewal_window_label: string;
   tier: string;
   recommended_action: string;
-  risk_drivers: string[];
+  risk_drivers: string[];        // kept for backward compat
   risk_driver_summary: string;
+  top_drivers: TopDriver[];      // structured SHAP drivers (preferred)
+  confidence_level: string;      // "high" | "medium" | "low"
 }
 
 export interface PredictResponse {
