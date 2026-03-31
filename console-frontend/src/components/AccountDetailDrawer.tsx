@@ -4,12 +4,6 @@ import { api, type ChurnPrediction, type ExplainResponse, type DraftEmailRequest
 import { riskColor, riskLabel } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
 
-function confidenceColor(level: string): string {
-  if (level === 'high') return 'var(--color-success)';
-  if (level === 'medium') return 'var(--color-warning)';
-  return 'var(--color-text-muted)';
-}
-
 function confidenceBg(level: string): string {
   if (level === 'high') return 'bg-green-50 text-green-700';
   if (level === 'medium') return 'bg-amber-50 text-amber-700';
