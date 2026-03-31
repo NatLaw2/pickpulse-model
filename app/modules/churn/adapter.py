@@ -1,9 +1,8 @@
 """Churn vertical adapter — customer churn risk prediction."""
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-import numpy as np
 import pandas as pd
 
 from app.engine.config import CHURN_MODULE, ModuleConfig
@@ -23,13 +22,21 @@ COLUMN_ALIASES: Dict[str, List[str]] = {
     "monthly_logins": ["monthly_logins", "logins", "login_count", "sessions"],
     "support_tickets": ["support_tickets", "tickets", "ticket_count", "cases"],
     "nps_score": ["nps_score", "nps", "satisfaction", "csat"],
-    "days_since_last_login": ["days_since_last_login", "days_inactive", "last_active_days"],
+    # days_since_last_login is the canonical name; days_since_last_activity is the
+    # HubSpot/services-mode equivalent — normalize_columns maps both to the same key.
+    "days_since_last_login": [
+        "days_since_last_login", "days_since_last_activity",
+        "days_inactive", "last_active_days",
+    ],
     "contract_months_remaining": ["contract_months_remaining", "months_remaining", "contract_end_months"],
     "industry": ["industry", "vertical", "sector"],
     "company_size": ["company_size", "employees", "size", "employee_count"],
     "days_until_renewal": ["days_until_renewal", "renewal_days", "days_to_renewal"],
     "auto_renew_flag": ["auto_renew_flag", "auto_renew", "autorenew", "auto_renewal"],
     "renewal_status": ["renewal_status", "renewal_state", "contract_status"],
+    # Universal CRM-derived signals (present for HubSpot-sourced portals)
+    "contact_count": ["contact_count", "contacts", "num_contacts"],
+    "deal_count": ["deal_count", "deals", "num_deals", "deal_activity"],
 }
 
 
@@ -69,28 +76,20 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_derived_features(
-    df: pd.DataFrame,
-    engagement_maxes: Optional[Dict[str, float]] = None,
-) -> pd.DataFrame:
-    """Add churn-specific derived features.
+def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add universal churn-signal derived features.
 
-    Args:
-        df: Input DataFrame.
-        engagement_maxes: Optional dict of {column: training_max} for
-            engagement_score normalization.  When provided (inference),
-            the training-time maxes are used instead of the batch max so
-            the feature is on the same scale as during training.  When
-            None (training), maxes are computed from the current batch.
+    Keeps only features that are schema-agnostic and meaningful across any
+    business type (SaaS, services, etc.).  All SaaS-specific composites
+    (engagement_score, contract_urgency, renewal_window flags, renewal_risk_multiplier)
+    have been removed so the model learns relationships from raw signals directly.
     """
     work = df.copy()
 
-    # ARR risk tier
+    # ARR tier — universal value segmentation
     if "arr" in work.columns:
         q = work["arr"].quantile([0.25, 0.75])
         q25, q75 = q[0.25], q[0.75]
-        # pd.cut requires strictly increasing bins — when quantiles
-        # collapse (e.g. single-row or constant column), fall back.
         if q25 < q75:
             work["arr_tier"] = pd.cut(
                 work["arr"],
@@ -99,44 +98,6 @@ def add_derived_features(
             ).astype(str)
         else:
             work["arr_tier"] = "mid_value"
-
-    # Engagement score (composite)
-    engagement_cols = ["monthly_logins", "seats"]
-    present = [c for c in engagement_cols if c in work.columns]
-    if present:
-        for c in present:
-            work[c] = work[c].fillna(0)
-        normed = work[present].copy()
-        for c in present:
-            if engagement_maxes and c in engagement_maxes:
-                mx = engagement_maxes[c]  # use training-time max at inference
-            else:
-                mx = normed[c].max()      # compute from batch at training time
-            if mx > 0:
-                normed[c] = normed[c] / mx
-        work["engagement_score"] = normed.mean(axis=1)
-
-    # Contract urgency
-    if "contract_months_remaining" in work.columns:
-        work["contract_urgency"] = pd.cut(
-            work["contract_months_remaining"].fillna(12),
-            bins=[-1, 2, 6, 12, float("inf")],
-            labels=["critical", "soon", "upcoming", "safe"],
-        ).astype(str)
-
-    # Renewal window flags
-    if "days_until_renewal" in work.columns:
-        dur = work["days_until_renewal"].fillna(999)
-        work["renewal_window_90d"] = (dur <= 90).astype(int)
-        work["renewal_window_30d"] = (dur <= 30).astype(int)
-
-        # Renewal risk multiplier: higher when close to renewal and not auto-renew
-        auto = work.get("auto_renew_flag", pd.Series(0, index=work.index)).fillna(0)
-        # Base multiplier from days
-        multiplier = np.where(dur <= 30, 2.0, np.where(dur <= 90, 1.5, 1.0))
-        # Reduce if auto-renew
-        multiplier = np.where(auto == 1, multiplier * 0.5, multiplier)
-        work["renewal_risk_multiplier"] = np.round(multiplier, 2)
 
     return work
 

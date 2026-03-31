@@ -14,3 +14,4 @@ cryptography==44.0.0
 PyJWT[crypto]>=2.8
 openai>=1.0
 sentry-sdk[fastapi]>=2.0
+shap>=0.44

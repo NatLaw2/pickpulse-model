@@ -241,6 +241,8 @@ def insert_scores(scores: List[ChurnScore], tenant_id: str = DEFAULT_TENANT) -> 
             "recommended_action": score.recommended_action,
             "account_status": "active",
             "model_version": "churn_v1",
+            "top_drivers": score.top_drivers or [],
+            "confidence_level": score.confidence_level,
         })
 
     if not rows:

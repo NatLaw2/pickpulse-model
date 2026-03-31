@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Optional
 
@@ -11,6 +12,8 @@ import pandas as pd
 
 from .config import ModuleConfig
 from .features import prepare_features
+
+logger = logging.getLogger(__name__)
 
 
 def load_model(
@@ -50,10 +53,24 @@ def load_model(
         with open(metadata_path) as f:
             metadata = json.load(f)
 
+    # Load base model (needed for SHAP — TreeExplainer can't wrap CalibratedClassifierCV)
+    base_model = None
+    base_model_path = os.path.join(artifact_dir, "base_model.joblib")
+    if os.path.exists(base_model_path):
+        base_model = joblib.load(base_model_path)
+
+    # Load SHAP background array
+    shap_background = None
+    shap_bg_path = os.path.join(artifact_dir, "shap_background.npy")
+    if os.path.exists(shap_bg_path):
+        shap_background = np.load(shap_bg_path)
+
     return {
         "model": model,
         "feature_meta": feature_meta,
         "metadata": metadata,
+        "base_model": base_model,
+        "shap_background": shap_background,
     }
 
 
@@ -99,6 +116,37 @@ def predict(
     if module.value_column and module.value_column in result.columns:
         result["value_at_risk"] = result[module.value_column] * result["probability"]
 
+    # SHAP per-account driver extraction
+    base_model = artifacts.get("base_model")
+    shap_background = artifacts.get("shap_background")
+    if base_model is not None and shap_background is not None:
+        try:
+            from app.engine.shap_utils import (
+                build_explainer, compute_shap_values, extract_top_drivers,
+                compute_confidence_level,
+            )
+            explainer = build_explainer(base_model, shap_background)
+            shap_vals = compute_shap_values(explainer, X)
+            result["top_drivers"] = [
+                extract_top_drivers(shap_vals[i], feature_names, n=5)
+                for i in range(len(shap_vals))
+            ]
+            # Confidence: fraction of model features with real data per row
+            result["confidence_level"] = [
+                compute_confidence_level(
+                    int(np.sum(np.abs(shap_vals[i]) > 1e-9)),
+                    len(feature_names),
+                )
+                for i in range(len(shap_vals))
+            ]
+        except Exception as exc:
+            logger.warning("SHAP driver extraction failed: %s", exc)
+            result["top_drivers"] = [[] for _ in range(len(result))]
+            result["confidence_level"] = ["low"] * len(result)
+    else:
+        result["top_drivers"] = [[] for _ in range(len(result))]
+        result["confidence_level"] = ["low"] * len(result)
+
     # Churn-specific enrichment
     if module.name == "churn":
         _enrich_churn_predictions(result)
@@ -143,8 +191,13 @@ def _enrich_churn_predictions(result: pd.DataFrame) -> None:
     if "arr" in result.columns:
         result["arr_at_risk"] = (result["arr"] * result["probability"]).round(2)
 
-    # recommended_action
-    dsll = result["days_since_last_login"] if "days_since_last_login" in result.columns else pd.Series(0, index=result.index)
+    # recommended_action — days_since_last_activity is the HubSpot-normalized alias
+    if "days_since_last_login" in result.columns:
+        dsll = result["days_since_last_login"]
+    elif "days_since_last_activity" in result.columns:
+        dsll = result["days_since_last_activity"]
+    else:
+        dsll = pd.Series(0, index=result.index)
     result["recommended_action"] = [
         compute_recommended_action(pct, rwl, dsl)
         for pct, rwl, dsl in zip(

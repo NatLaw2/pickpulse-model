@@ -130,6 +130,24 @@ def train_model(
         ])
         base_model.fit(X_train, y_train)
 
+    # SHAP background — sample X_train for per-account driver extraction at predict time.
+    # Store before calibration wrapper so the base model can be used with TreeExplainer.
+    n_bg = min(200, len(X_train))
+    rng_bg = np.random.RandomState(0)
+    bg_idx = rng_bg.choice(len(X_train), n_bg, replace=False)
+    X_background = X_train[bg_idx]
+
+    # Feature stats — mean/std/null-rate from training data for model insights
+    feature_stats: Dict[str, Any] = {}
+    for i, fname in enumerate(feature_names):
+        col = X_train[:, i].astype(float)
+        finite = col[np.isfinite(col)]
+        feature_stats[fname] = {
+            "mean": round(float(np.mean(finite)), 4) if len(finite) > 0 else 0.0,
+            "std": round(float(np.std(finite)), 4) if len(finite) > 0 else 1.0,
+            "pct_null": round(float(np.sum(~np.isfinite(col))) / len(col), 4),
+        }
+
     # Calibrate with Platt scaling (sigmoid) via cross-validation
     print(f"[train] Calibrating with CalibratedClassifierCV (sigmoid, cv={module.calibration.cv_folds})")
     calibrated_model = CalibratedClassifierCV(
@@ -175,6 +193,10 @@ def train_model(
     base_model_path = os.path.join(artifact_dir, "base_model.joblib")
     joblib.dump(base_model, base_model_path)
 
+    shap_bg_path = os.path.join(artifact_dir, "shap_background.npy")
+    np.save(shap_bg_path, X_background)
+    print(f"[train] Saved SHAP background ({n_bg} samples) -> {shap_bg_path}")
+
     feature_meta_path = os.path.join(artifact_dir, "feature_meta.json")
     # Convert numpy types for JSON serialization
     serializable_meta = _make_serializable(feature_meta)
@@ -217,10 +239,12 @@ def train_model(
         "train_metrics": train_metrics,
         "val_metrics": val_metrics,
         "feature_importance": importance,
+        "feature_stats": feature_stats,
         "artifact_paths": {
             "model": model_path,
             "base_model": base_model_path,
             "feature_meta": feature_meta_path,
+            "shap_background": shap_bg_path,
         },
     }
 

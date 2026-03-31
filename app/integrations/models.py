@@ -96,6 +96,7 @@ class ChurnScore(BaseModel):
     renewal_window_label: Optional[str] = None
     confidence_level: Optional[str] = None  # "high" | "medium" | "low"
     scored_features: int = 0  # how many model features had real data
+    top_drivers: List[Dict[str, Any]] = Field(default_factory=list)  # SHAP-derived drivers
 
 
 # ---------------------------------------------------------------------------
