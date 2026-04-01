@@ -119,24 +119,49 @@ def predict(
     # SHAP per-account driver extraction
     base_model = artifacts.get("base_model")
     shap_background = artifacts.get("shap_background")
+    metadata = artifacts.get("metadata", {})
+    feature_stats_by_outcome = metadata.get("feature_stats_by_outcome", {})
+
     if base_model is not None and shap_background is not None:
         try:
             from app.engine.shap_utils import (
                 build_explainer, compute_shap_values, extract_top_drivers,
-                compute_confidence_level,
+                compute_confidence_level, aggregate_portfolio_shap,
             )
             explainer = build_explainer(base_model, shap_background)
             shap_vals = compute_shap_values(explainer, X)
-            raw_drivers = [
+            raw_drivers_list = [
                 extract_top_drivers(shap_vals[i], feature_names, n=5)
                 for i in range(len(shap_vals))
             ]
             # LLM labeling — one batch call for all unique features in this run
             from app.engine.driver_labels import label_drivers_batch
-            result["top_drivers"] = label_drivers_batch(raw_drivers)
-            # Confidence: fraction of original row fields that had real (non-null)
-            # data before prepare_features imputed them.  Uses the same measure as
-            # score_accounts() in scoring.py for consistency across code paths.
+            labeled_drivers_list = label_drivers_batch(raw_drivers_list)
+
+            # Enrich drivers with raw values + retained/churned baselines
+            feat_idx = {name: i for i, name in enumerate(feature_names)}
+            import math as _math
+            enriched_drivers_list = []
+            for i_row, drivers in enumerate(labeled_drivers_list):
+                enriched = []
+                for d in drivers:
+                    d = d.copy()
+                    feat = d["feature"]
+                    fi = feat_idx.get(feat)
+                    if fi is not None:
+                        rv = float(X[i_row, fi])
+                        d["value"] = None if not _math.isfinite(rv) else rv
+                    else:
+                        d["value"] = None
+                    stats = feature_stats_by_outcome.get(feat, {})
+                    d["retained_mean"] = stats.get("retained_mean")
+                    d["churned_mean"] = stats.get("churned_mean")
+                    enriched.append(d)
+                enriched_drivers_list.append(enriched)
+
+            result["top_drivers"] = enriched_drivers_list
+
+            # Confidence: fraction of original row fields with real (non-null) data
             _id_col = module.id_column
             _ts_col = module.timestamp_column
             _skip = {_id_col, _ts_col, module.label_column}
@@ -147,8 +172,23 @@ def predict(
                 )
                 for i in range(len(result))
             ]
-        except Exception as exc:
-            logger.warning("SHAP driver extraction failed: %s", exc)
+
+            # Portfolio SHAP summary — stored in df.attrs for callers to persist if needed
+            arr_col = df["arr"] if "arr" in df.columns else None
+            arr_values_list = [
+                (float(arr_col.iloc[i]) if arr_col is not None and pd.notna(arr_col.iloc[i]) else None)
+                for i in range(len(df))
+            ]
+            portfolio_drivers = aggregate_portfolio_shap(
+                shap_vals, feature_names, arr_values_list, arr_cap_pct=0.20, top_n=10,
+            )
+            from app.engine.driver_labels import clean_feature_name
+            for pd_item in portfolio_drivers:
+                pd_item["label"] = clean_feature_name(pd_item["feature"], pd_item["direction"])
+            result.attrs["portfolio_shap_drivers"] = portfolio_drivers
+
+        except Exception:
+            logger.exception("SHAP driver extraction failed in predict()")
             result["top_drivers"] = [[] for _ in range(len(result))]
             result["confidence_level"] = ["low"] * len(result)
     else:
@@ -175,7 +215,7 @@ def _enrich_churn_predictions(result: pd.DataFrame) -> None:
     """Add churn-specific columns in-place."""
     from app.modules.churn.adapter import (
         compute_urgency_score, compute_renewal_window_label,
-        compute_recommended_action, compute_account_status,
+        compute_recommended_action, compute_account_status, compute_action_tier,
     )
 
     # churn_risk_pct (0-100, 1 decimal)
@@ -223,6 +263,14 @@ def _enrich_churn_predictions(result: pd.DataFrame) -> None:
     result["account_status"] = [
         compute_account_status(c, rs, d)
         for c, rs, d in zip(churned_col, rs_col, dur_col2)
+    ]
+
+    # action_tier
+    conf_col = result["confidence_level"] if "confidence_level" in result.columns else pd.Series(None, index=result.index)
+    urg_col = result["urgency_score"] if "urgency_score" in result.columns else pd.Series(None, index=result.index)
+    result["action_tier"] = [
+        compute_action_tier(u, cl, pct)
+        for u, cl, pct in zip(urg_col, conf_col, result["churn_risk_pct"])
     ]
 
 

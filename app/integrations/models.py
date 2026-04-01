@@ -97,6 +97,7 @@ class ChurnScore(BaseModel):
     confidence_level: Optional[str] = None  # "high" | "medium" | "low"
     scored_features: int = 0  # how many model features had real data
     top_drivers: List[Dict[str, Any]] = Field(default_factory=list)  # SHAP-derived drivers
+    action_tier: Optional[str] = None  # "act_now" | "watch_closely" | "low_priority"
 
 
 # ---------------------------------------------------------------------------

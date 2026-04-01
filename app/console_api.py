@@ -120,6 +120,15 @@ if _SENTRY_DSN:
 async def _startup():
     """Clean up jobs that were running when the previous process was killed."""
     store.fail_stale_model_runs(older_than_minutes=60)
+    # Verify shap is importable at startup so failures surface immediately in logs
+    try:
+        import shap as _shap  # noqa: F401
+        logger.info("startup: shap %s available", getattr(_shap, "__version__", "unknown"))
+    except ImportError:
+        logger.error(
+            "startup: shap package NOT installed — per-account SHAP drivers will be disabled. "
+            "Add 'shap' to requirements.txt and redeploy."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1012,6 +1021,23 @@ def model_insights(tenant_id: str = Depends(get_tenant_id)):
     if insights is None:
         raise HTTPException(status_code=404, detail="No trained model found for this tenant.")
     return insights
+
+
+@app.get("/api/model/portfolio-drivers")
+def get_portfolio_drivers(tenant_id: str = Depends(get_tenant_id)):
+    """Return the latest portfolio-level SHAP driver summary.
+
+    Written at score-time; updated every scoring run. Returns 404 if no
+    scoring run has been performed yet (or SHAP was unavailable during scoring).
+    """
+    summary_path = os.path.join(DATA_DIR, "outputs", tenant_id, "portfolio_shap_summary.json")
+    if not os.path.exists(summary_path):
+        raise HTTPException(status_code=404, detail="No portfolio driver summary found. Run scoring first.")
+    try:
+        with open(summary_path) as _f:
+            return json.load(_f)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read portfolio summary: {exc}")
 
 
 @app.get("/api/model/production-accuracy")

@@ -320,9 +320,16 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
                             }`}
                           >
                             <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] flex-shrink-0" />
-                            <span className={i === 0 ? 'text-[var(--color-text-primary)] font-semibold' : 'text-[var(--color-text-primary)]'}>
-                              {d.label}
-                            </span>
+                            <div>
+                              <span className={i === 0 ? 'text-[var(--color-text-primary)] font-semibold' : 'text-[var(--color-text-primary)]'}>
+                                {d.label}
+                              </span>
+                              {d.explanation_text && (
+                                <p className="text-[var(--color-text-muted)] mt-0.5 leading-relaxed">
+                                  {d.explanation_text}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -341,7 +348,14 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
                             className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs bg-green-50 border border-green-100"
                           >
                             <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-                            <span className="text-[var(--color-text-primary)]">{d.label}</span>
+                            <div>
+                              <span className="text-[var(--color-text-primary)]">{d.label}</span>
+                              {d.explanation_text && (
+                                <p className="text-[var(--color-text-muted)] mt-0.5 leading-relaxed">
+                                  {d.explanation_text}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -351,41 +365,40 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
               );
             }
 
-            // Fallback: heuristic string drivers (old model artifacts)
+            // Honest empty state — no heuristic fallbacks
             return (
-              <div className="space-y-2">
-                {explainData.risk_drivers.map((driver, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs ${
-                      i < 2
-                        ? 'bg-red-50 border border-red-100'
-                        : 'bg-[var(--color-bg-primary)]'
-                    }`}
-                  >
-                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] flex-shrink-0" />
-                    <span className={i < 2 ? 'text-[var(--color-text-primary)] font-semibold' : 'text-[var(--color-text-primary)]'}>
-                      {driver}
-                    </span>
-                  </div>
-                ))}
-                {explainData.risk_driver_summary && (
-                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2 italic px-1">
-                    {explainData.risk_driver_summary}
-                  </p>
-                )}
+              <div className="px-3 py-3 rounded-xl bg-[var(--color-bg-primary)] text-xs text-[var(--color-text-muted)]">
+                Signal analysis unavailable — run scoring to generate per-account drivers.
               </div>
             );
           })()}
         </div>
 
-        {/* Recommended Action */}
-        {prediction.recommended_action && (
-          <div>
-            <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Recommended Action</h4>
-            <div className="px-3 py-2.5 bg-[var(--color-accent)]/8 border border-[var(--color-accent)]/20 rounded-xl text-xs text-[var(--color-accent)]">
-              {prediction.recommended_action}
-            </div>
+        {/* Priority Tier + Recommended Action */}
+        {(explainData?.action_tier || prediction.action_tier || prediction.recommended_action) && (
+          <div className="space-y-2">
+            {(explainData?.action_tier || prediction.action_tier) && (() => {
+              const tier = explainData?.action_tier ?? prediction.action_tier;
+              const tierConfig: Record<string, { label: string; cls: string }> = {
+                act_now: { label: 'Act Now', cls: 'bg-red-50 border-red-200 text-red-700' },
+                watch_closely: { label: 'Watch Closely', cls: 'bg-amber-50 border-amber-200 text-amber-700' },
+                low_priority: { label: 'Low Priority', cls: 'bg-gray-50 border-gray-200 text-[var(--color-text-muted)]' },
+              };
+              const config = tierConfig[tier ?? ''] ?? { label: tier, cls: 'bg-gray-50 border-gray-200 text-[var(--color-text-muted)]' };
+              return (
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${config.cls}`}>
+                  {config.label}
+                </div>
+              );
+            })()}
+            {prediction.recommended_action && (
+              <div>
+                <h4 className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Recommended Action</h4>
+                <div className="px-3 py-2.5 bg-[var(--color-accent)]/8 border border-[var(--color-accent)]/20 rounded-xl text-xs text-[var(--color-accent)]">
+                  {prediction.recommended_action}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

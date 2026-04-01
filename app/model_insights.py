@@ -574,6 +574,14 @@ def load_insights_for_tenant(tenant_id: str) -> Optional[Dict[str, Any]]:
         # Signal whether this model artifact includes SHAP direction metadata.
         # Frontend uses this to show a retrain recommendation for stale models.
         insights["has_shap_directions"] = bool(metadata.get("shap_directions"))
+        # Whether this model was trained with per-outcome feature baselines (Phase 5+)
+        insights["has_outcome_baselines"] = bool(metadata.get("feature_stats_by_outcome"))
+        # Whether shap package is available at runtime
+        try:
+            import shap as _shap  # noqa: F401
+            insights["shap_available"] = True
+        except ImportError:
+            insights["shap_available"] = False
         return insights
 
     except Exception as exc:

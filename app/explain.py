@@ -60,6 +60,10 @@ class TopDriver(BaseModel):
     label: str
     direction: str  # "increases_risk" | "decreases_risk"
     shap_value: float
+    value: Optional[float] = None           # raw feature value for this account
+    retained_mean: Optional[float] = None   # mean value for retained accounts (training)
+    churned_mean: Optional[float] = None    # mean value for churned accounts (training)
+    explanation_text: Optional[str] = None  # "82 days — 4.5× longer than retained accounts (avg 18 days)"
 
 
 class ExplainResponse(BaseModel):
@@ -75,6 +79,7 @@ class ExplainResponse(BaseModel):
     risk_driver_summary: str
     top_drivers: List[TopDriver] = []   # structured SHAP drivers (preferred)
     confidence_level: str = ""          # "high" | "medium" | "low"
+    action_tier: Optional[str] = None   # "act_now" | "watch_closely" | "low_priority"
 
 
 # ---------------------------------------------------------------------------
@@ -249,9 +254,9 @@ def explain_account(
             pass  # Fall back to prediction dict
 
     # -----------------------------------------------------------------------
-    # Prefer SHAP-based top_drivers already stored in the prediction row.
-    # These are direction-aware and labeled (from Phase 1–2 pipeline).
-    # Fall back to heuristic generation only for older artifacts.
+    # Build structured top_drivers from SHAP data stored in the prediction row.
+    # Generate explanation_text per driver at explain-time using both baselines.
+    # No heuristic fallback — honest empty states only.
     # -----------------------------------------------------------------------
     top_drivers_raw: Any = row.get("top_drivers") or []
     if isinstance(top_drivers_raw, str):
@@ -260,39 +265,54 @@ def explain_account(
         except Exception:
             top_drivers_raw = []
 
+    from .engine.explanation import build_explanation_text as _build_explanation_text
+
     top_drivers: List[TopDriver] = []
     if isinstance(top_drivers_raw, list) and top_drivers_raw:
         for d in top_drivers_raw:
             if isinstance(d, dict) and d.get("feature") and d.get("label"):
+                feat = str(d.get("feature", ""))
+                direction = str(d.get("direction", "increases_risk"))
+                value = d.get("value")
+                retained_mean = d.get("retained_mean")
+                churned_mean = d.get("churned_mean")
+                explanation_text = _build_explanation_text(
+                    feat, value, retained_mean, churned_mean, direction
+                )
                 top_drivers.append(TopDriver(
-                    feature=str(d.get("feature", "")),
+                    feature=feat,
                     label=str(d.get("label", "")),
-                    direction=str(d.get("direction", "increases_risk")),
+                    direction=direction,
                     shap_value=float(d.get("shap_value", 0.0)),
+                    value=float(value) if value is not None else None,
+                    retained_mean=float(retained_mean) if retained_mean is not None else None,
+                    churned_mean=float(churned_mean) if churned_mean is not None else None,
+                    explanation_text=explanation_text,
                 ))
 
     confidence_level: str = str(row.get("confidence_level") or "")
 
+    # Derive flat driver list from structured labels (for email backward compat)
     if top_drivers:
-        # Derive flat driver list from structured labels (for email compat)
         drivers = [d.label for d in top_drivers]
     else:
-        # Legacy fallback: importance-weighted heuristic
-        feature_weights: Dict[str, float] = {}
-        try:
-            from .engine import store
-            current_run = store.get_current_model_run(tenant_id, "churn")
-            if current_run and current_run.get("artifact_path"):
-                feature_weights = _load_feature_weights(current_run["artifact_path"])
-        except Exception:
-            pass
-        drivers = generate_risk_drivers(full_row, feature_weights=feature_weights or None)
+        drivers = []
 
     summary = build_risk_driver_summary(drivers)
 
+    # Compute action_tier at explain-time
+    from .modules.churn.adapter import compute_action_tier as _compute_action_tier
+    urgency = row.get("urgency_score")
+    churn_pct = float(row.get("churn_risk_pct") or 0)
+    action_tier = _compute_action_tier(
+        float(urgency) if urgency is not None else None,
+        confidence_level or None,
+        churn_pct,
+    )
+
     return ExplainResponse(
         account_id=account_id,
-        churn_risk_pct=float(row.get("churn_risk_pct") or 0),
+        churn_risk_pct=round(churn_pct, 1),
         arr=float(row.get("arr") or 0),
         arr_at_risk=float(row.get("arr_at_risk") or 0),
         days_until_renewal=int(row.get("days_until_renewal") or 0),
@@ -303,6 +323,7 @@ def explain_account(
         risk_driver_summary=summary,
         top_drivers=top_drivers,
         confidence_level=confidence_level,
+        action_tier=action_tier,
     )
 
 

@@ -182,6 +182,9 @@ export const api = {
   modelPerformance: () => request<ModelPerformance>('/model/performance'),
   modelInsights: () => request<ModelInsights>('/model/insights'),
 
+  // Portfolio-level SHAP drivers — what's driving risk in this portfolio today
+  portfolioDrivers: () => request<PortfolioDriverSummary>('/model/portfolio-drivers'),
+
   // Production accuracy — predictions matched to real outcomes
   productionAccuracy: () => request<ProductionAccuracy>('/model/production-accuracy'),
   refreshProductionAccuracy: () =>
@@ -780,6 +783,8 @@ export interface ModelInsights {
   behavioral_diff: BehavioralDiff | null;
   generated_at: string;
   has_shap_directions?: boolean;
+  has_outcome_baselines?: boolean;
+  shap_available?: boolean;
 }
 
 export interface ProductionAccuracy {
@@ -811,6 +816,33 @@ export interface TopDriver {
   label: string;
   direction: 'increases_risk' | 'decreases_risk';
   shap_value: number;
+  // Phase 5 enrichment — present after retrain with feature_stats_by_outcome
+  value?: number | null;
+  retained_mean?: number | null;
+  churned_mean?: number | null;
+  explanation_text?: string | null;
+}
+
+export interface PortfolioDriver {
+  feature: string;
+  label: string;
+  direction: 'increases_risk' | 'decreases_risk';
+  arr_weighted_shap: number;
+  mean_abs_shap: number;
+  pct_accounts_positive: number;
+  n_accounts_material: number;
+  pct_accounts_material: number;
+}
+
+export interface PortfolioDriverSummary {
+  scored_at: string;
+  n_accounts: number;
+  total_arr: number;
+  drivers: PortfolioDriver[];
+  narrative: {
+    risk_summary: string[];
+    protective_summary: string[];
+  };
 }
 
 export interface ChurnPrediction {
@@ -829,6 +861,7 @@ export interface ChurnPrediction {
   rank: number;
   top_drivers?: TopDriver[];
   confidence_level?: string;
+  action_tier?: 'act_now' | 'watch_closely' | 'low_priority';
 }
 
 export interface DraftEmailRequest {
@@ -863,8 +896,9 @@ export interface ExplainResponse {
   recommended_action: string;
   risk_drivers: string[];        // kept for backward compat
   risk_driver_summary: string;
-  top_drivers: TopDriver[];      // structured SHAP drivers (preferred)
+  top_drivers: TopDriver[];      // structured SHAP drivers with explanation_text
   confidence_level: string;      // "high" | "medium" | "low"
+  action_tier?: 'act_now' | 'watch_closely' | 'low_priority';
 }
 
 export interface PredictResponse {

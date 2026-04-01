@@ -148,6 +148,28 @@ def train_model(
             "pct_null": round(float(np.sum(~np.isfinite(col))) / len(col), 4),
         }
 
+    # Feature stats split by outcome — retained/churned baselines for explanation text
+    # Requires at least 5 samples in each class per feature to be meaningful.
+    feature_stats_by_outcome: Dict[str, Any] = {}
+    for i, fname in enumerate(feature_names):
+        col = X_train[:, i].astype(float)
+        finite_mask = np.isfinite(col)
+        retained_mask = (y_train == 0) & finite_mask
+        churned_mask = (y_train == 1) & finite_mask
+        r_vals = col[retained_mask]
+        c_vals = col[churned_mask]
+        if len(r_vals) >= 5 and len(c_vals) >= 5:
+            feature_stats_by_outcome[fname] = {
+                "retained_mean": round(float(np.mean(r_vals)), 4),
+                "retained_std": round(float(np.std(r_vals)), 4),
+                "retained_median": round(float(np.median(r_vals)), 4),
+                "churned_mean": round(float(np.mean(c_vals)), 4),
+                "churned_std": round(float(np.std(c_vals)), 4),
+                "churned_median": round(float(np.median(c_vals)), 4),
+                "n_retained": int(len(r_vals)),
+                "n_churned": int(len(c_vals)),
+            }
+
     # Calibrate with Platt scaling (sigmoid) via cross-validation
     print(f"[train] Calibrating with CalibratedClassifierCV (sigmoid, cv={module.calibration.cv_folds})")
     calibrated_model = CalibratedClassifierCV(
@@ -259,6 +281,7 @@ def train_model(
         "val_metrics": val_metrics,
         "feature_importance": importance,
         "feature_stats": feature_stats,
+        "feature_stats_by_outcome": feature_stats_by_outcome,
         "shap_directions": shap_directions,
         "artifact_paths": {
             "model": model_path,

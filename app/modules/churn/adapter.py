@@ -1,7 +1,7 @@
 """Churn vertical adapter — customer churn risk prediction."""
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -145,6 +145,38 @@ def compute_recommended_action(
     if churn_risk_pct >= 40:
         return "CSM check-in + usage review"
     return "Monitor"
+
+
+def compute_action_tier(
+    urgency_score: Optional[float],
+    confidence_level: Optional[str],
+    churn_risk_pct: float,
+) -> str:
+    """Compute action tier: 'act_now' | 'watch_closely' | 'low_priority'.
+
+    Urgency score already encodes both churn probability and renewal timing.
+    Confidence level gates certainty — low confidence shifts down one tier.
+    """
+    if urgency_score is not None:
+        score = urgency_score
+    else:
+        score = churn_risk_pct
+
+    if score >= 65 or churn_risk_pct >= 70:
+        tier = "act_now"
+    elif score >= 35 or churn_risk_pct >= 40:
+        tier = "watch_closely"
+    else:
+        tier = "low_priority"
+
+    # Downgrade one tier when model confidence is low
+    if confidence_level == "low":
+        if tier == "act_now":
+            tier = "watch_closely"
+        elif tier == "watch_closely":
+            tier = "low_priority"
+
+    return tier
 
 
 def compute_account_status(
