@@ -146,7 +146,7 @@ def _build_text(
         lines += ["", "TOP PRIORITY ACCOUNTS (renewing soon + high risk)"]
         for acct in top_priority_accounts:
             name = acct.get("name") or acct.get("account_id") or "—"
-            risk = acct.get("churn_risk_pct", 0)
+            risk = round(float(acct.get("churn_risk_pct") or 0), 1)
             dur = acct.get("days_until_renewal")
             renewal_str = f"{int(dur)}d" if dur is not None else "unknown"
             arr_risk = _fmt_currency_simple(acct.get("arr_at_risk", 0))
@@ -156,7 +156,7 @@ def _build_text(
         lines += ["", "TOP ACCOUNTS REQUIRING ATTENTION"]
         for acct in top_accounts:
             name = acct.get("name") or acct.get("account_id") or "—"
-            risk = acct.get("churn_risk_pct", 0)
+            risk = round(float(acct.get("churn_risk_pct") or 0), 1)
             arr = _fmt_currency_simple(acct.get("arr", 0))
             arr_risk = _fmt_currency_simple(acct.get("arr_at_risk", 0))
             lines.append(f"  {name}: {risk}% risk  |  ARR {arr}  |  At risk {arr_risk}")
@@ -210,7 +210,7 @@ def _build_html(
     acct_rows = ""
     for i, acct in enumerate(top_accounts):
         bg = "#f9fafb" if i % 2 == 1 else "#ffffff"
-        risk_pct = acct.get("churn_risk_pct", 0)
+        risk_pct = round(float(acct.get("churn_risk_pct") or 0), 1)
         risk_color = "#ef4444" if risk_pct >= 30 else "#f59e0b" if risk_pct >= 20 else "#10b981"
         renewal_days = acct.get("days_until_renewal", "—")
         renewal_label = f"{renewal_days}d" if isinstance(renewal_days, (int, float)) else renewal_days
@@ -246,7 +246,7 @@ def _build_html(
     priority_rows = ""
     for i, acct in enumerate(top_priority_accounts or []):
         bg = "#f9fafb" if i % 2 == 1 else "#ffffff"
-        risk_pct = acct.get("churn_risk_pct", 0)
+        risk_pct = round(float(acct.get("churn_risk_pct") or 0), 1)
         dur = acct.get("days_until_renewal")
         renewal_label = f"{int(dur)}d" if dur is not None else "—"
         arr_risk = _fmt_currency(acct.get("arr_at_risk", 0))

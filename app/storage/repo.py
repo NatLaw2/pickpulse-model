@@ -234,7 +234,7 @@ def insert_scores(scores: List[ChurnScore], tenant_id: str = DEFAULT_TENANT) -> 
             "tenant_id": tenant_id,
             "account_id": account_id,
             "score_date": today,
-            "churn_risk_pct": float(score.churn_probability * 100),
+            "churn_risk_pct": round(float(score.churn_probability * 100), 1),
             "urgency": float(score.urgency_score) if score.urgency_score is not None else None,
             "renewal_window": score.renewal_window_label,
             "arr_at_risk": float(score.arr_at_risk) if score.arr_at_risk is not None else None,

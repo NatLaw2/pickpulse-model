@@ -785,6 +785,8 @@ export interface ModelInsights {
   has_shap_directions?: boolean;
   has_outcome_baselines?: boolean;
   shap_available?: boolean;
+  has_base_model?: boolean;
+  has_shap_background?: boolean;
 }
 
 export interface ProductionAccuracy {

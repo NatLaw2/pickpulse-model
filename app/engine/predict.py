@@ -122,6 +122,17 @@ def predict(
     metadata = artifacts.get("metadata", {})
     feature_stats_by_outcome = metadata.get("feature_stats_by_outcome", {})
 
+    if base_model is None:
+        logger.warning(
+            "predict: base_model.joblib not found — SHAP drivers disabled. "
+            "Retrain the model to generate this artifact."
+        )
+    if shap_background is None:
+        logger.warning(
+            "predict: shap_background.npy not found — SHAP drivers disabled. "
+            "Retrain the model to generate this artifact."
+        )
+
     if base_model is not None and shap_background is not None:
         try:
             from app.engine.shap_utils import (

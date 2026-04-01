@@ -155,7 +155,14 @@ def compute_action_tier(
     """Compute action tier: 'act_now' | 'watch_closely' | 'low_priority'.
 
     Urgency score already encodes both churn probability and renewal timing.
-    Confidence level gates certainty — low confidence shifts down one tier.
+    Confidence level can downgrade the tier, but ONLY when urgency is not
+    already elevated — accounts with near-term renewal pressure or high
+    absolute risk should not be deprioritized solely because SHAP failed.
+
+    Confidence downgrade guard:
+      - If urgency_score >= 50 (i.e. meaningful risk with <30d renewal),
+        skip the downgrade — the renewal signal itself is authoritative.
+      - If churn_risk_pct >= 40, same logic — raw risk overrides confidence penalty.
     """
     if urgency_score is not None:
         score = urgency_score
@@ -169,8 +176,14 @@ def compute_action_tier(
     else:
         tier = "low_priority"
 
-    # Downgrade one tier when model confidence is low
-    if confidence_level == "low":
+    # Downgrade only when confidence is low AND urgency doesn't override it.
+    # urgency >= 50 means the renewal window is pressing enough that even
+    # incomplete signal data shouldn't reduce the priority.
+    urgency_overrides = (
+        (urgency_score is not None and urgency_score >= 50)
+        or churn_risk_pct >= 40
+    )
+    if confidence_level == "low" and not urgency_overrides:
         if tier == "act_now":
             tier = "watch_closely"
         elif tier == "watch_closely":

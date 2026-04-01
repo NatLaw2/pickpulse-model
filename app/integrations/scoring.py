@@ -159,6 +159,17 @@ def score_accounts(
     import numpy as _np
     shap_vals_arr = None
     raw_drivers_all: list = []
+    if not os.path.exists(base_model_path):
+        logger.warning(
+            "score_accounts: base_model.joblib not found at %s — SHAP drivers disabled. "
+            "Retrain the model to generate this artifact.", base_model_path
+        )
+    if not os.path.exists(shap_bg_path):
+        logger.warning(
+            "score_accounts: shap_background.npy not found at %s — SHAP drivers disabled. "
+            "Retrain the model to generate this artifact.", shap_bg_path
+        )
+
     if os.path.exists(base_model_path) and os.path.exists(shap_bg_path):
         try:
             base_model = joblib.load(base_model_path)

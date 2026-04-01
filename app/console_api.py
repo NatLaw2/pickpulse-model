@@ -1017,9 +1017,25 @@ def model_insights(tenant_id: str = Depends(get_tenant_id)):
     Raw feature names are never exposed in the response.
     """
     from app.model_insights import load_insights_for_tenant
+    from app.engine.config import get_module as _get_module
+    from app.engine import store as _store
     insights = load_insights_for_tenant(tenant_id)
     if insights is None:
         raise HTTPException(status_code=404, detail="No trained model found for this tenant.")
+    # Augment with artifact availability so the UI can prompt retrain when needed
+    try:
+        _mod = _get_module("churn")
+        _run = _store.get_current_model_run(tenant_id, "churn")
+        _adir = _run.get("artifact_path") if _run else _mod.get_artifact_dir(tenant_id)
+        if _adir:
+            insights["has_base_model"] = os.path.exists(os.path.join(_adir, "base_model.joblib"))
+            insights["has_shap_background"] = os.path.exists(os.path.join(_adir, "shap_background.npy"))
+        else:
+            insights["has_base_model"] = False
+            insights["has_shap_background"] = False
+    except Exception:
+        insights["has_base_model"] = False
+        insights["has_shap_background"] = False
     return insights
 
 
@@ -1287,6 +1303,11 @@ def predict_module(
             display_cols = [c for c in display_cols if c in scored_display.columns]
 
         records = scored_display[display_cols].head(limit).to_dict(orient="records")
+        # Round churn_risk_pct to 1 decimal — pandas float64 → dict preserves
+        # IEEE 754 imprecision (e.g. 15.370000000000001 instead of 15.4)
+        for _r in records:
+            if "churn_risk_pct" in _r and _r["churn_risk_pct"] is not None:
+                _r["churn_risk_pct"] = round(float(_r["churn_risk_pct"]), 1)
         state["predictions"][module_name] = records
         state["predictions_generated_at"] = datetime.now(timezone.utc).isoformat()
         store.save_predictions(tenant_id, module_name, run_id or "", records)
