@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 from datetime import datetime, date, time, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -15,6 +16,30 @@ from pydantic import BaseModel
 from .auth import get_tenant_id
 
 logger = logging.getLogger("pickpulse.explain")
+
+
+# ---------------------------------------------------------------------------
+# Safe numeric helpers — pandas NaN is truthy in Python, so `val or 0`
+# returns NaN rather than 0, and json.dumps(NaN) raises ValueError.
+# These helpers guarantee finite, JSON-serializable output.
+# ---------------------------------------------------------------------------
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    """Return a finite float, falling back to default for None/NaN/inf."""
+    try:
+        v = float(val) if val is not None else default
+        return v if math.isfinite(v) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(val: Any, default: int = 0) -> int:
+    """Return an int, falling back to default for None/NaN/inf."""
+    try:
+        v = float(val) if val is not None else float(default)
+        return int(v) if math.isfinite(v) else default
+    except (TypeError, ValueError):
+        return default
 
 # ---------------------------------------------------------------------------
 # Feature importance cache  (artifact_dir → {feature_name: importance})
@@ -312,10 +337,10 @@ def explain_account(
 
     return ExplainResponse(
         account_id=account_id,
-        churn_risk_pct=round(churn_pct, 1),
-        arr=float(row.get("arr") or 0),
-        arr_at_risk=float(row.get("arr_at_risk") or 0),
-        days_until_renewal=int(row.get("days_until_renewal") or 0),
+        churn_risk_pct=round(_safe_float(row.get("churn_risk_pct")), 1),
+        arr=_safe_float(row.get("arr")),
+        arr_at_risk=_safe_float(row.get("arr_at_risk")),
+        days_until_renewal=_safe_int(row.get("days_until_renewal")),
         renewal_window_label=str(row.get("renewal_window_label") or "unknown"),
         tier=str(row.get("tier") or "Unknown"),
         recommended_action=str(row.get("recommended_action") or "Monitor"),

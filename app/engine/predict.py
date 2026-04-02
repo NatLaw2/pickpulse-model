@@ -135,6 +135,11 @@ def predict(
 
     if base_model is not None and shap_background is not None:
         try:
+            import shap as _shap_pkg
+            logger.info("predict: shap %s — building explainer", getattr(_shap_pkg, "__version__", "unknown"))
+        except ImportError:
+            logger.error("predict: shap package not importable — drivers disabled")
+        try:
             from app.engine.shap_utils import (
                 build_explainer, compute_shap_values, extract_top_drivers,
                 compute_confidence_level, aggregate_portfolio_shap,

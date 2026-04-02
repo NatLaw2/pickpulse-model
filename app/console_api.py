@@ -1289,7 +1289,7 @@ def predict_module(
             mod.id_column, "churn_risk_pct", "urgency_score",
             "renewal_window_label", "days_until_renewal", "auto_renew_flag",
             "arr", "arr_at_risk", "recommended_action", "account_status", "tier", "rank",
-            "top_drivers", "confidence_level",
+            "top_drivers", "confidence_level", "action_tier",
             "hs_object_id",  # included when present; flows into prediction_json for CRM card lookup
         ]
         # Fall back to generic cols if churn-specific ones aren't present

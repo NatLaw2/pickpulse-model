@@ -37,8 +37,8 @@ def build_explainer(base_model: Any, X_background: np.ndarray) -> Any:
         explainer = shap.TreeExplainer(base_model)
         logger.info("shap_utils: TreeExplainer selected")
         return explainer
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("shap_utils: TreeExplainer failed (%s: %s) — trying next", type(exc).__name__, exc)
 
     # --- LinearExplainer: for LogisticRegression wrapped in a Pipeline ---
     try:
@@ -50,8 +50,8 @@ def build_explainer(base_model: Any, X_background: np.ndarray) -> Any:
             explainer = shap.LinearExplainer(lr, X_bg_scaled)
             logger.info("shap_utils: LinearExplainer selected (Pipeline)")
             return explainer
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("shap_utils: LinearExplainer failed (%s: %s) — trying next", type(exc).__name__, exc)
 
     # --- KernelExplainer: model-agnostic fallback (slow) ---
     try:
