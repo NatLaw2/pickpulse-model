@@ -405,6 +405,7 @@ export interface DashboardResponse {
   top_priority_accounts?: ChurnPrediction[];
   tier_counts: Record<string, number>;
   top_risk_drivers: { feature: string; importance: number }[];
+  active_source?: 'dataset' | 'crm';
 }
 
 export interface DashboardModule {

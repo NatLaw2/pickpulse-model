@@ -1311,6 +1311,7 @@ def predict_module(
         state["predictions"][module_name] = records
         state["predictions_generated_at"] = datetime.now(timezone.utc).isoformat()
         store.save_predictions(tenant_id, module_name, run_id or "", records)
+        _set_active_source(tenant_id, "dataset")
 
         # H3: write-back uses the full active scored set (no head() cap).
         # The display subset above is limited to `limit` rows for the UI;
@@ -1360,8 +1361,46 @@ def predict_module(
 # CRM pipeline helpers — power the Accounts page from churn_scores_daily
 # ---------------------------------------------------------------------------
 
+def _source_context_path(tenant_id: str) -> str:
+    """Path to the persisted active-source marker file."""
+    return os.path.join(_tenant_output_dir(tenant_id), ".source_context.json")
+
+
+def _get_active_source(tenant_id: str) -> Optional[str]:
+    """Return 'dataset' | 'crm' | None (file absent = no explicit context set)."""
+    try:
+        p = _source_context_path(tenant_id)
+        if os.path.exists(p):
+            with open(p) as f:
+                return json.load(f).get("active_source")
+    except Exception:
+        pass
+    return None
+
+
+def _set_active_source(tenant_id: str, source: str) -> None:
+    """Persist the active source ('dataset' | 'crm') to disk."""
+    try:
+        os.makedirs(os.path.dirname(_source_context_path(tenant_id)), exist_ok=True)
+        with open(_source_context_path(tenant_id), "w") as f:
+            json.dump({"active_source": source}, f)
+    except Exception as exc:
+        logger.warning("[source_context] Could not persist active_source: %s", exc)
+
+
 def _crm_mode_active(tenant_id: str) -> bool:
-    """True if churn_scores_daily has rows scored within the last 30 days."""
+    """True when the active scoring context is CRM (HubSpot/Stripe).
+
+    Explicit source context (written by predict and CRM scoring endpoints) takes
+    precedence.  Falls back to DB presence check only when no explicit context
+    has been written yet.
+    """
+    explicit = _get_active_source(tenant_id)
+    if explicit == "dataset":
+        return False
+    if explicit == "crm":
+        return True
+    # Legacy fallback: infer from DB presence
     return storage_repo.has_recent_scores(tenant_id, days=30)
 
 
@@ -1875,6 +1914,7 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
         "top_priority_accounts": top_priority_accounts,
         "tier_counts": tier_counts,
         "top_risk_drivers": top_risk_drivers,
+        "active_source": _get_active_source(tenant_id) or "dataset",
     }
 
 
@@ -2478,6 +2518,7 @@ def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
 
     try:
         scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir)
+        _set_active_source(tenant_id, "crm")
         high = sum(1 for s in scores if s.tier == "High Risk")
         med = sum(1 for s in scores if s.tier == "Medium Risk")
         low = sum(1 for s in scores if s.tier == "Low Risk")
@@ -2584,6 +2625,7 @@ def run_demo(connector_name: str, tenant_id: str = Depends(get_tenant_id)):
             auto_seed_if_needed(tenant_id=tenant_id)
         try:
             scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir)
+            _set_active_source(tenant_id, "crm")
             scored = len(scores)
             tier_counts = {
                 "High Risk": sum(1 for s in scores if s.tier == "High Risk"),
