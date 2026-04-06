@@ -10,6 +10,12 @@ function confidenceBg(level: string): string {
   return 'bg-gray-100 text-[var(--color-text-muted)]';
 }
 
+function confidenceLabel(level: string): string {
+  if (level === 'high') return 'High data confidence';
+  if (level === 'medium') return 'Moderate data confidence';
+  return 'Low data confidence';
+}
+
 type Tone = 'friendly' | 'direct' | 'executive';
 
 interface Props {
@@ -246,7 +252,7 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
                 </span>
                 {explainData?.confidence_level && (
                   <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${confidenceBg(explainData.confidence_level)}`}>
-                    {explainData.confidence_level} conf
+                    {confidenceLabel(explainData.confidence_level)}
                   </span>
                 )}
               </div>
@@ -365,10 +371,39 @@ export function AccountDetailDrawer({ customerId, prediction, onClose }: Props) 
               );
             }
 
-            // Honest empty state — no heuristic fallbacks
+            // Contextual fallback — use account facts already in prediction prop.
+            // Clearly labeled as a summary, not model-derived signal analysis.
+            const fallbackBullets: string[] = [];
+            if (prediction.days_until_renewal != null) {
+              fallbackBullets.push(
+                `Renewal ${prediction.days_until_renewal} day${prediction.days_until_renewal === 1 ? '' : 's'} away` +
+                (prediction.renewal_window_label ? ` (${prediction.renewal_window_label} window)` : '')
+              );
+            }
+            if (prediction.arr_at_risk != null && prediction.arr_at_risk > 0) {
+              fallbackBullets.push(
+                `${formatCurrency(prediction.arr_at_risk)} ARR at risk of ${formatCurrency(prediction.arr ?? 0)} total`
+              );
+            }
+            fallbackBullets.push(
+              `Classified as ${prediction.tier ?? 'Unknown'} based on composite model output`
+            );
             return (
-              <div className="px-3 py-3 rounded-xl bg-[var(--color-bg-primary)] text-xs text-[var(--color-text-muted)]">
-                Signal analysis unavailable — run scoring to generate per-account drivers.
+              <div className="space-y-2">
+                <p className="text-[10px] text-[var(--color-text-muted)] leading-relaxed">
+                  Limited signal data available from this source. Risk score reflects composite model output.
+                </p>
+                <div className="space-y-1.5">
+                  {fallbackBullets.map((b, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-2 px-3 py-2 rounded-lg bg-[var(--color-bg-primary)] text-xs text-[var(--color-text-secondary)]"
+                    >
+                      <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--color-text-muted)] flex-shrink-0" />
+                      {b}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })()}

@@ -120,11 +120,20 @@ export function DashboardPage() {
         (d) => featureLabel(d.feature)
       );
 
-      const tierCountLabels: string[] = [];
       const tc = dashData.tier_counts ?? {};
-      if (tc['High Risk']) tierCountLabels.push(`${tc['High Risk']} accounts at High Risk`);
-      if (tc['Medium Risk']) tierCountLabels.push(`${tc['Medium Risk']} accounts at Medium Risk`);
-      const driverSummary = [...riskDriverNames.slice(0, 3), ...tierCountLabels];
+      const driverSummary: string[] = [...riskDriverNames.slice(0, 3)];
+      if (tc['High Risk']) {
+        const n = tc['High Risk'];
+        driverSummary.push(`${n} account${n === 1 ? '' : 's'} classified as High Risk`);
+      }
+      if (tc['Medium Risk']) {
+        const n = tc['Medium Risk'];
+        driverSummary.push(`${n} account${n === 1 ? '' : 's'} at Medium Risk`);
+      }
+      const urgentCount = dashData.kpis?.high_risk_in_window ?? 0;
+      if (urgentCount > 0) {
+        driverSummary.push(`${urgentCount} high-risk account${urgentCount === 1 ? '' : 's'} renewing within 30 days`);
+      }
 
       const priorityAccounts = (dashData.top_priority_accounts ?? []).slice(0, 3).map((p) => ({
         account_id: p.account_id,
@@ -185,7 +194,7 @@ export function DashboardPage() {
               {dataset?.is_demo && (
                 <span
                   className="px-2.5 py-1 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/25 rounded-lg text-[10px] font-bold tracking-widest uppercase text-[var(--color-warning)]"
-                  title="Illustrative metrics generated from a sample dataset. Upload your own data for production-grade insights."
+                  title="Estimated from current model outputs on sample data. Connect your CRM or upload customer data for production-grade insights."
                 >
                   Sample Data
                 </span>
@@ -449,7 +458,7 @@ export function DashboardPage() {
             <div className="bg-white border border-[var(--color-border)] rounded-2xl p-6 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)] card-hover">
               <h3 className="text-sm font-semibold mb-4">Portfolio Risk Drivers</h3>
               <p className="text-xs text-[var(--color-text-secondary)] mb-4">
-                The features most influencing churn predictions across your portfolio
+                Signals with the strongest predictive influence on churn across your portfolio
               </p>
               <div className="space-y-3">
                 {riskDrivers.map((d, i) => {

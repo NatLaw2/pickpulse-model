@@ -162,7 +162,7 @@ def _build_text(
             lines.append(f"  {name}: {risk}% risk  |  ARR {arr}  |  At risk {arr_risk}")
 
     if risk_drivers:
-        lines += ["", "TOP RISK DRIVERS"]
+        lines += ["", "KEY RISK SIGNALS"]
         for d in risk_drivers:
             lines.append(f"  • {d}")
 
@@ -341,12 +341,15 @@ def _build_html(
     drivers_section = ""
     if driver_rows:
         drivers_section = f"""
-        <!-- Risk Drivers -->
+        <!-- Risk Signals -->
         <tr>
           <td style="padding:0 0 24px 0">
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif">
               <tr>
-                <td style="padding:0 0 10px 0;font-size:15px;font-weight:700;color:#1a1d26;font-family:Arial,sans-serif">Top Risk Drivers</td>
+                <td style="padding:0 0 4px 0;font-size:15px;font-weight:700;color:#1a1d26;font-family:Arial,sans-serif">Key Risk Signals</td>
+              </tr>
+              <tr>
+                <td style="padding:0 0 10px 0;font-size:11px;color:#6b7280;font-family:Arial,sans-serif">Based on model feature importance and portfolio distribution</td>
               </tr>
               <tr>
                 <td>
