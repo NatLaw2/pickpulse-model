@@ -28,13 +28,13 @@ _OAUTH_PROVIDERS: Dict[str, Dict[str, Any]] = {
         #   crm.objects.companies.write    — write churn scores back to company records
         #   crm.schemas.companies.read     — read property definitions for schema discovery
         #   crm.schemas.companies.write    — auto-provision PickPulse custom properties
-        #
-        # Temporarily removed (not yet enabled in HubSpot app — add back after OAuth is confirmed):
         #   crm.objects.deals.read         — deal pipeline/stage analysis
+        #
+        # Temporarily removed (not yet enabled in HubSpot app — add back after deals is confirmed):
         #   crm.objects.tasks.write        — create tasks for high-risk accounts
         #   crm.objects.contacts.read      — contact count via associations
         #   crm.objects.tickets.read       — ticket count via associations
-        "scopes": "oauth crm.objects.companies.read crm.objects.companies.write crm.schemas.companies.read crm.schemas.companies.write",
+        "scopes": "oauth crm.objects.companies.read crm.objects.companies.write crm.schemas.companies.read crm.schemas.companies.write crm.objects.deals.read",
         "client_id_env": "HUBSPOT_CLIENT_ID",
         "client_secret_env": "HUBSPOT_CLIENT_SECRET",
     },
