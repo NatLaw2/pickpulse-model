@@ -1,0 +1,38 @@
+{
+  "uid": "pickpulse_test_1_app",
+  "type": "app",
+  "config": {
+    "description": "An example to demonstrate how to build a private oauth app with developer projects.",
+    "name": "pickpulse-test-1-App",
+    "distribution": "private",
+    "auth": {
+      "type": "oauth",
+      "redirectUrls": [
+        "https://pickpulse-churn-api.onrender.com/api/integrations/hubspot/oauth/callback"
+      ],
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.companies.read",
+        "crm.objects.companies.write",
+        "crm.schemas.companies.read",
+        "crm.schemas.companies.write",
+        "crm.objects.deals.read"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [
+        "https://api.hubapi.com"
+      ],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "support@example.com",
+      "documentationUrl": "https://example.com/docs",
+      "supportUrl": "https://example.com/support",
+      "supportPhone": "+18005555555"
+    }
+  }
+}
