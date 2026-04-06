@@ -21,19 +21,20 @@ _OAUTH_PROVIDERS: Dict[str, Dict[str, Any]] = {
     "hubspot": {
         "authorize_url": "https://app.hubspot.com/oauth/authorize",
         "token_url": "https://api.hubapi.com/oauth/v1/token",
-        # Scopes required by the PickPulse HubSpot app:
+        # Scopes must exactly match HubSpot OAuth app configuration or install will fail.
+        # Current enabled scopes (developers.hubspot.com → App → Auth → Scopes):
         #   oauth                          — base OAuth scope (always required)
         #   crm.objects.companies.read     — pull companies
         #   crm.objects.companies.write    — write churn scores back to company records
         #   crm.schemas.companies.read     — read property definitions for schema discovery
         #   crm.schemas.companies.write    — auto-provision PickPulse custom properties
+        #
+        # Temporarily removed (not yet enabled in HubSpot app — add back after OAuth is confirmed):
         #   crm.objects.deals.read         — deal pipeline/stage analysis
         #   crm.objects.tasks.write        — create tasks for high-risk accounts
-        #
-        # Not requested (optional signals, avoid extra scope surface):
-        #   crm.objects.contacts.read      — dropped; only used for association count
-        #   crm.objects.tickets.read       — dropped; only used for association count
-        "scopes": "oauth crm.objects.companies.read crm.objects.companies.write crm.schemas.companies.read crm.schemas.companies.write crm.objects.deals.read crm.objects.tasks.write",
+        #   crm.objects.contacts.read      — contact count via associations
+        #   crm.objects.tickets.read       — ticket count via associations
+        "scopes": "oauth crm.objects.companies.read crm.objects.companies.write crm.schemas.companies.read crm.schemas.companies.write",
         "client_id_env": "HUBSPOT_CLIENT_ID",
         "client_secret_env": "HUBSPOT_CLIENT_SECRET",
     },
