@@ -5,6 +5,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import time
@@ -12,6 +13,8 @@ from typing import Any, Dict, Optional, Tuple
 from urllib.parse import quote, urlencode
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Provider OAuth configs (loaded from templates at import time)
@@ -170,6 +173,18 @@ def generate_auth_url(
     # Note: HubSpot does NOT accept response_type — it always uses
     # authorization code flow implicitly.
     auth_url = f"{cfg['authorize_url']}?{urlencode(params, quote_via=quote)}"
+
+    # DIAGNOSTIC: log exact scope string so Render logs confirm what is being sent.
+    # If HubSpot returns "scope mismatch", compare this log line against the
+    # scopes enabled in the deployed HubSpot app (developers.hubspot.com → App → Auth).
+    # The deployed app config lives in pickpulse-test-1/src/app/app-hsmeta.json
+    # and must be pushed with: hs project upload (from the pickpulse-test-1/ directory).
+    logger.info(
+        "[oauth] generating auth URL for %s — requesting scopes: [%s]",
+        provider,
+        cfg["scopes"],
+    )
+
     return auth_url, state
 
 
