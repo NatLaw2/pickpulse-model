@@ -187,55 +187,92 @@ export function DashboardPage() {
   // Empty state: no predictions generated yet this session
   if (!predictions) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
-        <div className="max-w-xl w-full text-center">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--color-accent)]/10 flex items-center justify-center mx-auto mb-6">
-            <Shield size={24} className="text-[var(--color-accent)]" />
+      <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 relative overflow-hidden">
+        {/* Background glow */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-[var(--color-accent)]/6 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative max-w-2xl w-full text-center">
+          {/* Wordmark / badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 mb-8">
+            <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)]" />
+            <span className="text-xs font-semibold text-[var(--color-accent)] tracking-wide uppercase">PickPulse Intelligence</span>
           </div>
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-3">
-            Identify revenue at risk in your portfolio
+
+          <h1 className="text-3xl sm:text-4xl font-bold text-[var(--color-text-primary)] mb-4 leading-tight">
+            Identify at-risk accounts.<br />
+            <span className="text-[var(--color-accent)]">Protect your revenue.</span>
           </h1>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-8 leading-relaxed">
-            Connect your CRM or explore sample data to generate your first predictions in minutes.
+          <p className="text-base text-[var(--color-text-secondary)] mb-10 leading-relaxed max-w-lg mx-auto">
+            Surface churn signals, prioritize renewals, and quantify ARR at risk — from your CRM or your own data.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {/* Workflow indicator */}
+          <div className="flex items-center justify-center gap-2 mb-10 text-xs text-[var(--color-text-muted)]">
+            <span className="px-2.5 py-1 rounded-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] font-medium">Connect Data</span>
+            <ChevronRight size={12} className="opacity-40" />
+            <span className="px-2.5 py-1 rounded-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] font-medium">Score Accounts</span>
+            <ChevronRight size={12} className="opacity-40" />
+            <span className="px-2.5 py-1 rounded-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] font-medium">Protect Revenue</span>
+          </div>
+
+          {/* Action cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Primary: Connect HubSpot */}
             <button
               onClick={() => navigate('/data-sources?tab=integrations')}
-              className="flex flex-col items-start gap-3 p-5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-glow)] text-white rounded-2xl transition-colors text-left shadow-sm"
+              className="group flex flex-col items-start gap-4 p-6 rounded-2xl text-left transition-all duration-200 border border-[#FF7A59]/30 bg-gradient-to-br from-[#FF7A59]/10 to-[#FF7A59]/5 hover:from-[#FF7A59]/18 hover:to-[#FF7A59]/10 hover:border-[#FF7A59]/50 hover:shadow-lg hover:shadow-[#FF7A59]/10"
             >
-              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
-                <TrendingUp size={16} className="text-white" />
+              {/* HubSpot sprocket-style icon */}
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#FF7A59' }}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="10" cy="10" r="3.5" fill="white" />
+                  <circle cx="10" cy="3" r="1.5" fill="white" />
+                  <circle cx="10" cy="17" r="1.5" fill="white" />
+                  <circle cx="3" cy="10" r="1.5" fill="white" />
+                  <circle cx="17" cy="10" r="1.5" fill="white" />
+                  <circle cx="5.05" cy="5.05" r="1.5" fill="white" />
+                  <circle cx="14.95" cy="14.95" r="1.5" fill="white" />
+                  <circle cx="14.95" cy="5.05" r="1.5" fill="white" />
+                  <circle cx="5.05" cy="14.95" r="1.5" fill="white" />
+                </svg>
               </div>
-              <div>
-                <div className="font-semibold text-sm mb-1">Connect HubSpot</div>
-                <div className="text-xs text-white/75 leading-relaxed">
-                  Sync your accounts and generate risk insights from live CRM data.
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="font-semibold text-sm text-[var(--color-text-primary)]">Connect HubSpot</span>
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: '#FF7A59', color: 'white' }}>CRM</span>
                 </div>
+                <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                  Sync your accounts and generate live churn risk scores directly from your CRM data.
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#FF7A59' }}>
+                <span>Connect now</span>
+                <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
               </div>
             </button>
 
-            {/* Secondary: Try Sample Dataset */}
+            {/* Secondary: Upload Your Data */}
             <button
               onClick={() => navigate('/data-sources')}
-              className="flex flex-col items-start gap-3 p-5 bg-white border border-[var(--color-border)] hover:bg-[var(--color-bg-primary)] rounded-2xl transition-colors text-left shadow-sm"
+              className="group flex flex-col items-start gap-4 p-6 rounded-2xl text-left transition-all duration-200 border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:bg-[var(--color-bg-primary)] hover:border-[var(--color-accent)]/30 hover:shadow-lg hover:shadow-[var(--color-accent)]/5"
             >
-              <div className="w-8 h-8 rounded-lg bg-[var(--color-accent)]/10 flex items-center justify-center flex-shrink-0">
-                <FileText size={16} className="text-[var(--color-accent)]" />
+              <div className="w-10 h-10 rounded-xl bg-[var(--color-accent)]/10 flex items-center justify-center flex-shrink-0">
+                <FileText size={18} className="text-[var(--color-accent)]" />
               </div>
-              <div>
-                <div className="font-semibold text-sm mb-1 text-[var(--color-text-primary)]">Try Sample Dataset</div>
+              <div className="flex-1">
+                <div className="font-semibold text-sm text-[var(--color-text-primary)] mb-1.5">Upload Your Data</div>
                 <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
-                  Explore PickPulse with a preloaded sample dataset.
+                  Bring your own CSV or explore a sample dataset to see predictions in minutes.
                 </div>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-medium text-[var(--color-accent)]">
+                <span>Get started</span>
+                <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
               </div>
             </button>
           </div>
-
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Most teams get to their first results in just a few minutes.
-          </p>
         </div>
       </div>
     );
