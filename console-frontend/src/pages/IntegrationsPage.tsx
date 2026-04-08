@@ -514,11 +514,11 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
         </div>
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Accounts Synced</div>
-          <div className="text-xl font-bold text-[var(--color-text-primary)]">{totalAccounts.toLocaleString()}</div>
+          <div className="text-xl font-bold text-[var(--color-text-primary)]">{(enabledCount > 0 ? totalAccounts : 0).toLocaleString()}</div>
         </div>
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Scored</div>
-          <div className="text-xl font-bold text-[var(--color-text-primary)]">{scores.length.toLocaleString()}</div>
+          <div className="text-xl font-bold text-[var(--color-text-primary)]">{(enabledCount > 0 ? scores.length : 0).toLocaleString()}</div>
         </div>
       </div>
 
@@ -542,8 +542,8 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
         </div>
       )}
 
-      {/* Scoring pipeline */}
-      {(enabledCount > 0 || totalAccounts > 0) && (
+      {/* Scoring pipeline — only shown when an integration is actually connected */}
+      {enabledCount > 0 && (
         <div className="mb-6 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
             <Zap size={14} className="text-[var(--color-accent)]" /> Scoring Pipeline
@@ -571,8 +571,8 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
         </div>
       )}
 
-      {/* Accounts table */}
-      {accounts.length > 0 && (
+      {/* Accounts table — only shown when an integration is actually connected */}
+      {enabledCount > 0 && accounts.length > 0 && (
         <div className="mb-6 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
             <Users size={14} className="text-[var(--color-accent)]" /> Synced Accounts
