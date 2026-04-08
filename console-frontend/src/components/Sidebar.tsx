@@ -107,18 +107,6 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Dataset indicator */}
-      {dataset && (
-        <div className="mx-3 mt-2 px-3 py-2 bg-[rgba(255,255,255,0.06)] rounded-xl">
-          <div className="text-[10px] text-[var(--color-sidebar-text-muted)] uppercase tracking-wider">Dataset</div>
-          <div className="text-xs text-[var(--color-sidebar-text)] truncate mt-0.5" title={dataset.name}>
-            {dataset.name}
-          </div>
-          <div className="text-[10px] text-[var(--color-sidebar-text-muted)] mt-0.5">
-            {(dataset.rows ?? 0).toLocaleString()} rows
-          </div>
-        </div>
-      )}
 
       <nav className="flex-1 py-3 px-2 overflow-y-auto">
         <div className="space-y-0.5">
