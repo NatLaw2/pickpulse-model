@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DatasetsPage } from './DatasetsPage';
 import { IntegrationsPage } from './IntegrationsPage';
 
@@ -10,7 +11,9 @@ const TABS = [
 type Tab = typeof TABS[number]['key'];
 
 export function DataSourcesPage() {
-  const [tab, setTab] = useState<Tab>('datasets');
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'integrations' ? 'integrations' : 'datasets';
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
     <div>

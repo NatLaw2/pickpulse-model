@@ -184,6 +184,63 @@ export function DashboardPage() {
       ?? null
     : null;
 
+  // Empty state: no predictions generated yet this session
+  if (!predictions) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
+        <div className="max-w-xl w-full text-center">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--color-accent)]/10 flex items-center justify-center mx-auto mb-6">
+            <Shield size={24} className="text-[var(--color-accent)]" />
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-3">
+            Identify revenue at risk in your portfolio
+          </h1>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-8 leading-relaxed">
+            Connect your CRM or explore sample data to generate your first predictions in minutes.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            {/* Primary: Connect HubSpot */}
+            <button
+              onClick={() => navigate('/data-sources?tab=integrations')}
+              className="flex flex-col items-start gap-3 p-5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-glow)] text-white rounded-2xl transition-colors text-left shadow-sm"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+                <TrendingUp size={16} className="text-white" />
+              </div>
+              <div>
+                <div className="font-semibold text-sm mb-1">Connect HubSpot</div>
+                <div className="text-xs text-white/75 leading-relaxed">
+                  Sync your accounts and generate risk insights from live CRM data.
+                </div>
+              </div>
+            </button>
+
+            {/* Secondary: Try Sample Dataset */}
+            <button
+              onClick={() => navigate('/data-sources')}
+              className="flex flex-col items-start gap-3 p-5 bg-white border border-[var(--color-border)] hover:bg-[var(--color-bg-primary)] rounded-2xl transition-colors text-left shadow-sm"
+            >
+              <div className="w-8 h-8 rounded-lg bg-[var(--color-accent)]/10 flex items-center justify-center flex-shrink-0">
+                <FileText size={16} className="text-[var(--color-accent)]" />
+              </div>
+              <div>
+                <div className="font-semibold text-sm mb-1 text-[var(--color-text-primary)]">Try Sample Dataset</div>
+                <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                  Explore PickPulse with a preloaded sample dataset.
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Most teams get to their first results in just a few minutes.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-8">
