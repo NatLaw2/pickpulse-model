@@ -10,7 +10,7 @@ import { IntegrationWizard } from '../components/IntegrationWizard';
 import {
   Plug, RefreshCw, Play, Key, CheckCircle2, XCircle,
   AlertTriangle, Loader2, Users, Zap, ArrowRight, ExternalLink,
-  Unplug, Clock, Shield, Activity,
+  Unplug, Activity,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,14 @@ function timeAgo(iso: string | null): string {
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
 }
+
+// ---------------------------------------------------------------------------
+// Provider visibility config
+// ---------------------------------------------------------------------------
+
+// Providers hidden from the UI until they are demo-ready.
+// Data is still fetched normally — this is a render-only filter.
+const HIDDEN_PROVIDERS = new Set(['custom', 'custom_crm']);
 
 // ---------------------------------------------------------------------------
 // Provider card
@@ -55,7 +63,6 @@ function ProviderCard({
   onDisconnect: (name: string) => void;
   syncing: boolean;
 }) {
-  const isComingSoon = provider.template_status === 'coming_soon';
   const isConnected = health?.connected || (provider.enabled && provider.status !== 'not_configured');
 
   const statusColor: Record<string, string> = {
@@ -84,14 +91,35 @@ function ProviderCard({
     .sort()
     .reverse()[0] ?? null;
 
+  const isHubSpot = provider.provider === 'hubspot';
+
   return (
     <div className={`
-      bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-5
-      ${isComingSoon ? 'opacity-50' : 'hover:border-[var(--color-accent)]/30'} transition-all
+      rounded-2xl p-5 transition-all duration-200
+      ${isHubSpot
+        ? 'border border-[#FF7A59]/30 bg-gradient-to-br from-[#FF7A59]/8 to-[#FF7A59]/4 hover:border-[#FF7A59]/50 hover:shadow-md hover:shadow-[#FF7A59]/8'
+        : 'bg-[var(--color-bg-secondary)] border border-[var(--color-border)] hover:border-[var(--color-accent)]/30'
+      }
     `}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Plug size={16} className="text-[var(--color-accent)]" />
+          {isHubSpot ? (
+            <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: '#FF7A59' }}>
+              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="10" cy="10" r="3.5" fill="white" />
+                <circle cx="10" cy="3" r="1.5" fill="white" />
+                <circle cx="10" cy="17" r="1.5" fill="white" />
+                <circle cx="3" cy="10" r="1.5" fill="white" />
+                <circle cx="17" cy="10" r="1.5" fill="white" />
+                <circle cx="5.05" cy="5.05" r="1.5" fill="white" />
+                <circle cx="14.95" cy="14.95" r="1.5" fill="white" />
+                <circle cx="14.95" cy="5.05" r="1.5" fill="white" />
+                <circle cx="5.05" cy="14.95" r="1.5" fill="white" />
+              </svg>
+            </div>
+          ) : (
+            <Plug size={16} className="text-[var(--color-accent)]" />
+          )}
           <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
             {provider.display_name}
           </h3>
@@ -125,14 +153,11 @@ function ProviderCard({
       )}
 
       <div className="flex gap-2 flex-wrap">
-        {isComingSoon ? (
-          <span className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium rounded-lg bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]">
-            <Clock size={10} /> Coming Soon
-          </span>
-        ) : !isConnected ? (
+        {!isConnected ? (
           <button
             onClick={() => onSetup(provider)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-white hover:opacity-90"
+            style={{ background: isHubSpot ? '#FF7A59' : 'var(--color-accent)' }}
           >
             {provider.auth_method === 'oauth' ? <ExternalLink size={12} /> : <Key size={12} />}
             Connect{provider.auth_method === 'oauth' ? ` ${provider.display_name}` : ''}
@@ -424,15 +449,10 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
   const totalAccounts = accounts.length;
   const enabledCount = connectedProviders.length;
 
-  // Group by category
-  const categories = ['CRM', 'Billing', 'Support', 'Analytics', 'Import'];
-  const grouped = categories.map((cat) => ({
-    category: cat,
-    providers: providers.filter((p) => p.category === cat),
-  })).filter((g) => g.providers.length > 0);
-
-  const groupedProviders = new Set(grouped.flatMap((g) => g.providers.map((p) => p.provider)));
-  const ungrouped = providers.filter((p) => !groupedProviders.has(p.provider));
+  // Render-only filter: hide coming-soon and not-yet-ready providers
+  const visibleProviders = providers.filter(
+    (p) => p.template_status !== 'coming_soon' && !HIDDEN_PROVIDERS.has(p.provider)
+  );
 
   if (loading) {
     return (
@@ -486,13 +506,11 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
         </div>
       )}
 
-      {/* Summary strip */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      {/* Summary strip — 3 meaningful metrics only */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Connected</div>
-          <div className="text-xl font-bold text-[var(--color-text-primary)]">
-            {enabledCount}<span className="text-[var(--color-text-muted)] text-sm font-normal">/{providers.length}</span>
-          </div>
+          <div className="text-xl font-bold text-[var(--color-text-primary)]">{enabledCount}</div>
         </div>
         <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Accounts Synced</div>
@@ -502,41 +520,14 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">Scored</div>
           <div className="text-xl font-bold text-[var(--color-text-primary)]">{scores.length.toLocaleString()}</div>
         </div>
-        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-2xl p-4">
-          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
-            <Shield size={10} /> Encryption
-          </div>
-          <div className="text-xs font-medium text-[var(--color-success)] mt-1">AES-256-GCM</div>
-        </div>
       </div>
 
-      {/* Provider cards by category */}
-      {grouped.map((group) => (
-        <div key={group.category} className="mb-6">
-          <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
-            {group.category}
-          </h2>
+      {/* Provider cards — flat grid, no category grouping */}
+      {visibleProviders.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-[var(--color-text-secondary)] mb-3">Connect your data</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {group.providers.map((p) => (
-              <ProviderCard
-                key={p.provider}
-                provider={p}
-                health={healthMap[p.provider] || null}
-                onSetup={handleConnectOAuth}
-                onSync={handleSync}
-                onDisconnect={handleDisconnect}
-                syncing={syncing === p.provider}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {ungrouped.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">Other</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {ungrouped.map((p) => (
+            {visibleProviders.map((p) => (
               <ProviderCard
                 key={p.provider}
                 provider={p}
