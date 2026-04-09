@@ -6,10 +6,10 @@ import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
 import { useExecutiveSummary } from '../lib/ExecutiveSummaryContext';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
-import { riskColor, riskLabel } from '../lib/risk';
+import { riskLabel } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
 
-type SortKey = 'account_id' | 'churn_risk_pct' | 'urgency_score' | 'renewal_window_label' | 'days_until_renewal' | 'arr' | 'arr_at_risk';
+type SortKey = 'account_id' | 'churn_risk_pct' | 'renewal_window_label' | 'arr' | 'arr_at_risk';
 type SortDir = 'asc' | 'desc';
 
 export function PredictPage() {
@@ -160,6 +160,14 @@ export function PredictPage() {
   // Selected row data
   const selectedRow = selectedId ? (result?.predictions ?? []).find((p) => p.account_id === selectedId) : null;
 
+  // Tier color for Risk column — matches Overview page
+  const tierColor = (tier: string | undefined): string => {
+    if (!tier) return 'var(--color-text-muted)';
+    if (tier.includes('High')) return 'var(--color-danger)';
+    if (tier.includes('Medium')) return 'var(--color-warning)';
+    return 'var(--color-success)';
+  };
+
   return (
     <div className="relative">
       <div className="mb-8">
@@ -284,9 +292,9 @@ export function PredictPage() {
               className="px-3 py-2 bg-white border border-[var(--color-border)] rounded-xl text-sm"
             >
               <option value="all">All Risk</option>
-              <option value="high">High (70%+)</option>
-              <option value="med">Medium (40-69%)</option>
-              <option value="low">Low (&lt;40%)</option>
+              <option value="high">High Risk</option>
+              <option value="med">Medium Risk</option>
+              <option value="low">Low Risk</option>
             </select>
             <select
               value={windowFilter}
@@ -321,26 +329,18 @@ export function PredictPage() {
                       <th className="py-3 px-4 font-medium cursor-pointer group select-none" onClick={() => handleSort('account_id')}>
                         Account <SortIcon col="account_id" />
                       </th>
-                      <th className="py-3 px-4 font-medium text-right cursor-pointer group select-none" onClick={() => handleSort('churn_risk_pct')}>
-                        Churn Risk <SortIcon col="churn_risk_pct" />
-                      </th>
-                      <th className="py-3 px-4 font-medium text-right cursor-pointer group select-none" onClick={() => handleSort('urgency_score')} title="Composite score combining churn probability and proximity to renewal date.">
-                        Urgency <SortIcon col="urgency_score" />
+                      <th className="py-3 px-4 font-medium cursor-pointer group select-none" onClick={() => handleSort('churn_risk_pct')}>
+                        Risk <SortIcon col="churn_risk_pct" />
                       </th>
                       <th className="py-3 px-4 font-medium cursor-pointer group select-none" onClick={() => handleSort('renewal_window_label')}>
                         Renewal <SortIcon col="renewal_window_label" />
                       </th>
-                      <th className="py-3 px-4 font-medium text-right cursor-pointer group select-none" onClick={() => handleSort('days_until_renewal')}>
-                        Days <SortIcon col="days_until_renewal" />
-                      </th>
-                      <th className="py-3 px-4 font-medium text-center">Auto</th>
                       <th className="py-3 px-4 font-medium text-right cursor-pointer group select-none" onClick={() => handleSort('arr')}>
                         ARR <SortIcon col="arr" />
                       </th>
                       <th className="py-3 px-4 font-medium text-right cursor-pointer group select-none" onClick={() => handleSort('arr_at_risk')} title="Annual recurring revenue weighted by churn probability.">
                         ARR at Risk <SortIcon col="arr_at_risk" />
                       </th>
-                      <th className="py-3 px-4 font-medium">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -356,40 +356,27 @@ export function PredictPage() {
                           <span>{row.name || row.account_id}</span>
                           {row.domain && <span className="block text-[var(--color-text-muted)] font-normal">{row.domain}</span>}
                         </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-3 px-4">
                           <span
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
-                            style={{ background: `${riskColor(row.churn_risk_pct)}18`, color: riskColor(row.churn_risk_pct) }}
+                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold"
+                            style={{ background: `${tierColor(row.tier)}18`, color: tierColor(row.tier) }}
                           >
-                            {riskLabel(row.churn_risk_pct)} {row.churn_risk_pct}%
+                            {row.tier ?? riskLabel(row.churn_risk_pct)}
                           </span>
-                          {row.confidence_level && (
-                            <span className={`block text-[9px] font-medium mt-0.5 text-right ${
-                              row.confidence_level === 'high' ? 'text-green-600' :
-                              row.confidence_level === 'medium' ? 'text-amber-600' :
-                              'text-[var(--color-text-muted)]'
-                            }`}>
-                              {row.confidence_level} conf
-                            </span>
-                          )}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono text-xs">{row.urgency_score}</td>
                         <td className="py-3 px-4">
                           <span className={`text-xs px-2 py-0.5 rounded-lg ${
                             row.renewal_window_label === '<30d' ? 'bg-red-50 text-[var(--color-danger)]' :
                             row.renewal_window_label === '30-90d' ? 'bg-amber-50 text-[var(--color-warning)]' :
                             'bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)]'
                           }`}>
-                            {row.renewal_window_label}
+                            {row.renewal_window_label ?? '—'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right font-mono text-xs">{row.days_until_renewal}</td>
-                        <td className="py-3 px-4 text-center text-xs">{row.auto_renew_flag ? 'Yes' : 'No'}</td>
                         <td className="py-3 px-4 text-right font-mono text-xs">{formatCurrency(row.arr)}</td>
-                        <td className="py-3 px-4 text-right font-mono text-xs font-bold" style={{ color: riskColor(row.churn_risk_pct) }}>
+                        <td className="py-3 px-4 text-right font-mono text-xs font-bold" style={{ color: tierColor(row.tier) }}>
                           {formatCurrency(row.arr_at_risk)}
                         </td>
-                        <td className="py-3 px-4 text-xs text-[var(--color-text-secondary)] max-w-56 truncate">{row.recommended_action}</td>
                       </tr>
                     ))}
                   </tbody>
