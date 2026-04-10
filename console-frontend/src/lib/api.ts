@@ -282,7 +282,10 @@ export const api = {
       `/integrations/accounts?limit=${limit}${source ? `&source=${source}` : ''}`,
     ),
 
-  triggerScoring: () => request<ScoringResponse>('/integrations/score', { method: 'POST' }),
+  triggerScoring: (source?: string) => request<ScoringResponse>(
+    `/integrations/score${source ? `?source=${source}` : ''}`,
+    { method: 'POST' },
+  ),
   latestScores: (limit = 200) => request<LatestScoresResponse>(`/integrations/scores/latest?limit=${limit}`),
 
   // Run demo: sync + score a connector in one call

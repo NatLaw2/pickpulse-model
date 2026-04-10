@@ -25,9 +25,16 @@ from app.storage import repo
 logger = logging.getLogger(__name__)
 
 
-def _build_scoring_dataframe(tenant_id: str = repo.DEFAULT_TENANT) -> pd.DataFrame:
-    """Merge accounts + latest signals into a flat DataFrame ready for scoring."""
-    accounts = repo.list_accounts(limit=50000, tenant_id=tenant_id)
+def _build_scoring_dataframe(
+    tenant_id: str = repo.DEFAULT_TENANT,
+    source: Optional[str] = None,
+) -> pd.DataFrame:
+    """Merge accounts + latest signals into a flat DataFrame ready for scoring.
+
+    source: if provided, restricts scoring to accounts from that CRM provider
+    (e.g. "hubspot", "salesforce") so providers are never mixed in a single run.
+    """
+    accounts = repo.list_accounts(source=source, limit=50000, tenant_id=tenant_id)
     if not accounts:
         return pd.DataFrame()
 
@@ -97,11 +104,15 @@ def _enrich_drivers_with_baselines(
 def score_accounts(
     tenant_id: str = repo.DEFAULT_TENANT,
     artifact_dir: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> List[ChurnScore]:
-    """Score all stored accounts using the trained churn model.
+    """Score stored accounts using the trained churn model.
 
     artifact_dir should be the versioned run path from store.get_current_model_run().
     If not provided, falls back to the flat per-tenant path (legacy).
+
+    source: if provided, restricts scoring to accounts from that CRM provider
+    so HubSpot and Salesforce accounts are never scored together in one run.
 
     Returns a list of ChurnScore objects (also persisted to DB).
     """
@@ -118,7 +129,7 @@ def score_accounts(
             f"No trained model found at {model_path}. Train the model first."
         )
 
-    df = _build_scoring_dataframe(tenant_id=tenant_id)
+    df = _build_scoring_dataframe(tenant_id=tenant_id, source=source)
     if df.empty:
         logger.info("No accounts to score")
         return []

@@ -427,7 +427,13 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
     setScoring(true);
     setError(null);
     try {
-      const result = await api.triggerScoring();
+      // Determine the single active provider so scoring is scoped to it.
+      // Uses the same isConnected condition as the ProviderCard and loadData.
+      const connected = providers.filter(
+        (p) => healthMap[p.provider]?.connected || (p.enabled && p.status !== 'not_configured')
+      );
+      const activeProvider = connected.length === 1 ? connected[0].provider : undefined;
+      const result = await api.triggerScoring(activeProvider);
       showToast(`Scored ${result.accounts_scored} accounts — ${formatCurrency(result.total_arr_at_risk)} ARR at risk`);
       await loadData();
       setHasScored(true);

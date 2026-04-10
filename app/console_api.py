@@ -1378,14 +1378,42 @@ def _get_active_source(tenant_id: str) -> Optional[str]:
     return None
 
 
-def _set_active_source(tenant_id: str, source: str) -> None:
-    """Persist the active source ('dataset' | 'crm') to disk."""
+def _set_active_source(
+    tenant_id: str,
+    source: str,
+    crm_provider: Optional[str] = None,
+) -> None:
+    """Persist the active source ('dataset' | 'crm') to disk.
+
+    crm_provider: when source=='crm', the specific provider that is active
+    (e.g. 'hubspot', 'salesforce').  Stored so downstream endpoints can scope
+    queries to that provider without re-querying the integrations table.
+    """
     try:
         os.makedirs(os.path.dirname(_source_context_path(tenant_id)), exist_ok=True)
+        payload: Dict[str, Any] = {"active_source": source}
+        if crm_provider:
+            payload["crm_provider"] = crm_provider
         with open(_source_context_path(tenant_id), "w") as f:
-            json.dump({"active_source": source}, f)
+            json.dump(payload, f)
     except Exception as exc:
         logger.warning("[source_context] Could not persist active_source: %s", exc)
+
+
+def _get_crm_provider(tenant_id: str) -> Optional[str]:
+    """Return the CRM provider name stored in the active-source context file.
+
+    Returns None when in dataset mode or when the file predates provider tracking.
+    In both cases callers should apply no source filter (show all / legacy behaviour).
+    """
+    try:
+        p = _source_context_path(tenant_id)
+        if os.path.exists(p):
+            with open(p) as f:
+                return json.load(f).get("crm_provider")
+    except Exception:
+        pass
+    return None
 
 
 def _crm_mode_active(tenant_id: str) -> bool:
@@ -1408,16 +1436,20 @@ def _build_crm_predict_response(
     tenant_id: str,
     limit: int = 500,
     include_archived: bool = False,
+    source: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build a PredictResponse-shaped dict from churn_scores_daily + accounts + signals.
 
     Replaces the predictions_live path when the integrations pipeline has
     recent scores (CRM mode). Returns the same shape as predict_module so
     the frontend requires zero changes.
+
+    source: if provided (e.g. "salesforce"), restricts scores to that provider
+    so HubSpot and Salesforce data are never mixed in the response.
     """
     from .modules.churn.adapter import compute_renewal_window_label
 
-    scores = storage_repo.latest_scores(limit=10000, tenant_id=tenant_id)
+    scores = storage_repo.latest_scores(limit=10000, tenant_id=tenant_id, source=source)
     signals_by_account = storage_repo.bulk_latest_signals(tenant_id)
     account_statuses = _get_state(tenant_id).get("account_statuses", {})
 
@@ -1515,7 +1547,7 @@ def get_cached_predictions(
     Demo/CSV mode: falls back to the existing predictions_live path.
     """
     if module_name == MODULE_NAME and _crm_mode_active(tenant_id):
-        return _build_crm_predict_response(tenant_id)
+        return _build_crm_predict_response(tenant_id, source=_get_crm_provider(tenant_id))
 
     state = _get_state(tenant_id)
     records = state["predictions"].get(module_name, [])
@@ -1569,7 +1601,9 @@ def export_predictions(module_name: str, tenant_id: str = Depends(get_tenant_id)
 
     # CRM mode: build CSV in-memory from live scores (no static file exists)
     if module_name == MODULE_NAME and _crm_mode_active(tenant_id):
-        crm_data = _build_crm_predict_response(tenant_id, limit=100_000)
+        crm_data = _build_crm_predict_response(
+            tenant_id, limit=100_000, source=_get_crm_provider(tenant_id)
+        )
         predictions = crm_data.get("predictions", [])
         if not predictions:
             raise HTTPException(status_code=404, detail="No scored predictions. Run Rescore All first.")
@@ -1820,7 +1854,9 @@ def dashboard_summary(save_rate: float = Query(0.35, ge=0.05, le=0.95), tenant_i
     # CRM mode: source predictions from churn_scores_daily instead of
     # the in-memory CSV pipeline state.
     if _crm_mode_active(tenant_id):
-        crm_response = _build_crm_predict_response(tenant_id, limit=10000)
+        crm_response = _build_crm_predict_response(
+            tenant_id, limit=10000, source=_get_crm_provider(tenant_id)
+        )
         predictions = crm_response.get("predictions", [])
     else:
         predictions = state["predictions"].get("churn", [])
@@ -2493,8 +2529,17 @@ def list_integration_accounts(
 
 
 @app.post("/api/integrations/score")
-def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
-    """Score all integrated accounts using the trained churn model."""
+def trigger_live_scoring(
+    source: Optional[str] = Query(None),
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Score integrated accounts using the trained churn model.
+
+    source: optional CRM provider name (e.g. "salesforce", "hubspot").
+    When provided, only that provider's accounts are scored and the active-source
+    context is updated to reflect the provider.  When omitted, all accounts are
+    scored (legacy behaviour — retained for backward compatibility).
+    """
     mod = get_module("churn")
     current_run = store.get_current_model_run(tenant_id, "churn")
     if current_run and current_run.get("artifact_path"):
@@ -2517,8 +2562,8 @@ def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
         auto_seed_if_needed(tenant_id=tenant_id)
 
     try:
-        scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir)
-        _set_active_source(tenant_id, "crm")
+        scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir, source=source)
+        _set_active_source(tenant_id, "crm", crm_provider=source)
         high = sum(1 for s in scores if s.tier == "High Risk")
         med = sum(1 for s in scores if s.tier == "Medium Risk")
         low = sum(1 for s in scores if s.tier == "Low Risk")
@@ -2582,9 +2627,18 @@ def trigger_live_scoring(tenant_id: str = Depends(get_tenant_id)):
 
 
 @app.get("/api/integrations/scores/latest")
-def get_latest_scores(limit: int = Query(200), tenant_id: str = Depends(get_tenant_id)):
-    """Get the most recent churn scores for all accounts."""
-    scores = storage_repo.latest_scores(limit=limit, tenant_id=tenant_id)
+def get_latest_scores(
+    limit: int = Query(200),
+    source: Optional[str] = Query(None),
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Get the most recent churn scores for accounts.
+
+    source: explicit provider filter.  When omitted, auto-detects from the
+    active-source context so scores always reflect the currently active integration.
+    """
+    effective_source = source or _get_crm_provider(tenant_id)
+    scores = storage_repo.latest_scores(limit=limit, tenant_id=tenant_id, source=effective_source)
     return {"scores": scores, "count": len(scores)}
 
 

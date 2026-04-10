@@ -256,10 +256,24 @@ def insert_scores(scores: List[ChurnScore], tenant_id: str = DEFAULT_TENANT) -> 
     return len(res.data) if res.data else 0
 
 
-def latest_scores(limit: int = 200, tenant_id: str = DEFAULT_TENANT) -> List[Dict[str, Any]]:
-    """Get the most recent score per account, joined with account info."""
+def latest_scores(
+    limit: int = 200,
+    tenant_id: str = DEFAULT_TENANT,
+    source: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Get the most recent score per account, joined with account info.
+
+    source: if provided, restricts results to accounts from that CRM provider
+    (e.g. "hubspot", "salesforce"). Filtering is done in Python after the join
+    because PostgREST filtering on related table columns is not reliably
+    supported via the Python client.
+    """
     try:
         sb = get_client()
+
+        # Over-fetch when a source filter is applied so the Python-side filter
+        # doesn't silently truncate results from the desired provider.
+        db_limit = 10000 if source else limit
 
         # Get latest scores ordered by risk
         res = (
@@ -268,7 +282,7 @@ def latest_scores(limit: int = 200, tenant_id: str = DEFAULT_TENANT) -> List[Dic
             .eq("tenant_id", tenant_id)
             .order("score_date", desc=True)
             .order("churn_risk_pct", desc=True)
-            .limit(limit)
+            .limit(db_limit)
             .execute()
         )
 
@@ -285,6 +299,10 @@ def latest_scores(limit: int = 200, tenant_id: str = DEFAULT_TENANT) -> List[Dic
                 continue  # only latest per account
             seen_accounts.add(aid)
 
+            acct_source = acct.get("source")
+            if source and acct_source != source:
+                continue  # skip accounts from other providers
+
             meta = acct.get("metadata") or {}
             results.append({
                 **row,
@@ -292,7 +310,7 @@ def latest_scores(limit: int = 200, tenant_id: str = DEFAULT_TENANT) -> List[Dic
                 "email": acct.get("domain"),
                 "plan": meta.get("plan"),
                 "arr": acct.get("arr"),
-                "source": acct.get("source"),
+                "source": acct_source,
                 "external_id": acct.get("external_id"),
                 # Map fields for frontend compatibility
                 "churn_probability": row.get("churn_risk_pct", 0) / 100.0,
@@ -300,7 +318,7 @@ def latest_scores(limit: int = 200, tenant_id: str = DEFAULT_TENANT) -> List[Dic
                 "urgency_score": row.get("urgency"),
             })
 
-        return results
+        return results[:limit]
     except Exception as exc:
         logger.warning("latest_scores: table unavailable (%s) — returning empty list", exc)
         return []
