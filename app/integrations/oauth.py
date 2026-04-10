@@ -47,6 +47,8 @@ _OAUTH_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "scopes": "api refresh_token",
         "client_id_env": "SALESFORCE_CLIENT_ID",
         "client_secret_env": "SALESFORCE_CLIENT_SECRET",
+        # Salesforce requires response_type=code explicitly; HubSpot does not accept it.
+        "response_type": "code",
     },
     "intercom": {
         "authorize_url": "https://app.intercom.com/oauth",
@@ -168,21 +170,27 @@ def generate_auth_url(
         "state": state,
     }
 
+    # Some providers (e.g. Salesforce) require response_type=code explicitly.
+    # HubSpot does NOT accept this parameter, so it is omitted unless the
+    # provider config sets "response_type".
+    if cfg.get("response_type"):
+        params["response_type"] = cfg["response_type"]
+
     # Build query string: use quote (not quote_plus) so spaces in scope
-    # are encoded as %20 (required by HubSpot), not +.
-    # Note: HubSpot does NOT accept response_type — it always uses
-    # authorization code flow implicitly.
+    # are encoded as %20, not +.
     auth_url = f"{cfg['authorize_url']}?{urlencode(params, quote_via=quote)}"
 
-    # DIAGNOSTIC: log exact scope string so Render logs confirm what is being sent.
-    # If HubSpot returns "scope mismatch", compare this log line against the
-    # scopes enabled in the deployed HubSpot app (developers.hubspot.com → App → Auth).
-    # The deployed app config lives in pickpulse-test-1/src/app/app-hsmeta.json
-    # and must be pushed with: hs project upload (from the pickpulse-test-1/ directory).
+    # DIAGNOSTIC: log non-secret URL parameters so Render logs confirm what is sent.
+    # Do NOT log client_id in full or state token.
     logger.info(
-        "[oauth] generating auth URL for %s — requesting scopes: [%s]",
+        "[oauth] auth URL generated — provider=%s authorize_base=%s "
+        "redirect_uri=%s scope=[%s] response_type=%s client_id_present=%s",
         provider,
+        cfg["authorize_url"],
+        callback_url,
         cfg["scopes"],
+        params.get("response_type", "<not set>"),
+        bool(client_id),
     )
 
     return auth_url, state
