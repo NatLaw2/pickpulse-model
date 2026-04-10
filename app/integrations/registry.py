@@ -73,11 +73,19 @@ def get_connector_for_integration(integration_id: str) -> Optional[BaseConnector
         return None
 
     # Build config with token
+    extra: dict = {"access_token": token} if integration["auth_method"] == "oauth" else {}
+
+    # Load instance_url for providers that return one during OAuth (e.g. Salesforce)
+    if integration["auth_method"] == "oauth":
+        instance_url = get_decrypted_token(integration_id, "instance_url")
+        if instance_url:
+            extra["instance_url"] = instance_url
+
     config = ConnectorConfig(
         name=provider,
         display_name=integration["display_name"],
         api_key=token if integration["auth_method"] == "api_key" else None,
-        extra={"access_token": token} if integration["auth_method"] == "oauth" else {},
+        extra=extra,
         enabled=True,
     )
 

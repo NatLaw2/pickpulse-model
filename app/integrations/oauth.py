@@ -222,6 +222,8 @@ def exchange_code(
         "access_token": body["access_token"],
         "refresh_token": body.get("refresh_token"),
         "expires_in": body.get("expires_in"),
+        # Salesforce-specific: org-scoped API base URL returned in token response
+        "instance_url": body.get("instance_url"),
     }
 
 

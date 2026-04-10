@@ -248,6 +248,20 @@ def complete_oauth(
             on_conflict="integration_id,token_type",
         ).execute()
 
+    # Store instance_url if provided (Salesforce returns org-specific API base URL)
+    if tokens.get("instance_url"):
+        iu_ct, iu_iv = encrypt_token(tokens["instance_url"])
+        sb.table("integration_tokens").upsert(
+            {
+                "integration_id": integration_id,
+                "token_type": "instance_url",
+                "encrypted_value": iu_ct,
+                "iv": iu_iv,
+                "expires_at": None,
+            },
+            on_conflict="integration_id,token_type",
+        ).execute()
+
     # Seed default field mappings
     _seed_default_mappings(integration_id, provider)
 
