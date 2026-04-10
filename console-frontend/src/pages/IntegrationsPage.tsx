@@ -309,11 +309,8 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
 
   const loadData = useCallback(async () => {
     try {
-      const [intRes, acctRes, scoresRes] = await Promise.all([
-        api.integrations().catch(() => ({ providers: [], connectors: [] })),
-        api.integrationAccounts().catch(() => ({ accounts: [], total: 0, showing: 0 })),
-        api.latestScores().catch(() => ({ scores: [], count: 0 })),
-      ]);
+      // Fetch providers first so we can scope accounts to the active provider(s).
+      const intRes = await api.integrations().catch(() => ({ providers: [], connectors: [] }));
 
       // Handle both new platform and legacy responses
       let providerList: ProviderInfo[] = [];
@@ -336,22 +333,39 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
         }));
       }
       setProviders(providerList);
-      setAccounts(acctRes.accounts ?? []);
-      setScores(scoresRes.scores ?? []);
 
-      // Fetch health for connected providers
-      const connected = providerList.filter(
+      // Fetch health first — must happen before accounts so we can filter by truly connected providers.
+      // provider.enabled alone is unreliable (HubSpot may retain enabled:true after disconnect).
+      // Health is the authoritative signal for whether a provider is actually active.
+      const candidateProviders = providerList.filter(
         (p) => p.enabled || p.status === 'healthy' || p.status === 'connected'
       );
       const healthResults: Record<string, HealthResponse> = {};
       await Promise.all(
-        connected.map(async (p) => {
+        candidateProviders.map(async (p) => {
           try {
             healthResults[p.provider] = await api.integrationHealth(p.provider);
           } catch { /* ignore */ }
         })
       );
       setHealthMap(healthResults);
+
+      // Determine truly connected providers using the same logic as ProviderCard.isConnected:
+      //   health?.connected  OR  (provider.enabled AND status !== 'not_configured')
+      // This matches what the cards show, so the account table stays in sync with the UI.
+      const trulyConnected = providerList.filter(
+        (p) => healthResults[p.provider]?.connected || (p.enabled && p.status !== 'not_configured')
+      );
+      // If exactly one provider is active, scope accounts to it. Otherwise show all (multi-connected).
+      const sourceFilter = trulyConnected.length === 1 ? trulyConnected[0].provider : undefined;
+
+      const [acctRes, scoresRes] = await Promise.all([
+        api.integrationAccounts(sourceFilter).catch(() => ({ accounts: [], total: 0, showing: 0 })),
+        api.latestScores().catch(() => ({ scores: [], count: 0 })),
+      ]);
+
+      setAccounts(acctRes.accounts ?? []);
+      setScores(scoresRes.scores ?? []);
     } catch (e: any) {
       setError(e.message);
     } finally {
