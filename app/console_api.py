@@ -268,6 +268,60 @@ async def whoami(tenant_id: str = Depends(get_tenant_id)):
 
 
 # -----------------------------------------------------------------------
+# Active mode — authoritative workflow selection (salesforce / hubspot / csv / none)
+# -----------------------------------------------------------------------
+
+_VALID_MODES = frozenset({"salesforce", "hubspot", "csv", "none"})
+
+
+@app.get("/api/mode")
+def get_mode(tenant_id: str = Depends(get_tenant_id)):
+    """Return the current active workflow mode for this tenant.
+
+    Maps the raw active_source value to one of the four canonical mode names:
+      salesforce | hubspot | csv | none
+
+    'none' is returned whenever the source is absent, invalid, or the generic
+    'crm' string (which carries no provider information and cannot be used for
+    filtered queries).
+    """
+    source = _get_active_source(tenant_id)
+    if source in ("salesforce", "hubspot"):
+        mode = source
+    elif source in ("csv", "dataset"):
+        mode = "csv"
+    else:
+        mode = "none"
+    return {"mode": mode}
+
+
+@app.post("/api/mode")
+def set_mode(body: Dict[str, Any], tenant_id: str = Depends(get_tenant_id)):
+    """Set the active workflow mode.
+
+    Valid values: 'salesforce', 'hubspot', 'csv', 'none'.
+    Setting 'none' removes the context file entirely so a fresh page load
+    returns the user to the welcome / source-selection experience.
+    """
+    mode = body.get("mode")
+    if mode not in _VALID_MODES:
+        raise HTTPException(status_code=422, detail=f"Invalid mode '{mode}'. Must be one of: {sorted(_VALID_MODES)}")
+
+    if mode == "none":
+        # Clear the context file so the next mode-check returns 'none'
+        try:
+            p = _source_context_path(tenant_id)
+            if os.path.exists(p):
+                os.remove(p)
+        except Exception as exc:
+            logger.warning("[set_mode] could not remove context file: %s", exc)
+    else:
+        _set_active_source(tenant_id, mode)
+
+    return {"mode": mode}
+
+
+# -----------------------------------------------------------------------
 # Demo Reset
 # -----------------------------------------------------------------------
 @app.post("/api/demo/reset")
@@ -1316,7 +1370,7 @@ def predict_module(
         # If CRM is active, the context must stay on the CRM provider — dataset
         # predictions running in the background must not silently overwrite it.
         if not _crm_mode_active(tenant_id):
-            _set_active_source(tenant_id, "dataset")
+            _set_active_source(tenant_id, "csv")
 
         # H3: write-back uses the full active scored set (no head() cap).
         # The display subset above is limited to `limit` rows for the UI;
@@ -1562,13 +1616,20 @@ def get_cached_predictions(
 ):
     """Return cached predictions without re-scoring.
 
-    CRM mode: when churn_scores_daily has recent rows for this tenant,
-    builds the response from the integrations pipeline (churn_scores_daily
-    + accounts + account_signals_daily) so the Accounts page shows real
-    CRM accounts instead of demo dataset predictions.
+    Returns 404 when no active mode has been set — this is the primary
+    guard against pre-populating the UI from stale DB rows or old scores
+    when the user has not yet selected a workflow source.
 
-    Demo/CSV mode: falls back to the existing predictions_live path.
+    CRM mode (salesforce / hubspot): builds the response from
+    churn_scores_daily filtered to the active provider.
+
+    CSV mode: reads from the predictions_live table (in-memory state).
     """
+    # Gate: no active mode = no predictions served, ever.
+    active_source = _get_active_source(tenant_id)
+    if active_source is None or active_source == "crm":
+        raise HTTPException(status_code=404, detail="No active workflow mode. Select a data source first.")
+
     if module_name == MODULE_NAME and _crm_mode_active(tenant_id):
         return _build_crm_predict_response(tenant_id, source=_get_crm_provider(tenant_id))
 

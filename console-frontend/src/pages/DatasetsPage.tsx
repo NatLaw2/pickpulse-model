@@ -1,36 +1,9 @@
 import { useCallback, useState } from 'react';
-import { Upload, Database, Briefcase, AlertTriangle, Building2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, Database, AlertCircle } from 'lucide-react';
 import { api, type StagedUploadResponse, type ReadinessReport, type UploadResponse } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 import { MappingReviewStep } from '../components/MappingReviewStep';
 import { ReadinessReportCard } from '../components/ReadinessReportCard';
-
-const DEMO_VARIANTS = [
-  {
-    key: 'balanced',
-    label: 'Balanced Demo',
-    description: 'Realistic mixed SaaS portfolio',
-    accounts: '~2,000 accounts',
-    icon: Briefcase,
-    accent: 'var(--color-accent)',
-  },
-  {
-    key: 'high_risk',
-    label: 'High-Risk Demo',
-    description: 'Curated urgent churn scenarios',
-    accounts: '~1,000 accounts',
-    icon: AlertTriangle,
-    accent: 'var(--color-danger)',
-  },
-  {
-    key: 'enterprise',
-    label: 'Enterprise Demo',
-    description: 'Large portfolio, higher ARR exposure',
-    accounts: '~4,000 accounts',
-    icon: Building2,
-    accent: 'var(--color-success)',
-  },
-] as const;
 
 // Upload flow step
 type Step = 'idle' | 'mapping' | 'confirmed';
@@ -39,37 +12,15 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [step, setStep] = useState<Step>('idle');
-  const [showSampleData, setShowSampleData] = useState(false);
 
   // Upload state
   const [staged, setStaged] = useState<StagedUploadResponse | null>(null);
   const [readiness, setReadiness] = useState<ReadinessReport | null>(null);
 
-  // Sample data state (old ValidationInfo format)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [sampleResult, setSampleResult] = useState<UploadResponse | null>(null);
 
   const { dataset, refresh } = useDataset();
-
-  // ---------------------------------------------------------------------------
-  // Sample data load (unchanged flow)
-  // ---------------------------------------------------------------------------
-  const loadSample = useCallback(async (variant: string) => {
-    setLoading(variant);
-    setError('');
-    setSampleResult(null);
-    setStep('idle');
-    setStaged(null);
-    setReadiness(null);
-    try {
-      const res = await api.loadSample(variant);
-      setSampleResult(res);
-      refresh();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(null);
-    }
-  }, [refresh]);
 
   // ---------------------------------------------------------------------------
   // Stage 1: Upload CSV → get mapping suggestion
@@ -115,8 +66,6 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
-  const v = sampleResult?.validation;
-
   return (
     <div>
       {!embedded && (
@@ -227,43 +176,6 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
             </p>
           </div>
 
-          {/* Sample data — secondary, collapsed by default */}
-          <div className="mb-6">
-            <button
-              onClick={() => setShowSampleData((v) => !v)}
-              className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
-            >
-              {showSampleData ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              Use sample data instead
-            </button>
-
-            {showSampleData && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                {DEMO_VARIANTS.map((variant) => {
-                  const Icon = variant.icon;
-                  const isLoading = loading === variant.key;
-                  return (
-                    <div
-                      key={variant.key}
-                      className="bg-white border border-[var(--color-border)] rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-                    >
-                      <Icon size={24} style={{ color: variant.accent }} className="mb-3" />
-                      <h3 className="font-semibold text-sm mb-1">{variant.label}</h3>
-                      <p className="text-[10px] text-[var(--color-text-muted)] mb-1">{variant.accounts}</p>
-                      <p className="text-xs text-[var(--color-text-secondary)] mb-4">{variant.description}</p>
-                      <button
-                        onClick={() => loadSample(variant.key)}
-                        disabled={loading !== null}
-                        className="px-4 py-2 bg-[var(--color-accent)] text-white rounded-xl text-xs font-medium hover:bg-[var(--color-accent-glow)] transition-colors disabled:opacity-50"
-                      >
-                        {isLoading ? 'Loading...' : 'Load'}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </>
       )}
 
@@ -272,30 +184,6 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
           <AlertCircle size={18} className="text-[var(--color-danger)] mt-0.5 shrink-0" />
           <p className="text-sm text-[var(--color-danger)]">{error}</p>
-        </div>
-      )}
-
-      {/* Sample data validation result (old flow) */}
-      {v && step === 'idle' && (
-        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
-          <div className="flex items-center gap-2 mb-2">
-            {v.valid
-              ? <span className="text-xs font-semibold text-[var(--color-success)]">Sample data loaded</span>
-              : <span className="text-xs font-semibold text-[var(--color-warning)]">Loaded with warnings</span>
-            }
-            <span className="text-xs text-[var(--color-text-muted)] ml-auto">
-              {v.n_rows.toLocaleString()} rows · {v.n_columns} columns
-            </span>
-          </div>
-          {v.warnings.length > 0 && (
-            <ul className="space-y-1 mt-1">
-              {v.warnings.map((w, i) => (
-                <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
-                  <span className="shrink-0 mt-0.5">•</span>{w}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
     </div>

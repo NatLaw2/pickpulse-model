@@ -348,6 +348,16 @@ export const api = {
       body: JSON.stringify({ recipients }),
     }),
 
+  // Active mode — authoritative source of truth for the current workflow
+  getMode: () =>
+    request<{ mode: string }>('/mode'),
+
+  setMode: (mode: string) =>
+    request<{ mode: string }>('/mode', {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
+    }),
+
   // Demo reset
   resetDemo: () =>
     request<DemoResetResponse>('/demo/reset', { method: 'POST' }),

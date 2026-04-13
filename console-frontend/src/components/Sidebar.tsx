@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Database, Brain,
+  LayoutDashboard, Brain,
   Crosshair, Code2, FileText, ShieldAlert, LogOut,
   RotateCcw, Loader2, FlaskConical,
 } from 'lucide-react';
@@ -10,31 +10,40 @@ import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
 import { useAuth } from '../lib/AuthContext';
 import { useExecutiveSummary } from '../lib/ExecutiveSummaryContext';
+import { useActiveMode, type ActiveMode } from '../lib/ActiveModeContext';
 
+// Primary navigation — never includes Data Sources (accessed via Welcome page)
 const mainLinks = [
   { to: '/', icon: LayoutDashboard, label: 'Overview' },
   { to: '/predict', icon: Crosshair, label: 'Accounts' },
   { to: '/reports', icon: FileText, label: 'Reports' },
 ];
 
+// Configuration links — model management and API docs
 const configLinks = [
-  { to: '/data-sources', icon: Database, label: 'Data Sources' },
   { to: '/model', icon: Brain, label: 'Model' },
   { to: '/api-docs', icon: Code2, label: 'API' },
 ];
+
+const MODE_LABELS: Record<Exclude<ActiveMode, 'none'>, string> = {
+  salesforce: 'Salesforce',
+  hubspot: 'HubSpot',
+  csv: 'CSV Upload',
+};
 
 export function Sidebar() {
   const { dataset, refresh } = useDataset();
   const { clearPredictions } = usePredictions();
   const { user, signOut } = useAuth();
   const { clearSummary } = useExecutiveSummary();
+  const { mode, setMode } = useActiveMode();
   const navigate = useNavigate();
 
   const [resetting, setResetting] = useState(false);
   const [resetToast, setResetToast] = useState(false);
 
   const handleReset = async () => {
-    if (!window.confirm('Reset demo to a clean state? This removes all data, models, and predictions.')) return;
+    if (!window.confirm('Reset to a clean state? This removes all data, models, predictions, and the active workflow mode.')) return;
 
     setResetting(true);
     try {
@@ -42,9 +51,11 @@ export function Sidebar() {
       clearPredictions();
       clearSummary();
       refresh();
+      // Clear the active mode — returns the app to the welcome page
+      await setMode('none');
       setResetToast(true);
       setTimeout(() => setResetToast(false), 3000);
-      navigate('/data-sources');
+      navigate('/');
     } catch (err: any) {
       console.error('[reset] failed:', err);
       alert(err?.message || 'Reset failed');
@@ -70,16 +81,16 @@ export function Sidebar() {
         </p>
       </div>
 
-      {/* Demo environment banner + reset button */}
+      {/* Active mode indicator + reset */}
       <div className="mx-3 mt-3 px-3 py-1.5 bg-[var(--color-accent)]/8 border border-[var(--color-accent)]/20 rounded-lg flex items-center justify-between">
         <span className="text-[9px] font-semibold tracking-widest uppercase text-[var(--color-accent)]">
-          Demo Environment
+          {mode !== 'none' ? MODE_LABELS[mode] : 'No Source'}
         </span>
         <button
           onClick={handleReset}
           disabled={resetting}
           className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium text-[var(--color-sidebar-text-muted)] hover:text-white transition-colors disabled:opacity-50"
-          title="Reset demo to clean state"
+          title="Reset to clean state and return to source selection"
         >
           {resetting ? <Loader2 size={10} className="animate-spin" /> : <RotateCcw size={10} />}
           Reset
@@ -90,23 +101,22 @@ export function Sidebar() {
       {resetToast && (
         <div className="mx-3 mt-2 px-3 py-2 bg-[var(--color-success)]/15 border border-[var(--color-success)]/25 rounded-lg text-center">
           <span className="text-[10px] font-medium text-[var(--color-success)]">
-            Demo reset. Ready to load fresh data.
+            Reset complete. Select a data source to begin.
           </span>
         </div>
       )}
 
-      {/* Sample data badge */}
+      {/* Sample data badge (CSV demo data) */}
       {dataset?.is_demo && (
         <div
           className="mx-3 mt-2 px-3 py-2 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/25 rounded-xl text-center"
-          title="Illustrative metrics generated from a sample dataset. Upload your own data for production-grade insights."
+          title="Illustrative metrics from a sample dataset."
         >
           <span className="text-[10px] font-bold tracking-widest uppercase text-[var(--color-warning)]">
             Sample Data
           </span>
         </div>
       )}
-
 
       <nav className="flex-1 py-3 px-2 overflow-y-auto">
         <div className="space-y-0.5">
@@ -154,6 +164,7 @@ export function Sidebar() {
           ))}
         </div>
       </nav>
+
       {/* Labs — visually separated from production nav */}
       <div className="px-2 pb-2">
         <div className="border-t border-[rgba(255,255,255,0.08)] pt-3 mt-1">
