@@ -70,7 +70,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
         }
       } catch { /* no cached predictions on backend — fall through to sessionStorage */ }
 
-      // sessionStorage fallback: used when backend has nothing (no model run yet)
+      // sessionStorage fallback: only for CSV/dataset mode predictions (never CRM)
       try {
         const stored = sessionStorage.getItem(STORAGE_KEY);
         if (stored) {
@@ -78,11 +78,14 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
           // Support both new keyed format { data, dataset_loaded_at } and legacy bare PredictResponse
           const cachedData: PredictResponse = parsed.data ?? parsed;
           const cachedDatasetAt: string | null = parsed.dataset_loaded_at ?? null;
-          // If both tokens are non-null and don't match, discard — stale from prior dataset
-          const currentDatasetAt = dataset?.loaded_at ?? null;
-          if (cachedDatasetAt !== null && currentDatasetAt !== null && cachedDatasetAt !== currentDatasetAt) {
+          // Never restore CRM predictions from sessionStorage — backend is authoritative for CRM context
+          if (cachedData.crm_mode) {
             try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-          } else if (cachedData.predictions?.length) {
+          } else if (cachedDatasetAt !== null && dataset?.loaded_at !== null && cachedDatasetAt !== dataset?.loaded_at) {
+            // Dataset token mismatch — stale from prior dataset
+            try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+          } else if (cachedData.predictions?.length && dataset?.loaded_at) {
+            // Only restore if there is an active dataset to match against
             setPredictionsState(cachedData);
             return;
           }

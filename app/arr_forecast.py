@@ -139,6 +139,7 @@ def compute_arr_forecast(
     tenant_id: str,
     horizon_days: int = 90,
     expansion_rate: float = 0.0,
+    source: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Compute the ARR trajectory forecast for a tenant.
 
@@ -147,6 +148,9 @@ def compute_arr_forecast(
         horizon_days:   Look-ahead window in days (default 90).
         expansion_rate: Fractional uplift applied to low-risk renewing accounts
                         (churn_prob < 0.30). Default 0.0 (no expansion assumed).
+        source:         Optional CRM provider filter ("hubspot", "salesforce").
+                        When supplied, only accounts and scores from that source
+                        are included — prevents cross-provider mixing.
 
     Returns a dict ready for JSON serialization. See module docstring for
     field definitions and assumptions.
@@ -159,7 +163,7 @@ def compute_arr_forecast(
     # ------------------------------------------------------------------
     # 1. current_arr — all active accounts with non-null arr
     # ------------------------------------------------------------------
-    all_accounts = list_accounts(limit=5000, tenant_id=tenant_id)
+    all_accounts = list_accounts(limit=5000, tenant_id=tenant_id, source=source)
     current_arr: float = sum(
         float(a["arr"])
         for a in all_accounts
@@ -172,7 +176,7 @@ def compute_arr_forecast(
     # ------------------------------------------------------------------
     # 2. Scored accounts — churn_probability + arr per account
     # ------------------------------------------------------------------
-    scores = latest_scores(limit=5000, tenant_id=tenant_id)
+    scores = latest_scores(limit=5000, tenant_id=tenant_id, source=source)
 
     # Most recent score date across all scored accounts (for the assumptions note).
     scored_as_of: Optional[str] = None

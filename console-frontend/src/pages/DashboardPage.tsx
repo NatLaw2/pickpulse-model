@@ -44,7 +44,7 @@ export function DashboardPage() {
   const [modelInsights, setModelInsights] = useState<ModelInsights | null>(null);
   const navigate = useNavigate();
   const { dataset } = useDataset();
-  const { predictions } = usePredictions();
+  const { predictions, loadCached } = usePredictions();
 
   // Drawer state
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -57,6 +57,12 @@ export function DashboardPage() {
 
   const fetchDashboard = useCallback((rate: number) => {
     api.dashboard(rate).then(setData).catch(console.error);
+  }, []);
+
+  // Restore predictions from backend/sessionStorage on mount (same as PredictPage)
+  useEffect(() => {
+    loadCached();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Only fetch dashboard data if predictions have been explicitly set this session.
@@ -81,14 +87,15 @@ export function DashboardPage() {
     api.modelInsights().then(setModelInsights).catch(() => {});
   }, []);
 
-  // Fetch ARR forecast on load and whenever expansion rate changes
+  // Fetch ARR forecast only when predictions are loaded (prevents pre-population)
   useEffect(() => {
+    if (!predictions) return;
     setForecastLoading(true);
     api.arrForecast(90, expansionRate)
       .then(setArrForecast)
       .catch(() => {})
       .finally(() => setForecastLoading(false));
-  }, [expansionRate]);
+  }, [expansionRate, predictions]);
 
   // Auto-generate executive summary when dashboard data loads with predictions
   useEffect(() => {

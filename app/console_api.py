@@ -1003,6 +1003,7 @@ def arr_forecast(
         tenant_id=tenant_id,
         horizon_days=horizon_days,
         expansion_rate=expansion_rate,
+        source=_get_crm_provider(tenant_id) if _crm_mode_active(tenant_id) else None,
     )
 
 
@@ -1423,17 +1424,14 @@ def _get_crm_provider(tenant_id: str) -> Optional[str]:
 def _crm_mode_active(tenant_id: str) -> bool:
     """True when the active scoring context is CRM (HubSpot/Stripe).
 
-    Explicit source context (written by predict and CRM scoring endpoints) takes
-    precedence.  Falls back to DB presence check only when no explicit context
-    has been written yet.
+    Requires an explicit source context written by predict or CRM scoring
+    endpoints.  Without an explicit context file, mode is undefined — returns
+    False to avoid pre-populating UI from stale DB rows.
     """
     explicit = _get_active_source(tenant_id)
-    if explicit == "dataset":
-        return False
     if explicit == "crm":
         return True
-    # Legacy fallback: infer from DB presence
-    return storage_repo.has_recent_scores(tenant_id, days=30)
+    return False
 
 
 def _build_crm_predict_response(
