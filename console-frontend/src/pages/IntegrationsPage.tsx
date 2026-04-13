@@ -427,12 +427,14 @@ export function IntegrationsPage({ embedded }: { embedded?: boolean } = {}) {
     setScoring(true);
     setError(null);
     try {
-      // Determine the single active provider so scoring is scoped to it.
-      // Uses the same isConnected condition as the ProviderCard and loadData.
+      // Determine the active provider to scope scoring.
+      // Always pick the first connected provider — passing undefined would cause
+      // the backend to score all providers and record no specific source,
+      // which is the primary source of cross-provider account mixing.
       const connected = providers.filter(
         (p) => healthMap[p.provider]?.connected || (p.enabled && p.status !== 'not_configured')
       );
-      const activeProvider = connected.length === 1 ? connected[0].provider : undefined;
+      const activeProvider = connected[0]?.provider;
       const result = await api.triggerScoring(activeProvider);
       showToast(`Scored ${result.accounts_scored} accounts — ${formatCurrency(result.total_arr_at_risk)} ARR at risk`);
       await loadData();

@@ -1388,50 +1388,71 @@ def _set_active_source(
     source: str,
     crm_provider: Optional[str] = None,
 ) -> None:
-    """Persist the active source ('dataset' | 'crm') to disk.
+    """Persist the active source to disk.
 
-    crm_provider: when source=='crm', the specific provider that is active
-    (e.g. 'hubspot', 'salesforce').  Stored so downstream endpoints can scope
-    queries to that provider without re-querying the integrations table.
+    The stored value is always the specific, queryable source name:
+      - 'csv' / 'dataset' for CSV/dataset mode
+      - the exact CRM provider name (e.g. 'hubspot', 'salesforce') for CRM mode
+
+    The generic string 'crm' is intentionally NOT stored because it carries no
+    provider information and causes unfiltered cross-provider queries downstream.
+    When crm_provider is supplied it is used as the effective stored value so
+    callers using the old (source='crm', crm_provider='hubspot') convention
+    continue to work correctly.
     """
     try:
         os.makedirs(os.path.dirname(_source_context_path(tenant_id)), exist_ok=True)
-        payload: Dict[str, Any] = {"active_source": source}
-        if crm_provider:
-            payload["crm_provider"] = crm_provider
+        # Always store the most specific value available.
+        effective = crm_provider if crm_provider else source
         with open(_source_context_path(tenant_id), "w") as f:
-            json.dump(payload, f)
+            json.dump({"active_source": effective}, f)
     except Exception as exc:
         logger.warning("[source_context] Could not persist active_source: %s", exc)
 
 
 def _get_crm_provider(tenant_id: str) -> Optional[str]:
-    """Return the CRM provider name stored in the active-source context file.
+    """Return the specific CRM provider name when in CRM mode, else None.
 
-    Returns None when in dataset mode or when the file predates provider tracking.
-    In both cases callers should apply no source filter (show all / legacy behaviour).
+    With the new context format the active_source field IS the provider name
+    (e.g. 'hubspot', 'salesforce').  For legacy context files that still use
+    the generic 'crm' active_source, falls back to the separate crm_provider
+    field if present.  Returns None for dataset/csv mode or when the provider
+    cannot be determined (callers must then apply no source filter).
     """
     try:
         p = _source_context_path(tenant_id)
         if os.path.exists(p):
             with open(p) as f:
-                return json.load(f).get("crm_provider")
+                data = json.load(f)
+            s = data.get("active_source")
+            # New format: active_source holds the specific provider name directly.
+            if s and s not in ("csv", "dataset", "crm"):
+                return s
+            # Legacy format: active_source='crm' with a separate crm_provider field.
+            if s == "crm":
+                return data.get("crm_provider")  # may still be None for very old files
     except Exception:
         pass
     return None
 
 
 def _crm_mode_active(tenant_id: str) -> bool:
-    """True when the active scoring context is CRM (HubSpot/Stripe).
+    """True when the active scoring context is a specific CRM provider.
 
-    Requires an explicit source context written by predict or CRM scoring
-    endpoints.  Without an explicit context file, mode is undefined — returns
-    False to avoid pre-populating UI from stale DB rows.
+    Requires an explicit context file written by a CRM scoring endpoint with
+    a known provider name (e.g. 'hubspot', 'salesforce').  Returns False for:
+      - No context file (server restart / fresh deployment)
+      - Dataset/CSV mode ('dataset', 'csv')
+      - Generic 'crm' without a provider (old format — user must rescore)
+    This prevents the Overview and Accounts pages from pre-populating from
+    stale DB rows when the active provider cannot be determined.
     """
-    explicit = _get_active_source(tenant_id)
-    if explicit == "crm":
-        return True
-    return False
+    s = _get_active_source(tenant_id)
+    # Only dataset-mode markers and the unresolvable generic 'crm' return False.
+    if s is None or s in ("csv", "dataset", "crm"):
+        return False
+    # Any other non-empty string is treated as a specific CRM provider name.
+    return True
 
 
 def _build_crm_predict_response(
@@ -2553,7 +2574,13 @@ def trigger_live_scoring(
     if not os.path.exists(model_path):
         raise HTTPException(status_code=400, detail="No trained model. Train a model first.")
 
-    acct_count = storage_repo.account_count(tenant_id=tenant_id)
+    # Resolve the effective provider: prefer explicit source param; fall back to
+    # the provider recorded from the previous scoring run so that "Rescore All"
+    # without an explicit source always rescores the same provider that was
+    # active before rather than silently mixing all providers.
+    effective_source = source or _get_crm_provider(tenant_id)
+
+    acct_count = storage_repo.account_count(source=effective_source, tenant_id=tenant_id)
     if acct_count == 0:
         raise HTTPException(status_code=400, detail="No accounts in database. Sync an integration first.")
 
@@ -2564,8 +2591,10 @@ def trigger_live_scoring(
         auto_seed_if_needed(tenant_id=tenant_id)
 
     try:
-        scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir, source=source)
-        _set_active_source(tenant_id, "crm", crm_provider=source)
+        scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir, source=effective_source)
+        # Store the specific provider name — never the generic string "crm".
+        # _set_active_source collapses crm_provider into active_source when provided.
+        _set_active_source(tenant_id, effective_source or "crm")
         high = sum(1 for s in scores if s.tier == "High Risk")
         med = sum(1 for s in scores if s.tier == "Medium Risk")
         low = sum(1 for s in scores if s.tier == "Low Risk")
@@ -2680,8 +2709,10 @@ def run_demo(connector_name: str, tenant_id: str = Depends(get_tenant_id)):
         if DEMO_MODE:
             auto_seed_if_needed(tenant_id=tenant_id)
         try:
-            scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir)
-            _set_active_source(tenant_id, "crm")
+            # Pass connector_name as source so only this provider's accounts are
+            # scored and the context file records the specific provider name.
+            scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir, source=connector_name)
+            _set_active_source(tenant_id, connector_name)
             scored = len(scores)
             tier_counts = {
                 "High Risk": sum(1 for s in scores if s.tier == "High Risk"),
