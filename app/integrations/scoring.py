@@ -159,6 +159,30 @@ def score_accounts(
         df, module, fit=False, feature_meta=feature_meta,
     )
 
+    # Feature alignment: CRM-derived data may have fewer features than the
+    # training dataset.  Reconcile X against the model's expected schema by
+    # filling missing columns with 0 and enforcing column order.
+    # This is inference-only — training code and model weights are untouched.
+    expected_features: Optional[List[str]] = None
+    if hasattr(model, "feature_names_in_"):
+        expected_features = list(model.feature_names_in_)
+    elif "feature_names" in feature_meta:
+        expected_features = feature_meta["feature_names"]
+
+    if expected_features is not None and expected_features != feat_names:
+        missing = set(expected_features) - set(feat_names)
+        if missing:
+            logger.info(
+                "Feature alignment: padding %d missing feature(s) with 0: %s",
+                len(missing), sorted(missing),
+            )
+        X_df = pd.DataFrame(X, columns=feat_names)
+        for col in expected_features:
+            if col not in X_df.columns:
+                X_df[col] = 0.0
+        X = X_df[expected_features].values.astype(float)
+        feat_names = expected_features
+
     probs = model.predict_proba(X)[:, 1]
     probs = probs.clip(module.calibration.prob_floor, module.calibration.prob_ceil)
 
