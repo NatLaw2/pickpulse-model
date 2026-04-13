@@ -1311,7 +1311,11 @@ def predict_module(
         state["predictions"][module_name] = records
         state["predictions_generated_at"] = datetime.now(timezone.utc).isoformat()
         store.save_predictions(tenant_id, module_name, run_id or "", records)
-        _set_active_source(tenant_id, "dataset")
+        # Only set context to "dataset" when a CRM integration is NOT active.
+        # If CRM is active, the context must stay on the CRM provider — dataset
+        # predictions running in the background must not silently overwrite it.
+        if not _crm_mode_active(tenant_id):
+            _set_active_source(tenant_id, "dataset")
 
         # H3: write-back uses the full active scored set (no head() cap).
         # The display subset above is limited to `limit` rows for the UI;

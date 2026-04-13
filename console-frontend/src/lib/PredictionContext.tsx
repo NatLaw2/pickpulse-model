@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { type PredictResponse } from './api';
+import { api, type PredictResponse } from './api';
 import { useDataset } from './DatasetContext';
 
 const STORAGE_KEY = 'pickpulse_predictions';
@@ -22,7 +22,8 @@ const PredictionContext = createContext<PredictionState>({
 
 export function PredictionProvider({ children }: { children: ReactNode }) {
   const [predictions, setPredictionsState] = useState<PredictResponse | null>(null);
-  const loading = false;
+  // loading is true while loadCached() is fetching from the backend
+  const [loading, setLoading] = useState(false);
   const { dataset } = useDataset();
   const prevDatasetRef = useRef(dataset?.loaded_at);
 
@@ -56,25 +57,40 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
     // Already loaded in context — nothing to do
     if (predictions) return;
 
-    // Try sessionStorage first
+    setLoading(true);
     try {
-      const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Support both new keyed format { data, dataset_loaded_at } and legacy bare PredictResponse
-        const cachedData: PredictResponse = parsed.data ?? parsed;
-        const cachedDatasetAt: string | null = parsed.dataset_loaded_at ?? null;
-        // If both tokens are non-null and don't match, discard — stale from prior dataset
-        const currentDatasetAt = dataset?.loaded_at ?? null;
-        if (cachedDatasetAt !== null && currentDatasetAt !== null && cachedDatasetAt !== currentDatasetAt) {
-          try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-        } else if (cachedData.predictions?.length) {
-          setPredictionsState(cachedData);
+      // Always try the backend first — it holds the authoritative source context
+      // (dataset vs CRM provider).  This is what prevents stale sessionStorage from
+      // showing CSV data when a CRM integration is active, and vice-versa.
+      try {
+        const cached = await api.cachedPredictions();
+        if (cached?.predictions?.length) {
+          setPredictionsState(cached);
           return;
         }
-      }
-    } catch { /* corrupt data — fall through */ }
+      } catch { /* no cached predictions on backend — fall through to sessionStorage */ }
 
+      // sessionStorage fallback: used when backend has nothing (no model run yet)
+      try {
+        const stored = sessionStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          // Support both new keyed format { data, dataset_loaded_at } and legacy bare PredictResponse
+          const cachedData: PredictResponse = parsed.data ?? parsed;
+          const cachedDatasetAt: string | null = parsed.dataset_loaded_at ?? null;
+          // If both tokens are non-null and don't match, discard — stale from prior dataset
+          const currentDatasetAt = dataset?.loaded_at ?? null;
+          if (cachedDatasetAt !== null && currentDatasetAt !== null && cachedDatasetAt !== currentDatasetAt) {
+            try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+          } else if (cachedData.predictions?.length) {
+            setPredictionsState(cachedData);
+            return;
+          }
+        }
+      } catch { /* corrupt data — fall through */ }
+    } finally {
+      setLoading(false);
+    }
   }, [predictions, dataset?.loaded_at]);
 
   return (
@@ -82,6 +98,7 @@ export function PredictionProvider({ children }: { children: ReactNode }) {
       {children}
     </PredictionContext.Provider>
   );
+
 }
 
 export function usePredictions() {

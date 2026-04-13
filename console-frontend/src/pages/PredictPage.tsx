@@ -21,7 +21,7 @@ export function PredictPage() {
   const [windowFilter, setWindowFilter] = useState('all');
   const navigate = useNavigate();
   const { dataset } = useDataset();
-  const { predictions: result, setPredictions, loadCached } = usePredictions();
+  const { predictions: result, setPredictions, loadCached, loading: contextLoading } = usePredictions();
 
   // Sorting state — default by ARR at Risk DESC
   const [sortKey, setSortKey] = useState<SortKey>('arr_at_risk');
@@ -209,8 +209,10 @@ export function PredictPage() {
         </div>
       )}
 
-      {/* Action bar — only show when we have a dataset and are not in CRM mode */}
-      {!noDataset && !noModel && !result?.crm_mode && (
+      {/* Action bar — only show when we have a dataset and are not in CRM mode.
+          Also suppressed while contextLoading is true to prevent the button appearing
+          briefly before the backend confirms CRM mode (which hides it via crm_mode). */}
+      {!noDataset && !noModel && !result?.crm_mode && !contextLoading && (
         <div className="flex items-center gap-3 mb-6 flex-wrap">
           <button
             onClick={handlePredict}
