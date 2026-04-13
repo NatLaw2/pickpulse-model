@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Upload, Database, Briefcase, AlertTriangle, Building2, AlertCircle } from 'lucide-react';
+import { Upload, Database, Briefcase, AlertTriangle, Building2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { api, type StagedUploadResponse, type ReadinessReport, type UploadResponse } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 import { MappingReviewStep } from '../components/MappingReviewStep';
@@ -39,6 +39,7 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [step, setStep] = useState<Step>('idle');
+  const [showSampleData, setShowSampleData] = useState(false);
 
   // Upload state
   const [staged, setStaged] = useState<StagedUploadResponse | null>(null);
@@ -186,37 +187,11 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
       )}
 
       {/* ------------------------------------------------------------------ */}
-      {/* Idle state: show demo cards + upload                                */}
+      {/* Idle state: CSV upload primary, demo datasets secondary             */}
       {/* ------------------------------------------------------------------ */}
       {step === 'idle' && (
         <>
-          {/* Demo Dataset Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {DEMO_VARIANTS.map((variant) => {
-              const Icon = variant.icon;
-              const isLoading = loading === variant.key;
-              return (
-                <div
-                  key={variant.key}
-                  className="bg-white border border-[var(--color-border)] rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-                >
-                  <Icon size={24} style={{ color: variant.accent }} className="mb-3" />
-                  <h3 className="font-semibold text-sm mb-1">{variant.label}</h3>
-                  <p className="text-[10px] text-[var(--color-text-muted)] mb-1">{variant.accounts}</p>
-                  <p className="text-xs text-[var(--color-text-secondary)] mb-4">{variant.description}</p>
-                  <button
-                    onClick={() => loadSample(variant.key)}
-                    disabled={loading !== null}
-                    className="px-4 py-2 bg-[var(--color-accent)] text-white rounded-xl text-xs font-medium hover:bg-[var(--color-accent-glow)] transition-colors disabled:opacity-50 shadow-[0_0_0_0_rgba(123,97,255,0)] hover:shadow-[0_0_0_4px_rgba(123,97,255,0.15)]"
-                  >
-                    {isLoading ? 'Loading...' : 'Load'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Upload CSV */}
+          {/* Upload CSV — primary action */}
           <label className="block bg-white border border-dashed border-[var(--color-border)] rounded-2xl p-5 mb-3 text-center cursor-pointer hover:border-[var(--color-accent)] transition-colors shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
             <Upload size={24} className="mx-auto text-[var(--color-text-secondary)] mb-2" />
             <h3 className="font-semibold text-sm mb-1">Upload Your Own CSV</h3>
@@ -250,6 +225,44 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
             <p className="text-[10px] text-[var(--color-text-muted)]">
               Column names are matched automatically. You'll review and adjust the mapping before anything is processed.
             </p>
+          </div>
+
+          {/* Sample data — secondary, collapsed by default */}
+          <div className="mb-6">
+            <button
+              onClick={() => setShowSampleData((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+            >
+              {showSampleData ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              Use sample data instead
+            </button>
+
+            {showSampleData && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                {DEMO_VARIANTS.map((variant) => {
+                  const Icon = variant.icon;
+                  const isLoading = loading === variant.key;
+                  return (
+                    <div
+                      key={variant.key}
+                      className="bg-white border border-[var(--color-border)] rounded-2xl p-5 flex flex-col items-center text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+                    >
+                      <Icon size={24} style={{ color: variant.accent }} className="mb-3" />
+                      <h3 className="font-semibold text-sm mb-1">{variant.label}</h3>
+                      <p className="text-[10px] text-[var(--color-text-muted)] mb-1">{variant.accounts}</p>
+                      <p className="text-xs text-[var(--color-text-secondary)] mb-4">{variant.description}</p>
+                      <button
+                        onClick={() => loadSample(variant.key)}
+                        disabled={loading !== null}
+                        className="px-4 py-2 bg-[var(--color-accent)] text-white rounded-xl text-xs font-medium hover:bg-[var(--color-accent-glow)] transition-colors disabled:opacity-50"
+                      >
+                        {isLoading ? 'Loading...' : 'Load'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

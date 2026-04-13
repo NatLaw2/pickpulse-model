@@ -20,7 +20,7 @@ export function DataSourcesPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Data Sources</h1>
         <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-          Connect your account data via CSV upload, demo datasets, or live integrations
+          Connect your account data via CSV upload or live integrations
         </p>
       </div>
 

@@ -326,7 +326,6 @@ export function DashboardPage() {
             <StatCard
               label="ARR at Risk"
               value={kpis ? formatCurrency(kpis.total_arr_at_risk) : '—'}
-              sub="Probability-weighted exposure"
               icon={<DollarSign size={16} />}
               accent="var(--color-danger)"
               tooltip="Each account's ARR multiplied by its churn probability, summed across the portfolio."
@@ -335,7 +334,7 @@ export function DashboardPage() {
             <StatCard
               label="Accounts Requiring Action"
               value={kpis?.high_risk_in_window ?? '—'}
-              sub="High risk and renewing within 30 days"
+              sub="High risk · renewing within 30 days"
               icon={<AlertTriangle size={16} />}
               accent="var(--color-danger)"
               tooltip="Accounts with ≥25% churn probability that also renew within 30 days. These need immediate outreach."
@@ -344,7 +343,6 @@ export function DashboardPage() {
             <StatCard
               label="Potential ARR Protected"
               value={kpis ? formatCurrency(kpis.projected_recoverable_arr) : '—'}
-              sub={kpis ? `At ${Math.round(kpis.assumed_save_rate * 100)}% save rate` : undefined}
               icon={<Shield size={16} />}
               accent="var(--color-success)"
               tooltip="Estimated ARR that could be retained through proactive intervention, based on your assumed save rate."
@@ -506,9 +504,6 @@ export function DashboardPage() {
                 <TrendingUp size={16} className="text-[var(--color-success)]" />
                 <h3 className="text-sm font-semibold">Revenue Recovery Simulation</h3>
               </div>
-              <p className="text-xs text-[var(--color-text-secondary)] mb-5">
-                Estimate recoverable ARR by adjusting the assumed save rate — the percentage of at-risk accounts successfully retained through proactive intervention.
-              </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                 <div>
                   <label className="text-xs text-[var(--color-text-muted)] block mb-2">
@@ -538,9 +533,6 @@ export function DashboardPage() {
                   <div className="text-xs text-[var(--color-text-muted)] mb-1">Projected Recoverable ARR</div>
                   <div className="text-2xl font-bold text-[var(--color-success)]">
                     {formatCurrency(kpis.projected_recoverable_arr)}
-                  </div>
-                  <div className="text-[10px] text-[var(--color-text-muted)] mt-1">
-                    at {Math.round(kpis.assumed_save_rate * 100)}% save rate
                   </div>
                 </div>
               </div>
@@ -682,7 +674,6 @@ export function DashboardPage() {
                             </div>
                             <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-1.5">
                               <span>{formatCurrency(lo)}</span>
-                              <span className="text-[9px] text-[var(--color-text-muted)] opacity-70">±1σ · not a guaranteed bound</span>
                               <span>{formatCurrency(hi)}</span>
                             </div>
                           </div>
@@ -736,12 +727,6 @@ export function DashboardPage() {
                           <div className="w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-danger)', opacity: 0.75 }} />
                           <span className="text-[var(--color-text-muted)]">Expected at risk</span>
                         </div>
-                        {/* Estimated-month disclosure at calendar level */}
-                        {arrForecast.renewal_calendar.some((m) => m.has_month_estimates) && (
-                          <span className="ml-auto text-[var(--color-text-muted)] italic">
-                            ~ months use estimated renewal dates (contract_months_remaining)
-                          </span>
-                        )}
                       </div>
                     </div>
                   )}

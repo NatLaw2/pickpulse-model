@@ -55,24 +55,14 @@ export function RevenueImpactCard() {
             <span className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-medium">
               Revenue Impact
             </span>
-            {data.illustrative && (
-              <span className="px-2 py-0.5 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/25 rounded-md text-[10px] font-bold tracking-wide uppercase text-[var(--color-warning)]">
-                Illustrative · Demo
-              </span>
-            )}
           </div>
 
           <div className="text-3xl font-bold tracking-tight text-[var(--color-success)]">
             {formatCurrency(data.total_revenue_impact)}
           </div>
 
-          {/* Main label — always "Estimated ARR Protected" in illustrative mode */}
           <div className="text-xs text-[var(--color-text-secondary)] mt-2">
             {data.label}
-          </div>
-
-          <div className="text-[11px] text-[var(--color-text-muted)] mt-1 max-w-xs">
-            {data.subtext}
           </div>
         </div>
 
@@ -101,13 +91,6 @@ export function RevenueImpactCard() {
         </div>
       </div>
 
-      {data.illustrative && (
-        <div className="mt-5 pt-4 border-t border-[var(--color-border)]">
-          <p className="text-[11px] text-[var(--color-text-muted)]">
-            Based on synthetic data and model-driven assumptions. Upload production data to track confirmed financial impact.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
