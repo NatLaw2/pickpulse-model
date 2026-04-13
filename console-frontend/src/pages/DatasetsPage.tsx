@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Upload, Database, AlertCircle } from 'lucide-react';
-import { api, type StagedUploadResponse, type ReadinessReport, type UploadResponse } from '../lib/api';
+import { api, type StagedUploadResponse, type ReadinessReport } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
 import { MappingReviewStep } from '../components/MappingReviewStep';
 import { ReadinessReportCard } from '../components/ReadinessReportCard';
@@ -17,9 +17,6 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
   const [staged, setStaged] = useState<StagedUploadResponse | null>(null);
   const [readiness, setReadiness] = useState<ReadinessReport | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [sampleResult, setSampleResult] = useState<UploadResponse | null>(null);
-
   const { dataset, refresh } = useDataset();
 
   // ---------------------------------------------------------------------------
@@ -33,7 +30,6 @@ export function DatasetsPage({ embedded }: { embedded?: boolean } = {}) {
 
     setLoading('upload');
     setError('');
-    setSampleResult(null);
     setStaged(null);
     setReadiness(null);
     setStep('idle');
