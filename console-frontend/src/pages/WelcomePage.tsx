@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cloud, Upload } from 'lucide-react';
 import { useActiveMode, type ActiveMode } from '../lib/ActiveModeContext';
@@ -51,7 +51,7 @@ const SOURCE_CARDS: {
   mode: Exclude<ActiveMode, 'none'>;
   label: string;
   description: string;
-  IconComponent: () => JSX.Element;
+  IconComponent: () => React.ReactElement;
   accent: string;
   borderHover: string;
   ringHover: string;
