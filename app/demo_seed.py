@@ -192,7 +192,12 @@ def auto_seed_if_needed(tenant_id: str, source: Optional[str] = None) -> bool:
         print(f"[demo_seed] existing signals count: {len(existing)}")
 
         if _demo_signals_complete(existing, _REQUIRED_DEMO_KEYS):
-            print("[demo_seed] required demo keys present — skipping seed")
+            print("[demo_seed] required demo keys present — skipping signal seed")
+            # Signals are complete, but outcomes may still be missing.
+            # Always ensure outcome labels exist so the CRM sufficiency gate passes.
+            accounts = repo.list_accounts(source=source, limit=50_000, tenant_id=tenant_id)
+            if accounts:
+                _seed_outcomes_if_needed(accounts, tenant_id)
             return False
 
         # Signals exist but are partial/legacy — report and re-seed
