@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Brain,
   Crosshair, Code2, FileText, ShieldAlert, LogOut,
-  RotateCcw, Loader2, FlaskConical,
+  RotateCcw, Loader2, FlaskConical, Settings2,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
@@ -19,8 +19,9 @@ const mainLinks = [
   { to: '/reports', icon: FileText, label: 'Reports' },
 ];
 
-// Configuration links — model management and API docs
+// Configuration links — setup, model management, API docs
 const configLinks = [
+  { to: '/workflow', icon: Settings2, label: 'Setup' },
   { to: '/model', icon: Brain, label: 'Model' },
   { to: '/api-docs', icon: Code2, label: 'API' },
 ];

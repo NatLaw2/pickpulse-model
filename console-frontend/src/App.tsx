@@ -8,6 +8,7 @@ import { ApiDocsPage } from './pages/ApiDocsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ExpansionDemoPage } from './pages/ExpansionDemoPage';
 import { WelcomePage } from './pages/WelcomePage';
+import { WorkflowPage } from './pages/WorkflowPage';
 import { DatasetProvider } from './lib/DatasetContext';
 import { PredictionProvider } from './lib/PredictionContext';
 import { ExecutiveSummaryProvider } from './lib/ExecutiveSummaryContext';
@@ -42,6 +43,7 @@ function AppContent() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/predict" element={<PredictPage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/workflow" element={<WorkflowPage />} />
           <Route path="/data-sources" element={<DataSourcesPage />} />
           <Route path="/model" element={<ModelPage />} />
           <Route path="/api-docs" element={<ApiDocsPage />} />
