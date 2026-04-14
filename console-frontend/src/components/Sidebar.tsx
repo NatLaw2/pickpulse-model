@@ -22,7 +22,7 @@ const mainLinks = [
 // Configuration links — setup, model management, API docs
 const configLinks = [
   { to: '/workflow', icon: Settings2, label: 'Setup' },
-  { to: '/model', icon: Brain, label: 'Model' },
+  { to: '/model', icon: Brain, label: 'Performance' },
   { to: '/api-docs', icon: Code2, label: 'API' },
 ];
 

@@ -119,6 +119,70 @@ def _demo_signals_complete(
     return (fully_seeded / len(signals_by_account)) >= min_fraction
 
 
+_MIN_DEMO_CHURNED = 10   # minimum churned outcomes required to pass sufficiency gate
+_MIN_DEMO_RETAINED = 10  # minimum retained outcomes
+
+
+def _seed_outcomes_if_needed(
+    accounts: List[Dict[str, Any]],
+    tenant_id: str,
+) -> int:
+    """Seed account_outcomes for demo mode so the CRM training sufficiency gate passes.
+
+    Uses the same cohort ordering as signals: high-risk accounts (first 25%)
+    become churned=1, the rest become retained=0.  Idempotent — skips accounts
+    that already have a demo-sourced outcome.
+    """
+    try:
+        sb = get_client()
+
+        # Fetch existing demo-sourced outcomes to avoid duplicates
+        existing_res = (
+            sb.table("account_outcomes")
+            .select("account_id")
+            .eq("tenant_id", tenant_id)
+            .eq("source", "system")
+            .execute()
+        )
+        already_seeded_ids = {r["account_id"] for r in (existing_res.data or [])}
+
+        accounts_sorted = sorted(accounts, key=lambda a: a.get("external_id", ""))
+        total = len(accounts_sorted)
+        high_n = max(1, round(_TARGET_RATIOS[0] * total / 20))  # same split as cohorts
+
+        rows = []
+        today = date.today().isoformat()
+        for rank, acct in enumerate(accounts_sorted):
+            account_uuid = acct.get("id")
+            if not account_uuid or account_uuid in already_seeded_ids:
+                continue
+            outcome_type = "churned" if rank < high_n else "renewed"
+            rows.append({
+                "tenant_id": tenant_id,
+                "account_id": account_uuid,
+                "outcome_type": outcome_type,
+                "effective_date": today,
+                "source": "system",
+                "notes": "Auto-seeded for demo",
+                "recorded_at": date.today().isoformat(),
+            })
+
+        if not rows:
+            print("[demo_seed] outcomes already seeded — skipping")
+            return 0
+
+        res = sb.table("account_outcomes").insert(rows).execute()
+        inserted = len(res.data) if res.data else 0
+        print(f"[demo_seed] seeded {inserted} outcome rows ({high_n} churned, {total - high_n} retained)")
+        return inserted
+
+    except Exception as exc:
+        import traceback
+        print(f"[demo_seed] outcome seed EXCEPTION: {exc}")
+        print(traceback.format_exc())
+        return 0
+
+
 def auto_seed_if_needed(tenant_id: str, source: Optional[str] = None) -> bool:
     """Seed demo signals unless required keys are already present for this tenant."""
     print(f"[demo_seed] auto_seed_if_needed called — tenant={tenant_id[:8]}… source={source}")
@@ -169,6 +233,10 @@ def auto_seed_if_needed(tenant_id: str, source: Optional[str] = None) -> bool:
             print("[demo_seed] WARNING: upsert returned 0 rows — possible RLS block or schema mismatch")
         else:
             print(f"[demo_seed] SUCCESS: seeded {inserted} signal rows for {len(accounts)} accounts")
+
+        # Seed outcome labels so the CRM training sufficiency gate passes
+        _seed_outcomes_if_needed(accounts, tenant_id)
+
         return inserted > 0
 
     except Exception as exc:

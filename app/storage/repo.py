@@ -90,9 +90,18 @@ def get_account(
     return res.data[0] if res.data else None
 
 
-def get_account_id(external_id: str, tenant_id: str = DEFAULT_TENANT) -> Optional[str]:
-    """Look up the uuid for an external_id."""
-    row = get_account(external_id, tenant_id=tenant_id)
+def get_account_id(
+    external_id: str,
+    source: Optional[str] = None,
+    tenant_id: str = DEFAULT_TENANT,
+) -> Optional[str]:
+    """Look up the uuid for an external_id, optionally scoped to a source.
+
+    Pass source="hubspot" or source="salesforce" to prevent cross-CRM
+    collisions when the same external_id format could theoretically appear
+    in multiple providers.
+    """
+    row = get_account(external_id, source=source, tenant_id=tenant_id)
     return row["id"] if row else None
 
 

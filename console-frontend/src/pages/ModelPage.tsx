@@ -15,9 +15,9 @@ export function ModelPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Model</h1>
+        <h1 className="text-2xl font-bold">Performance</h1>
         <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-          Train your churn prediction model and review its performance
+          Review model health, training history, and prediction accuracy
         </p>
       </div>
 

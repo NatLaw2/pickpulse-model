@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { api } from './api';
 
 interface AuthState {
   session: Session | null;
@@ -49,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear active mode on the backend before signing out so the next
+    // sign-in always lands on the WelcomePage rather than a stale mode.
+    try { await api.setMode('none'); } catch { /* non-fatal */ }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };

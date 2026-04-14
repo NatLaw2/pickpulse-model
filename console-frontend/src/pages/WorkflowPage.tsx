@@ -269,6 +269,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [scoring, setScoring] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -395,6 +396,23 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!window.confirm(`Disconnect ${brand.name}? This removes the connection but keeps your synced accounts and predictions.`)) return;
+    setDisconnecting(true);
+    setError(null);
+    try {
+      await api.disconnectIntegration(mode);
+      await api.setMode('none');
+    } catch (e: any) {
+      setError(e.message);
+      setDisconnecting(false);
+      return;
+    }
+    // Return to WelcomePage — mode is now 'none' on the backend
+    navigate('/');
+    window.location.reload();
+  };
+
   const lastSync =
     health?.sync_states
       ?.map((s) => s.last_synced_at)
@@ -471,12 +489,22 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
               Connect {brand.name}
             </button>
           ) : (
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {brand.name} is connected.
-              {lastSync && (
-                <> Last synced {new Date(lastSync).toLocaleString()}.</>
-              )}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {brand.name} is connected.
+                {lastSync && (
+                  <> Last synced {new Date(lastSync).toLocaleString()}.</>
+                )}
+              </p>
+              <button
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
+              >
+                {disconnecting ? <Loader2 size={11} className="animate-spin" /> : null}
+                Disconnect
+              </button>
+            </div>
           )}
         </div>
 
