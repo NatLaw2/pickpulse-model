@@ -592,6 +592,8 @@ export interface CrmDataSufficiencyResponse {
     accounts_with_outcomes: number;
     error?: string;
   };
+  /** Non-null when demo seed failed — surfaced so the UI can show a diagnostic. */
+  seed_warning?: string | null;
 }
 
 /** Returned by POST /api/crm/train (202). */

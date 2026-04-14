@@ -98,22 +98,24 @@ const POLL_MS = 3000;
 function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; syncCount: number }) {
   const [sufficiency, setSufficiency] = useState<CrmDataSufficiencyResponse | null>(null);
   const [loadingSufficiency, setLoadingSufficiency] = useState(true);
+  const [recheckCount, setRecheckCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<TrainJobStatus | null>(null);
   const [error, setError] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Re-fetch sufficiency whenever sync completes (syncCount increments after each sync)
+  // Re-fetch sufficiency whenever sync completes or user clicks Re-check
   useEffect(() => {
     let cancelled = false;
     setLoadingSufficiency(true);
+    setError('');
     api.crmDataSufficiency(mode)
       .then((res) => { if (!cancelled) setSufficiency(res); })
       .catch((e: any) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoadingSufficiency(false); });
     return () => { cancelled = true; };
-  }, [mode, syncCount]);
+  }, [mode, syncCount, recheckCount]);
 
   // Poll training job
   useEffect(() => {
@@ -203,6 +205,14 @@ function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; 
         </div>
       )}
 
+      {/* Seed failure diagnostic (demo mode only) */}
+      {sufficiency?.seed_warning && (
+        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+          <AlertCircle size={13} className="shrink-0 mt-0.5" />
+          <span>{sufficiency.seed_warning}</span>
+        </div>
+      )}
+
       {/* Sufficiency failure message */}
       {sufficiency && !sufficiency.ok && !jobId && (
         <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
@@ -211,7 +221,8 @@ function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; 
         </div>
       )}
 
-      {/* Train button */}
+      {/* Train button + Re-check */}
+      <div className="flex items-center gap-2">
       <button
         onClick={handleTrain}
         disabled={submitting || isRunning || (sufficiency !== null && !sufficiency.ok)}
@@ -229,6 +240,20 @@ function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; 
           </>
         )}
       </button>
+
+      {/* Re-check button — lets user retry sufficiency after fixing data */}
+      {!jobId && (
+        <button
+          onClick={() => setRecheckCount((c) => c + 1)}
+          disabled={loadingSufficiency}
+          title="Re-check data readiness"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-text-muted)] disabled:opacity-40 transition-colors"
+        >
+          {loadingSufficiency ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          Re-check
+        </button>
+      )}
+      </div>
 
       {isRunning && (
         <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-1.5">

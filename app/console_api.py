@@ -1240,14 +1240,25 @@ def crm_data_sufficiency(
     """
     if source not in ("hubspot", "salesforce"):
         raise HTTPException(status_code=400, detail=f"Unknown source '{source}'. Must be 'hubspot' or 'salesforce'.")
+    seed_warning: Optional[str] = None
+    if DEMO_MODE:
+        try:
+            seed_result = auto_seed_if_needed(tenant_id, source=source)
+            if seed_result == -1:
+                seed_warning = "Demo outcome seeding failed — check server logs. Training may be blocked."
+                logger.warning("[demo_seed] sufficiency pre-seed returned failure for source=%s tenant=%s", source, tenant_id)
+        except Exception as exc:
+            seed_warning = f"Demo seed error: {exc}"
+            logger.warning("[demo_seed] sufficiency pre-seed raised: %s", exc)
     try:
         from app.crm_training import build_crm_training_dataset, check_data_sufficiency
         df, stats = build_crm_training_dataset(tenant_id=tenant_id, source=source)
-        ok, message, stats = check_data_sufficiency(df, stats)
+        ok, message, stats = check_data_sufficiency(df, stats, demo_mode=DEMO_MODE)
         return {
             "ok": ok,
             "message": message,
             "stats": stats,
+            "seed_warning": seed_warning,
         }
     except Exception as exc:
         logger.exception("[crm] data-sufficiency failed: %s", exc)
@@ -1272,10 +1283,15 @@ def crm_train(
     mod = get_module(module_name)  # validates module exists
 
     # Build and validate the training dataset synchronously (fast enough for request time)
+    if DEMO_MODE:
+        try:
+            auto_seed_if_needed(tenant_id, source=source)
+        except Exception as exc:
+            logger.warning("[demo_seed] train pre-seed failed: %s", exc)
     try:
         from app.crm_training import build_crm_training_dataset, check_data_sufficiency
         df, stats = build_crm_training_dataset(tenant_id=tenant_id, source=source)
-        ok, message, stats = check_data_sufficiency(df, stats)
+        ok, message, stats = check_data_sufficiency(df, stats, demo_mode=DEMO_MODE)
         if not ok:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:

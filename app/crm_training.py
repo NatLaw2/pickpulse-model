@@ -501,8 +501,17 @@ def build_crm_training_dataset(
 def check_data_sufficiency(
     df: pd.DataFrame,
     stats: Dict[str, Any],
+    demo_mode: bool = False,
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """Check whether the dataset is large and balanced enough to train.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    stats : dict
+    demo_mode : bool
+        When True, relaxes MIN_TOTAL_LABELED to match actual account count so
+        small demo tenants (< 30 accounts) aren't permanently blocked.
 
     Returns
     -------
@@ -530,6 +539,10 @@ def check_data_sufficiency(
     retained = stats.get("total_retained", 0)
     primary_churned = stats.get("primary_churned", 0)
 
+    # In demo mode, relax the total-rows floor to the actual dataset size so
+    # small demo tenants (< 30 accounts) aren't permanently blocked.
+    effective_min_total = min(MIN_TOTAL_LABELED, total) if demo_mode else MIN_TOTAL_LABELED
+
     issues: List[str] = []
 
     if primary_churned == 0:
@@ -550,9 +563,9 @@ def check_data_sufficiency(
             f"Need {MIN_NEGATIVE_LABELED} retained examples — have {retained}."
         )
 
-    if total < MIN_TOTAL_LABELED:
+    if total < effective_min_total:
         issues.append(
-            f"Need at least {MIN_TOTAL_LABELED} labeled rows — have {total}."
+            f"Need at least {effective_min_total} labeled rows — have {total}."
         )
 
     if issues:

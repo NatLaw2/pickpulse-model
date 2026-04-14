@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from .storage import repo
@@ -130,28 +130,43 @@ def _seed_outcomes_if_needed(
     """Seed account_outcomes for demo mode so the CRM training sufficiency gate passes.
 
     Uses the same cohort ordering as signals: high-risk accounts (first 25%)
-    become churned=1, the rest become retained=0.  Idempotent — skips accounts
-    that already have a demo-sourced outcome.
+    become churned=1, the rest become retained=0.  Idempotent — upserts on
+    (tenant_id, account_id) so re-running is safe.
+
+    Guarantees at least _MIN_DEMO_CHURNED churned rows regardless of cohort math,
+    so the sufficiency gate always has enough labeled examples.
     """
     try:
         sb = get_client()
 
-        # Fetch existing demo-sourced outcomes to avoid duplicates
+        # Check for any existing outcomes for these accounts (any source)
+        # to avoid overwriting user-created manual labels.
+        account_ids = [a["id"] for a in accounts if a.get("id")]
+        if not account_ids:
+            print("[demo_seed] no accounts with valid ids — cannot seed outcomes")
+            return 0
+
         existing_res = (
             sb.table("account_outcomes")
             .select("account_id")
             .eq("tenant_id", tenant_id)
-            .eq("source", "system")
+            .in_("account_id", account_ids)
             .execute()
         )
         already_seeded_ids = {r["account_id"] for r in (existing_res.data or [])}
 
         accounts_sorted = sorted(accounts, key=lambda a: a.get("external_id", ""))
         total = len(accounts_sorted)
-        high_n = max(1, round(_TARGET_RATIOS[0] * total / 20))  # same split as cohorts
+
+        # Ensure at least _MIN_DEMO_CHURNED accounts are labeled churned
+        # regardless of cohort ratio (cohort math fails with <40 accounts).
+        high_n = max(_MIN_DEMO_CHURNED, round(_TARGET_RATIOS[0] * total / 20))
+        # Never exceed total accounts (leave at least _MIN_DEMO_RETAINED retained)
+        high_n = min(high_n, max(0, total - _MIN_DEMO_RETAINED))
 
         rows = []
         today = date.today().isoformat()
+        now_ts = datetime.now(timezone.utc).isoformat()
         for rank, acct in enumerate(accounts_sorted):
             account_uuid = acct.get("id")
             if not account_uuid or account_uuid in already_seeded_ids:
@@ -164,23 +179,29 @@ def _seed_outcomes_if_needed(
                 "effective_date": today,
                 "source": "system",
                 "notes": "Auto-seeded for demo",
-                "recorded_at": date.today().isoformat(),
+                "recorded_at": now_ts,
             })
 
         if not rows:
             print("[demo_seed] outcomes already seeded — skipping")
             return 0
 
-        res = sb.table("account_outcomes").insert(rows).execute()
+        print(f"[demo_seed] seeding {len(rows)} outcome rows ({high_n} churned target, {total} total accounts)")
+        res = sb.table("account_outcomes").upsert(
+            rows,
+            on_conflict="tenant_id,account_id",
+        ).execute()
         inserted = len(res.data) if res.data else 0
-        print(f"[demo_seed] seeded {inserted} outcome rows ({high_n} churned, {total - high_n} retained)")
+        print(f"[demo_seed] outcome upsert complete — rows returned: {inserted}")
+        if inserted == 0:
+            print("[demo_seed] WARNING: upsert returned 0 rows — possible RLS block, schema mismatch, or all already seeded")
         return inserted
 
     except Exception as exc:
         import traceback
         print(f"[demo_seed] outcome seed EXCEPTION: {exc}")
         print(traceback.format_exc())
-        return 0
+        return -1  # distinguish failure from "already seeded" (0)
 
 
 def auto_seed_if_needed(tenant_id: str, source: Optional[str] = None) -> bool:
