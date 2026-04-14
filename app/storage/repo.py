@@ -118,6 +118,46 @@ def account_count(source: Optional[str] = None, tenant_id: str = DEFAULT_TENANT)
         return 0
 
 
+def clear_scores_for_source(source: str, tenant_id: str = DEFAULT_TENANT) -> int:
+    """Delete all churn_scores_daily rows for accounts belonging to `source`.
+
+    Called on CRM disconnect so that stale scores never pre-populate the UI
+    when the user reconnects and has not yet re-trained or re-scored.
+    Returns the number of rows deleted.
+    """
+    try:
+        sb = get_client()
+        # Resolve account UUIDs for this provider
+        acct_res = (
+            sb.table("accounts")
+            .select("id")
+            .eq("tenant_id", tenant_id)
+            .eq("source", source)
+            .execute()
+        )
+        account_ids = [r["id"] for r in (acct_res.data or []) if r.get("id")]
+        if not account_ids:
+            return 0
+        # Delete in batches to stay within Supabase URL limits
+        deleted = 0
+        BATCH = 200
+        for i in range(0, len(account_ids), BATCH):
+            batch = account_ids[i: i + BATCH]
+            res = (
+                sb.table("churn_scores_daily")
+                .delete()
+                .eq("tenant_id", tenant_id)
+                .in_("account_id", batch)
+                .execute()
+            )
+            deleted += len(res.data) if res.data else 0
+        logger.info("clear_scores_for_source: deleted %d score rows for source=%s", deleted, source)
+        return deleted
+    except Exception as exc:
+        logger.warning("clear_scores_for_source: failed (%s)", exc)
+        return 0
+
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------

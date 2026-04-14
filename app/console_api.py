@@ -1240,15 +1240,6 @@ def crm_data_sufficiency(
     """
     if source not in ("hubspot", "salesforce"):
         raise HTTPException(status_code=400, detail=f"Unknown source '{source}'. Must be 'hubspot' or 'salesforce'.")
-
-    # In DEMO_MODE, seed signals + outcomes before checking sufficiency so the
-    # gate passes automatically without requiring manual churn labeling.
-    if DEMO_MODE:
-        try:
-            auto_seed_if_needed(tenant_id, source=source)
-        except Exception as exc:
-            logger.warning("[demo_seed] sufficiency pre-seed failed: %s", exc)
-
     try:
         from app.crm_training import build_crm_training_dataset, check_data_sufficiency
         df, stats = build_crm_training_dataset(tenant_id=tenant_id, source=source)

@@ -276,7 +276,7 @@ def complete_oauth(
 # ---------------------------------------------------------------------------
 
 def disconnect(tenant_id: str, provider: str) -> None:
-    """Disconnect an integration — set status to disconnected and purge tokens."""
+    """Disconnect an integration — purge tokens, clear stale scores, disable."""
     integration = get_integration(tenant_id=tenant_id, provider=provider)
     if not integration:
         return
@@ -294,6 +294,14 @@ def disconnect(tenant_id: str, provider: str) -> None:
         "status": "disconnected",
         "enabled": False,
     }).eq("id", integration_id).execute()
+
+    # Clear stale churn scores so reconnecting does not pre-populate the UI
+    # with results from a prior session before the user re-trains/re-scores.
+    try:
+        from app.storage import repo
+        repo.clear_scores_for_source(provider, tenant_id=tenant_id)
+    except Exception as exc:
+        logger.warning("disconnect: score clear failed for %s: %s", provider, exc)
 
     log_event(integration_id, "disconnected", {})
 

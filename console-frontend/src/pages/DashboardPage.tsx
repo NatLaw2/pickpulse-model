@@ -45,8 +45,8 @@ export function DashboardPage() {
   const [modelInsights, setModelInsights] = useState<ModelInsights | null>(null);
   const navigate = useNavigate();
   const { dataset } = useDataset();
-  const { predictions, loadCached } = usePredictions();
-  const { setMode } = useActiveMode();
+  const { predictions, loading: predictionsLoading, loadCached } = usePredictions();
+  const { mode, setMode } = useActiveMode();
 
   // Drawer state
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -193,8 +193,35 @@ export function DashboardPage() {
       ?? null
     : null;
 
-  // Empty state: no predictions generated yet this session
+  // While predictions are loading from the backend, show a spinner — not the
+  // source-picker, which would flash and mislead the user when a mode is already set.
+  if (predictionsLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-[var(--color-text-muted)]" />
+      </div>
+    );
+  }
+
+  // Empty state: no predictions generated yet (and we've finished loading).
+  // Only show the source picker when no mode is active — if a mode is set but
+  // has no scores yet, direct the user to Setup instead of re-picking a source.
   if (!predictions) {
+    if (mode !== 'none') {
+      return (
+        <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4 text-center px-4">
+          <div className="text-[var(--color-text-muted)] text-sm">
+            No scores yet. Complete Setup to sync, train, and score your accounts.
+          </div>
+          <button
+            onClick={() => navigate('/workflow')}
+            className="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            Go to Setup
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 relative overflow-hidden">
         {/* Background glow */}
