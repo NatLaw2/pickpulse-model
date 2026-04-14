@@ -7,7 +7,6 @@ import { PredictPage } from './pages/PredictPage';
 import { ApiDocsPage } from './pages/ApiDocsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ExpansionDemoPage } from './pages/ExpansionDemoPage';
-import { WelcomePage } from './pages/WelcomePage';
 import { WorkflowPage } from './pages/WorkflowPage';
 import { DatasetProvider } from './lib/DatasetContext';
 import { PredictionProvider } from './lib/PredictionContext';
@@ -16,10 +15,10 @@ import { ActiveModeProvider, useActiveMode } from './lib/ActiveModeContext';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 
-// Renders either the WelcomePage (mode=none) or the main app (mode set).
-// This is the single routing gate — no page can be accessed without an active mode.
+// Renders the main app with sidebar. When no source is active yet the
+// Dashboard shows the source-selection cards inline — no separate page needed.
 function AppContent() {
-  const { mode, loading } = useActiveMode();
+  const { loading } = useActiveMode();
 
   if (loading) {
     return (
@@ -29,12 +28,6 @@ function AppContent() {
     );
   }
 
-  // No active mode — show the source-selection welcome page (no sidebar)
-  if (mode === 'none') {
-    return <WelcomePage />;
-  }
-
-  // Mode is set — show the full app with sidebar navigation
   return (
     <div className="flex min-h-screen">
       <Sidebar />

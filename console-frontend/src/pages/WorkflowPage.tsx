@@ -315,7 +315,9 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
         try {
           const h = await api.integrationHealth(mode);
           setHealth(h);
-          if (h.connected) {
+          // Load accounts if connected OR if any accounts are already in the DB
+          // (e.g. sync succeeded but a subsequent health/test_connection call failed)
+          if (h.connected || (h.account_count && h.account_count > 0)) {
             const acctRes = await api
               .integrationAccounts(mode)
               .catch(() => ({ accounts: [], total: 0, showing: 0 }));

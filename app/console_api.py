@@ -2395,13 +2395,19 @@ def disconnect_integration(provider: str, tenant_id: str = Depends(get_tenant_id
 @app.post("/api/integrations/{provider}/sync")
 def trigger_sync(provider: str, tenant_id: str = Depends(get_tenant_id)):
     """Trigger a sync for a provider."""
-    # Try new service layer first
-    try:
-        if not integration_service:
-            raise RuntimeError("service unavailable")
-        result = integration_service.trigger_sync(tenant_id, provider)
-    except Exception:
-        # Fallback to legacy sync
+    from app.integrations.models import SyncResult as _SyncResult
+
+    if integration_service:
+        # Service layer handles OAuth providers — never fall back to legacy for these.
+        # Any internal exception is caught here and returned as a SyncResult error
+        # rather than letting it surface to the legacy path (which raises 400).
+        try:
+            result = integration_service.trigger_sync(tenant_id, provider)
+        except Exception as exc:
+            logger.exception("[sync] Service layer raised for provider=%s", provider)
+            result = _SyncResult(connector=provider, errors=[str(exc)])
+    else:
+        # Legacy sync — only for non-OAuth connectors configured in-memory
         cfg = connector_registry.get_config(provider)
         if not cfg or not cfg.enabled:
             raise HTTPException(

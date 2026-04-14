@@ -519,7 +519,12 @@ def trigger_sync(tenant_id: str, provider: str) -> SyncResult:
     result = SyncResult(connector=provider)
 
     # Get connector instance with decrypted token
-    connector = get_connector_for_integration(integration_id)
+    try:
+        connector = get_connector_for_integration(integration_id)
+    except Exception as exc:
+        logger.exception("get_connector_for_integration raised for %s", provider)
+        result.errors.append(f"Could not build connector for '{provider}': {exc}")
+        return result
     if connector is None:
         result.errors.append(f"Could not instantiate connector for '{provider}'")
         return result

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2, ExternalLink } from 'lucide-react';
+import { DollarSign, Clock, AlertTriangle, Shield, TrendingUp, ChevronRight, FileText, X, Mail, Copy, Loader2, ExternalLink, Cloud } from 'lucide-react';
 import { api, type DashboardResponse, type ModelPerformance, type ProductionAccuracy, type ArrForecast, type ArrCalendarMonth, type ModelInsights } from '../lib/api';
 import { StatCard } from '../components/StatCard';
 import { RevenueImpactCard } from '../components/RevenueImpactCard';
@@ -8,6 +8,7 @@ import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
 import { useExecutiveSummary } from '../lib/ExecutiveSummaryContext';
+import { useActiveMode } from '../lib/ActiveModeContext';
 import { riskColor } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
 
@@ -45,6 +46,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { dataset } = useDataset();
   const { predictions, loadCached } = usePredictions();
+  const { setMode } = useActiveMode();
 
   // Drawer state
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -225,13 +227,35 @@ export function DashboardPage() {
           </div>
 
           {/* Action cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Primary: Connect HubSpot */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Salesforce */}
             <button
-              onClick={() => navigate('/data-sources?tab=integrations')}
+              onClick={async () => { await setMode('salesforce'); navigate('/workflow'); }}
+              className="group flex flex-col items-start gap-4 p-6 rounded-2xl text-left transition-all duration-200 border border-[#00A1E0]/30 bg-gradient-to-br from-[#00A1E0]/10 to-[#00A1E0]/5 hover:from-[#00A1E0]/18 hover:to-[#00A1E0]/10 hover:border-[#00A1E0]/50 hover:shadow-lg hover:shadow-[#00A1E0]/10"
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#00A1E0' }}>
+                <Cloud size={20} color="white" strokeWidth={2.5} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="font-semibold text-sm text-[var(--color-text-primary)]">Connect Salesforce</span>
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: '#00A1E0', color: 'white' }}>CRM</span>
+                </div>
+                <div className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                  Sync accounts from Salesforce and score churn risk from live CRM signals.
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#00A1E0' }}>
+                <span>Connect now</span>
+                <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </button>
+
+            {/* HubSpot */}
+            <button
+              onClick={async () => { await setMode('hubspot'); navigate('/workflow'); }}
               className="group flex flex-col items-start gap-4 p-6 rounded-2xl text-left transition-all duration-200 border border-[#FF7A59]/30 bg-gradient-to-br from-[#FF7A59]/10 to-[#FF7A59]/5 hover:from-[#FF7A59]/18 hover:to-[#FF7A59]/10 hover:border-[#FF7A59]/50 hover:shadow-lg hover:shadow-[#FF7A59]/10"
             >
-              {/* HubSpot sprocket-style icon */}
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#FF7A59' }}>
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <circle cx="10" cy="10" r="3.5" fill="white" />
@@ -260,7 +284,7 @@ export function DashboardPage() {
               </div>
             </button>
 
-            {/* Secondary: Upload Your Data */}
+            {/* CSV */}
             <button
               onClick={() => navigate('/data-sources')}
               className="group flex flex-col items-start gap-4 p-6 rounded-2xl text-left transition-all duration-200 border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:bg-[var(--color-bg-primary)] hover:border-[var(--color-accent)]/30 hover:shadow-lg hover:shadow-[var(--color-accent)]/5"
