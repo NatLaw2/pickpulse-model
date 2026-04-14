@@ -119,11 +119,19 @@ export const api = {
   validate: () => request<ValidationInfo>(`/datasets/${MOD}/validate`),
   currentDataset: () => request<DatasetInfo>(`/datasets/${MOD}/current`),
 
-  // Train
+  // Train (CSV)
   train: (valFrac = 0.2) =>
     request<TrainJobAccepted>(`/train/${MOD}?val_frac=${valFrac}`, { method: 'POST' }),
   trainStatus: (jobId: string) =>
     request<TrainJobStatus>(`/train/${MOD}/status/${jobId}`),
+
+  // CRM-native training (HubSpot / Salesforce)
+  crmDataSufficiency: (source: string) =>
+    request<CrmDataSufficiencyResponse>(`/crm/data-sufficiency?source=${source}`),
+  crmTrain: (source: string, valFrac = 0.2) =>
+    request<CrmTrainJobAccepted>(`/crm/train?source=${source}&val_frac=${valFrac}`, { method: 'POST' }),
+  crmTrainStatus: (source: string, jobId: string) =>
+    request<TrainJobStatus>(`/train/${source}_churn/status/${jobId}`),
 
   // Evaluate
   evaluate: () => request<EvalMetrics>(`/evaluate/${MOD}`),
@@ -566,6 +574,32 @@ export interface TrainResponse {
 export interface TrainJobAccepted {
   job_id: string;
   status: 'pending';
+}
+
+/** Returned by GET /api/crm/data-sufficiency */
+export interface CrmDataSufficiencyResponse {
+  ok: boolean;
+  message: string;
+  stats: {
+    account_count: number;
+    total_rows: number;
+    total_churned: number;
+    total_retained: number;
+    primary_churned: number;
+    primary_retained: number;
+    heuristic_retained: number;
+    accounts_with_signals: number;
+    accounts_with_outcomes: number;
+    error?: string;
+  };
+}
+
+/** Returned by POST /api/crm/train (202). */
+export interface CrmTrainJobAccepted {
+  job_id: string;
+  status: 'pending';
+  module: string;
+  training_rows: number;
 }
 
 /** Returned by GET /api/train/{module}/status/{job_id}. */

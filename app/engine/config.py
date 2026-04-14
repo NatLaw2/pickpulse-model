@@ -115,8 +115,70 @@ CHURN_MODULE = ModuleConfig(
     ),
 )
 
+HUBSPOT_CHURN_MODULE = ModuleConfig(
+    name="hubspot_churn",
+    display_name="HubSpot Churn Risk",
+    label_column="churned",
+    timestamp_column="snapshot_date",
+    id_column="account_id",
+    value_column="arr",
+    positive_label="1",
+    positive_display="Churned",
+    negative_display="Retained",
+    required_columns=["account_id", "churned"],
+    optional_columns=[
+        "arr", "plan", "seats", "monthly_logins", "support_tickets",
+        "nps_score", "days_since_last_login", "contract_months_remaining",
+        "industry", "company_size",
+        "days_until_renewal", "auto_renew_flag", "renewal_status",
+        "contact_count", "deal_count", "days_since_last_activity",
+        "login_rate_per_seat", "ticket_rate_per_seat",
+        "delta_monthly_logins", "delta_nps_score", "delta_support_tickets",
+        "delta_days_until_renewal",
+    ],
+    tiers=TierConfig(
+        high_threshold=0.30,
+        medium_threshold=0.20,
+        high_label="High Risk",
+        medium_label="Medium Risk",
+        low_label="Low Risk",
+    ),
+)
+
+SALESFORCE_CHURN_MODULE = ModuleConfig(
+    name="salesforce_churn",
+    display_name="Salesforce Churn Risk",
+    label_column="churned",
+    timestamp_column="snapshot_date",
+    id_column="account_id",
+    value_column="arr",
+    positive_label="1",
+    positive_display="Churned",
+    negative_display="Retained",
+    required_columns=["account_id", "churned"],
+    optional_columns=[
+        "arr", "plan", "seats", "monthly_logins", "support_tickets",
+        "nps_score", "days_since_last_login", "contract_months_remaining",
+        "industry", "company_size",
+        "days_until_renewal", "auto_renew_flag", "renewal_status",
+        "contact_count", "deal_count", "days_since_last_activity",
+        "login_rate_per_seat", "ticket_rate_per_seat",
+        "delta_monthly_logins", "delta_nps_score", "delta_support_tickets",
+        "delta_days_until_renewal",
+    ],
+    tiers=TierConfig(
+        high_threshold=0.30,
+        medium_threshold=0.20,
+        high_label="High Risk",
+        medium_label="Medium Risk",
+        low_label="Low Risk",
+    ),
+)
+
 MODULES: Dict[str, ModuleConfig] = {
     "churn": CHURN_MODULE,
+    "hubspot_churn": HUBSPOT_CHURN_MODULE,
+    "salesforce_churn": SALESFORCE_CHURN_MODULE,
 }
 
 

@@ -4,7 +4,7 @@ import { useActiveMode } from '../lib/ActiveModeContext';
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
 import { api } from '../lib/api';
-import type { ProviderInfo, HealthResponse, IntegrationAccount, TrainJobStatus } from '../lib/api';
+import type { ProviderInfo, HealthResponse, IntegrationAccount, TrainJobStatus, CrmDataSufficiencyResponse } from '../lib/api';
 import { DatasetsPage } from './DatasetsPage';
 import { TrainPage } from './TrainPage';
 import { formatCurrency } from '../lib/format';
@@ -90,25 +90,38 @@ function StepBadge({ n, done }: { n: number; done?: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
-// Standalone train section (for CRM — no dataset context requirement)
+// CRM-native train section — builds dataset from Supabase, trains isolated model
 // ---------------------------------------------------------------------------
 
 const POLL_MS = 3000;
 
-function TrainSection() {
+function CrmTrainSection({ mode }: { mode: 'hubspot' | 'salesforce' }) {
+  const [sufficiency, setSufficiency] = useState<CrmDataSufficiencyResponse | null>(null);
+  const [loadingSufficiency, setLoadingSufficiency] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<TrainJobStatus | null>(null);
   const [error, setError] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Load sufficiency on mount
+  useEffect(() => {
+    let cancelled = false;
+    api.crmDataSufficiency(mode)
+      .then((res) => { if (!cancelled) setSufficiency(res); })
+      .catch((e: any) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoadingSufficiency(false); });
+    return () => { cancelled = true; };
+  }, [mode]);
+
+  // Poll training job
   useEffect(() => {
     if (!jobId) return;
     if (jobStatus?.status === 'complete' || jobStatus?.status === 'failed') return;
 
     const poll = async () => {
       try {
-        const status = await api.trainStatus(jobId);
+        const status = await api.crmTrainStatus(mode, jobId);
         setJobStatus(status);
         if (status.status === 'complete' || status.status === 'failed') {
           if (pollRef.current) clearInterval(pollRef.current);
@@ -131,7 +144,7 @@ function TrainSection() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [jobId, jobStatus?.status]);
+  }, [jobId, jobStatus?.status, mode]);
 
   const handleTrain = async () => {
     setSubmitting(true);
@@ -139,7 +152,7 @@ function TrainSection() {
     setJobId(null);
     setJobStatus(null);
     try {
-      const res = await api.train(0.2);
+      const res = await api.crmTrain(mode, 0.2);
       setJobId(res.job_id);
       setJobStatus({
         job_id: res.job_id,
@@ -161,11 +174,46 @@ function TrainSection() {
   const isComplete = jobStatus?.status === 'complete';
   const isFailed = jobStatus?.status === 'failed';
 
+  if (loadingSufficiency) {
+    return (
+      <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-1.5">
+        <Loader2 size={11} className="animate-spin" /> Checking data…
+      </p>
+    );
+  }
+
   return (
-    <div>
+    <div className="space-y-3">
+      {/* Data readiness stats */}
+      {sufficiency && (
+        <div className="flex gap-3 flex-wrap">
+          <div className="text-xs px-2.5 py-1.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
+            <span className="font-semibold">{sufficiency.stats.account_count.toLocaleString()}</span>
+            <span className="text-[var(--color-text-muted)] ml-1">accounts</span>
+          </div>
+          <div className="text-xs px-2.5 py-1.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
+            <span className="font-semibold">{sufficiency.stats.accounts_with_outcomes.toLocaleString()}</span>
+            <span className="text-[var(--color-text-muted)] ml-1">verified outcomes</span>
+          </div>
+          <div className="text-xs px-2.5 py-1.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
+            <span className="font-semibold text-[var(--color-danger)]">{sufficiency.stats.primary_churned.toLocaleString()}</span>
+            <span className="text-[var(--color-text-muted)] ml-1">churned examples</span>
+          </div>
+        </div>
+      )}
+
+      {/* Sufficiency failure message */}
+      {sufficiency && !sufficiency.ok && !jobId && (
+        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+          <AlertCircle size={13} className="shrink-0 mt-0.5" />
+          <span>{sufficiency.message}</span>
+        </div>
+      )}
+
+      {/* Train button */}
       <button
         onClick={handleTrain}
-        disabled={submitting || isRunning}
+        disabled={submitting || isRunning || (sufficiency !== null && !sufficiency.ok)}
         className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
       >
         {submitting || isRunning ? (
@@ -182,13 +230,13 @@ function TrainSection() {
       </button>
 
       {isRunning && (
-        <p className="mt-2 text-xs text-[var(--color-text-muted)] flex items-center gap-1.5">
+        <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-1.5">
           <Loader2 size={11} className="animate-spin" />
           Training in progress — this runs in the background.
         </p>
       )}
       {isComplete && (
-        <p className="mt-2 text-xs text-[var(--color-success)] flex items-center gap-1.5">
+        <p className="text-xs text-[var(--color-success)] flex items-center gap-1.5">
           <CheckCircle2 size={11} />
           Training complete
           {jobStatus?.version_str ? ` · ${jobStatus.version_str}` : ''}
@@ -196,12 +244,12 @@ function TrainSection() {
         </p>
       )}
       {isFailed && (
-        <p className="mt-2 text-xs text-[var(--color-danger)] flex items-center gap-1.5">
+        <p className="text-xs text-[var(--color-danger)] flex items-center gap-1.5">
           <XCircle size={11} />
           {jobStatus?.error_message || 'Training failed'}
         </p>
       )}
-      {error && <p className="mt-2 text-xs text-[var(--color-danger)]">{error}</p>}
+      {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
     </div>
   );
 }
@@ -481,9 +529,9 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
             <h2 className="text-sm font-semibold">Train Churn Model</h2>
           </div>
           <p className="text-xs text-[var(--color-text-muted)] mb-3">
-            Build a calibrated model using your {brand.name} account data.
+            Build a calibrated model using your {brand.name} account data. Mark at least 10 accounts as churned in the Accounts page first.
           </p>
-          <TrainSection />
+          <CrmTrainSection mode={mode} />
         </div>
 
         {/* ── Step 4: Score accounts ── */}

@@ -1133,6 +1133,190 @@ def refresh_production_accuracy(tenant_id: str = Depends(get_tenant_id)):
     return get_or_refresh(tenant_id, force=True)
 
 
+# -----------------------------------------------------------------------
+# CRM-native model training
+# Builds a labeled dataset from Supabase (accounts + signals + outcomes)
+# and trains a provider-isolated model (hubspot_churn / salesforce_churn).
+# -----------------------------------------------------------------------
+
+def _execute_crm_training_job(
+    tenant_id: str,
+    module_name: str,
+    run_id: str,
+    df: "pd.DataFrame",
+    val_frac: float,
+    artifact_dir: str,
+    version_str: str,
+) -> None:
+    """Background worker for CRM-native training. Accepts a pre-built DataFrame."""
+
+    def _update_mem(run_id: str, **fields) -> None:
+        mem = _get_state(tenant_id).get("model_runs", {}).get(run_id)
+        if mem is not None:
+            mem.update(fields)
+
+    try:
+        started = datetime.now(timezone.utc)
+        store.update_model_run(run_id, status="running", started_at=started)
+        _update_mem(run_id, status="running", started_at=started.isoformat())
+
+        mod = get_module(module_name)
+
+        # Drop metadata column that must not become a feature
+        if "label_source" in df.columns:
+            df = df.drop(columns=["label_source"])
+
+        metadata = train_model(df, mod, val_frac=val_frac, tenant_id=tenant_id,
+                               run_id=run_id, version_str=version_str)
+
+        if "error" in metadata:
+            raise RuntimeError(metadata.get("message", metadata["error"]))
+
+        loaded_artifacts = load_model(mod, artifact_dir=artifact_dir)
+
+        state = _get_state(tenant_id)
+        ts_col = mod.timestamp_column
+        metrics = None
+        if ts_col in df.columns:
+            df_sorted = df.copy()
+            df_sorted["_ts"] = pd.to_datetime(df_sorted[ts_col], errors="coerce")
+            df_sorted = df_sorted.sort_values("_ts").drop(columns=["_ts"])
+            split_idx = int(len(df_sorted) * (1 - val_frac))
+            val_df = df_sorted.iloc[split_idx:]
+            if len(val_df) >= 10:
+                metrics = evaluate_model(val_df, mod, tenant_id=tenant_id,
+                                         artifacts=loaded_artifacts)
+                state["metrics"][module_name] = metrics
+                eval_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_evaluation.json")
+                with open(eval_path, "w") as ef:
+                    json.dump(metrics, ef, indent=2)
+        if metrics is None and metadata.get("val_metrics"):
+            metrics = metadata["val_metrics"]
+            state["metrics"][module_name] = metrics
+            eval_path = os.path.join(_tenant_output_dir(tenant_id), f"{module_name}_evaluation.json")
+            with open(eval_path, "w") as ef:
+                json.dump(metrics, ef, indent=2)
+
+        completed = datetime.now(timezone.utc)
+        final_metrics = metrics or metadata.get("val_metrics")
+        store.update_model_run(
+            run_id,
+            status="complete",
+            version_str=metadata.get("version"),
+            metrics_json=final_metrics,
+            artifact_path=artifact_dir,
+            completed_at=completed,
+        )
+        _update_mem(run_id, status="complete", version_str=metadata.get("version"),
+                    metrics_json=final_metrics, completed_at=completed.isoformat())
+        store.set_current_model_run(tenant_id, module_name, run_id)
+        store.log_action(tenant_id, "model.crm_train_complete", entity_id=run_id,
+                         metadata={"module": module_name, "version": metadata.get("version"),
+                                   "artifact_path": artifact_dir})
+
+    except Exception as exc:
+        traceback.print_exc()
+        failed_at = datetime.now(timezone.utc)
+        store.update_model_run(
+            run_id,
+            status="failed",
+            error_message=str(exc),
+            completed_at=failed_at,
+        )
+        _update_mem(run_id, status="failed", error_message=str(exc),
+                    completed_at=failed_at.isoformat())
+        sentry_sdk.capture_exception(exc)
+
+
+@app.get("/api/crm/data-sufficiency")
+def crm_data_sufficiency(
+    source: str = Query(...),
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Check whether sufficient labeled CRM data exists to train a model.
+
+    Returns account counts, outcome distribution, and a pass/fail verdict
+    with a human-readable explanation of any shortfall.
+    """
+    if source not in ("hubspot", "salesforce"):
+        raise HTTPException(status_code=400, detail=f"Unknown source '{source}'. Must be 'hubspot' or 'salesforce'.")
+    try:
+        from app.crm_training import build_crm_training_dataset, check_data_sufficiency
+        df, stats = build_crm_training_dataset(tenant_id=tenant_id, source=source)
+        ok, message, stats = check_data_sufficiency(df, stats)
+        return {
+            "ok": ok,
+            "message": message,
+            "stats": stats,
+        }
+    except Exception as exc:
+        logger.exception("[crm] data-sufficiency failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/crm/train", status_code=202)
+def crm_train(
+    source: str = Query(...),
+    val_frac: float = Query(0.2),
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Start a CRM-native training job. Builds dataset from Supabase tables.
+
+    Returns 202 immediately with job_id; poll
+    GET /api/train/{source}_churn/status/{job_id} for progress.
+    """
+    if source not in ("hubspot", "salesforce"):
+        raise HTTPException(status_code=400, detail=f"Unknown source '{source}'.")
+
+    module_name = f"{source}_churn"
+    mod = get_module(module_name)  # validates module exists
+
+    # Build and validate the training dataset synchronously (fast enough for request time)
+    try:
+        from app.crm_training import build_crm_training_dataset, check_data_sufficiency
+        df, stats = build_crm_training_dataset(tenant_id=tenant_id, source=source)
+        ok, message, stats = check_data_sufficiency(df, stats)
+        if not ok:
+            raise HTTPException(status_code=400, detail=message)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("[crm] train dataset build failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    run_id = str(uuid.uuid4())
+    artifact_dir = mod.get_artifact_dir(tenant_id, run_id=run_id)
+    store.create_model_run(tenant_id, module_name, run_id, artifact_dir)
+
+    _get_state(tenant_id)["model_runs"][run_id] = {
+        "id": run_id, "tenant_id": tenant_id, "module": module_name,
+        "status": "pending", "trained_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": None, "completed_at": None,
+        "version_str": None, "metrics_json": None, "error_message": None,
+    }
+
+    completed_count = sum(
+        1 for r in store.list_model_runs(tenant_id, module_name)
+        if r.get("status") == "complete"
+    )
+    version_str = f"{module_name}_v{completed_count + 1}"
+
+    store.log_action(tenant_id, "model.crm_train_start", entity_id=run_id,
+                     metadata={"module": module_name, "source": source,
+                               "val_frac": val_frac, "version_str": version_str,
+                               "training_rows": len(df)})
+
+    threading.Thread(
+        target=_execute_crm_training_job,
+        args=(tenant_id, module_name, run_id, df, val_frac, artifact_dir, version_str),
+        daemon=True,
+        name=f"crm-train-{run_id[:8]}",
+    ).start()
+
+    return {"job_id": run_id, "status": "pending", "module": module_name,
+            "training_rows": len(df)}
+
+
 @app.post("/api/evaluate/{module_name}/report")
 def generate_report(module_name: str, tenant_id: str = Depends(get_tenant_id)):
     mod = get_module(module_name)
@@ -2623,13 +2807,42 @@ def trigger_live_scoring(
     When provided, only that provider's accounts are scored and the active-source
     context is updated to reflect the provider.  When omitted, all accounts are
     scored (legacy behaviour — retained for backward compatibility).
+
+    Model resolution order (first model found wins):
+      1. {source}_churn model — provider-specific CRM-native model
+      2. generic churn model — CSV-trained fallback
     """
-    mod = get_module("churn")
-    current_run = store.get_current_model_run(tenant_id, "churn")
-    if current_run and current_run.get("artifact_path"):
-        artifact_dir = current_run["artifact_path"]
-    else:
-        artifact_dir = mod.get_artifact_dir(tenant_id)  # legacy fallback
+    # Resolve the effective provider first (needed for model selection)
+    effective_source = source or _get_crm_provider(tenant_id)
+
+    # Try provider-specific model first, then fall back to generic churn
+    mod = None
+    artifact_dir = None
+    if effective_source and effective_source in ("hubspot", "salesforce"):
+        crm_module_name = f"{effective_source}_churn"
+        try:
+            crm_mod = get_module(crm_module_name)
+            crm_run = store.get_current_model_run(tenant_id, crm_module_name)
+            if crm_run and crm_run.get("artifact_path"):
+                crm_artifact_dir = crm_run["artifact_path"]
+            else:
+                crm_artifact_dir = crm_mod.get_artifact_dir(tenant_id)
+            if os.path.exists(os.path.join(crm_artifact_dir, "model.joblib")):
+                mod = crm_mod
+                artifact_dir = crm_artifact_dir
+                logger.info("[scoring] using provider-specific model: %s", crm_module_name)
+        except Exception:
+            pass  # module not registered or other error — fall through to generic
+
+    if mod is None:
+        mod = get_module("churn")
+        current_run = store.get_current_model_run(tenant_id, "churn")
+        if current_run and current_run.get("artifact_path"):
+            artifact_dir = current_run["artifact_path"]
+        else:
+            artifact_dir = mod.get_artifact_dir(tenant_id)  # legacy fallback
+        logger.info("[scoring] using generic churn model")
+
     model_path = os.path.join(artifact_dir, "model.joblib")
 
     if not os.path.exists(model_path):
@@ -2637,10 +2850,6 @@ def trigger_live_scoring(
 
     # Resolve the effective provider: prefer explicit source param; fall back to
     # the provider recorded from the previous scoring run so that "Rescore All"
-    # without an explicit source always rescores the same provider that was
-    # active before rather than silently mixing all providers.
-    effective_source = source or _get_crm_provider(tenant_id)
-
     acct_count = storage_repo.account_count(source=effective_source, tenant_id=tenant_id)
     if acct_count == 0:
         raise HTTPException(status_code=400, detail="No accounts in database. Sync an integration first.")
