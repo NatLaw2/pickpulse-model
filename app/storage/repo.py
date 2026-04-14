@@ -465,7 +465,7 @@ def get_account_latest_score(
 # ---------------------------------------------------------------------------
 
 _OUTCOME_TYPES = {"renewed", "churned", "expanded"}
-_OUTCOME_SOURCES = {"manual", "hubspot", "stripe", "system"}
+_OUTCOME_SOURCES = {"manual", "hubspot", "salesforce", "stripe", "system"}
 
 
 def record_outcome(
@@ -508,6 +508,59 @@ def record_outcome(
         return True
     except Exception as exc:
         logger.warning("record_outcome: insert failed (%s)", exc)
+        return False
+
+
+def upsert_outcome(
+    external_id: str,
+    outcome_type: str,
+    source: str,
+    effective_date: Optional[str] = None,
+    notes: Optional[str] = None,
+    tenant_id: str = DEFAULT_TENANT,
+) -> bool:
+    """Write an outcome only if no outcome from this source already exists for the account.
+
+    Idempotent: safe to call on every sync — won't create duplicates.
+    Manual outcomes (source='manual') are separate from CRM-sourced outcomes
+    and are never overwritten.
+    Returns True if a new record was written, False if skipped or failed.
+    """
+    if outcome_type not in _OUTCOME_TYPES:
+        logger.warning("upsert_outcome: unknown outcome_type=%s — skipping", outcome_type)
+        return False
+
+    account_id = get_account_id(external_id, tenant_id=tenant_id)
+    if not account_id:
+        return False
+
+    try:
+        sb = get_client()
+        # Check whether this source has already recorded an outcome for this account
+        existing = (
+            sb.table("account_outcomes")
+            .select("id")
+            .eq("tenant_id", tenant_id)
+            .eq("account_id", account_id)
+            .eq("source", source)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            return False  # Already imported from this source — skip
+
+        sb.table("account_outcomes").insert({
+            "tenant_id": tenant_id,
+            "account_id": account_id,
+            "outcome_type": outcome_type,
+            "effective_date": effective_date or date.today().isoformat(),
+            "source": source if source in _OUTCOME_SOURCES else "system",
+            "notes": notes,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        return True
+    except Exception as exc:
+        logger.warning("upsert_outcome: failed (%s)", exc)
         return False
 
 

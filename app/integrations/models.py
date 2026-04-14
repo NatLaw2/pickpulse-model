@@ -126,5 +126,6 @@ class SyncResult(BaseModel):
     connector: str
     accounts_synced: int = 0
     signals_synced: int = 0
+    outcomes_imported: int = 0
     errors: List[str] = Field(default_factory=list)
     duration_seconds: float = 0.0

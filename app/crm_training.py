@@ -276,22 +276,56 @@ def _build_row(
 # ---------------------------------------------------------------------------
 
 def _fetch_all_signals(sb: Any, tenant_id: str, account_ids: Set[str]) -> List[Dict[str, Any]]:
-    """Fetch all signal rows for the given account UUIDs (all dates, ascending)."""
-    try:
-        res = (
-            sb.table("account_signals_daily")
-            .select("account_id, signal_key, signal_value, signal_text, signal_date")
-            .eq("tenant_id", tenant_id)
-            .order("signal_date", desc=False)
-            .limit(200000)
-            .execute()
-        )
-        if not res.data:
-            return []
-        return [r for r in res.data if r.get("account_id") in account_ids]
-    except Exception as exc:
-        logger.warning("[crm_train] _fetch_all_signals error: %s", exc)
-        return []
+    """Fetch all signal rows for the given account UUIDs (all dates, ascending).
+
+    Paginates in two dimensions to handle large datasets without hitting
+    Supabase's single-query row limits:
+      - Outer loop: batches of ACCOUNT_BATCH_SIZE account UUIDs (IN clause)
+      - Inner loop: pages of PAGE_SIZE rows within each account batch
+
+    At 6k accounts × 10 signals × 30 daily snapshots ≈ 1.8M rows, a single
+    200k-row query would silently truncate results. This approach scales to
+    millions of rows.
+    """
+    ACCOUNT_BATCH_SIZE = 200  # keep IN clause well under Supabase URL length limits
+    PAGE_SIZE = 10_000        # rows per Supabase paginated request
+
+    all_rows: List[Dict[str, Any]] = []
+    account_list = list(account_ids)
+
+    for i in range(0, len(account_list), ACCOUNT_BATCH_SIZE):
+        batch_ids = account_list[i: i + ACCOUNT_BATCH_SIZE]
+        offset = 0
+
+        while True:
+            try:
+                res = (
+                    sb.table("account_signals_daily")
+                    .select("account_id, signal_key, signal_value, signal_text, signal_date")
+                    .eq("tenant_id", tenant_id)
+                    .in_("account_id", batch_ids)
+                    .order("signal_date", desc=False)
+                    .range(offset, offset + PAGE_SIZE - 1)
+                    .execute()
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[crm_train] _fetch_all_signals batch %d-%d error: %s",
+                    i, i + ACCOUNT_BATCH_SIZE, exc,
+                )
+                break
+
+            if not res.data:
+                break
+
+            all_rows.extend(res.data)
+
+            if len(res.data) < PAGE_SIZE:
+                break  # Last page for this batch
+            offset += PAGE_SIZE
+
+    logger.info("[crm_train] fetched %d signal rows for %d accounts", len(all_rows), len(account_ids))
+    return all_rows
 
 
 def _fetch_outcomes(

@@ -39,6 +39,7 @@ _ACCOUNT_FIELDS = [
     "NumberOfEmployees",
     "CreatedDate",
     "LastActivityDate",
+    "Type",  # "Former Customer" → churn indicator for outcome auto-import
 ]
 
 # Batch size for SOQL IN clauses — stays well under the 20k char SOQL limit
@@ -277,41 +278,60 @@ class SalesforceConnector(BaseConnector):
     def pull_signals(self, external_ids: List[str]) -> List[AccountSignal]:
         """Pull account-level engagement signals via batch SOQL aggregates.
 
-        For each account, we collect:
-          - contact_count        (related Contact records)
-          - opp_count            (open Opportunity records)
-          - opp_value            (sum of Amount on open Opportunities)
-          - days_since_last_activity  (from LastActivityDate on Account record)
+        Signals collected per account:
+          - contact_count             → seats proxy (team breadth)
+          - opp_count / opp_value     → open opportunity pipeline
+          - case_count                → open support cases → support_tickets
+          - days_since_last_activity  → from LastActivityDate → days_since_last_login
+          - days_until_renewal        → from nearest open Opportunity CloseDate
 
-        Queries are batched in groups of _SIGNAL_BATCH_SIZE to keep SOQL
-        query strings well under the 20k character limit.
+        All queries are batched in groups of _SIGNAL_BATCH_SIZE to stay well
+        under the 20k character SOQL limit.
         """
         if not external_ids:
             return []
 
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_dt = datetime.now(timezone.utc)
+        today = today_dt.strftime("%Y-%m-%d")
 
-        # Build lookup maps from batch SOQL queries
+        # Batch SOQL queries — all return {account_id: value}
         contact_counts = self._query_contact_counts(external_ids)
         opp_data = self._query_opportunity_data(external_ids)
+        case_counts = self._query_case_counts(external_ids)
+        activity_dates = self._query_activity_dates(external_ids)
+        renewal_dates = self._query_renewal_dates(external_ids)
 
         signals: List[AccountSignal] = []
         for eid in external_ids:
             try:
                 contact_count = contact_counts.get(eid, 0)
                 opp_count, opp_value = opp_data.get(eid, (0, None))
+                case_count = case_counts.get(eid, None)
 
-                # LastActivityDate is already on the Account record in raw_data
-                # We don't have raw_data here, so days_inactive stays None.
-                # The scoring layer will use what's available.
-                # (Full activity date enrichment deferred to v2 via Account cache.)
+                # days_since_last_login proxy from LastActivityDate
+                days_inactive: Optional[int] = None
+                last_act = activity_dates.get(eid)
+                if last_act:
+                    days_inactive = days_since(last_act)
+
+                # days_until_renewal from nearest open Opportunity CloseDate
+                days_renewal: Optional[float] = None
+                renewal_date = renewal_dates.get(eid)
+                if renewal_date:
+                    try:
+                        from datetime import date as date_cls
+                        rd = date_cls.fromisoformat(renewal_date[:10])
+                        days_renewal = (rd - today_dt.date()).days
+                    except (ValueError, TypeError):
+                        pass
 
                 signals.append(AccountSignal(
                     external_id=eid,
                     signal_date=today,
                     seats=contact_count if contact_count > 0 else None,
-                    support_tickets=None,  # No Cases in v1 scope
-                    days_since_last_login=None,  # Set below from raw_data if available
+                    support_tickets=case_count,
+                    days_since_last_login=days_inactive,
+                    days_until_renewal=days_renewal,
                     extra={
                         "contact_count": contact_count,
                         "opp_count": opp_count,
@@ -385,6 +405,89 @@ class SalesforceConnector(BaseConnector):
             except Exception as exc:
                 logger.warning("[salesforce] Opportunity batch failed: %s", exc)
         return opp_map
+
+    def _query_case_counts(self, account_ids: List[str]) -> Dict[str, int]:
+        """Return {account_id: open_case_count} for all given account IDs."""
+        counts: Dict[str, int] = {}
+        for batch in self._chunks(account_ids, _SIGNAL_BATCH_SIZE):
+            id_list = ", ".join(f"'{aid}'" for aid in batch)
+            soql = (
+                f"SELECT AccountId, COUNT(Id) "
+                f"FROM Case "
+                f"WHERE AccountId IN ({id_list}) "
+                f"AND IsClosed = false "
+                f"GROUP BY AccountId"
+            )
+            try:
+                r = self._request(
+                    "GET",
+                    f"{self._api_base()}/query",
+                    params={"q": soql},
+                    timeout=30,
+                )
+                if r.status_code == 200:
+                    for rec in r.json().get("records", []):
+                        counts[rec["AccountId"]] = rec.get("expr0", 0)
+                else:
+                    logger.warning("[salesforce] Case count query returned %d", r.status_code)
+            except Exception as exc:
+                logger.warning("[salesforce] Case count batch failed: %s", exc)
+        return counts
+
+    def _query_activity_dates(self, account_ids: List[str]) -> Dict[str, Optional[str]]:
+        """Return {account_id: LastActivityDate ISO string} for given account IDs."""
+        dates: Dict[str, Optional[str]] = {}
+        for batch in self._chunks(account_ids, _SIGNAL_BATCH_SIZE):
+            id_list = ", ".join(f"'{aid}'" for aid in batch)
+            soql = (
+                f"SELECT Id, LastActivityDate "
+                f"FROM Account "
+                f"WHERE Id IN ({id_list})"
+            )
+            try:
+                r = self._request(
+                    "GET",
+                    f"{self._api_base()}/query",
+                    params={"q": soql},
+                    timeout=30,
+                )
+                if r.status_code == 200:
+                    for rec in r.json().get("records", []):
+                        dates[rec["Id"]] = rec.get("LastActivityDate")
+                else:
+                    logger.warning("[salesforce] Activity date query returned %d", r.status_code)
+            except Exception as exc:
+                logger.warning("[salesforce] Activity date batch failed: %s", exc)
+        return dates
+
+    def _query_renewal_dates(self, account_ids: List[str]) -> Dict[str, Optional[str]]:
+        """Return {account_id: nearest open Opportunity CloseDate ISO string}."""
+        dates: Dict[str, Optional[str]] = {}
+        for batch in self._chunks(account_ids, _SIGNAL_BATCH_SIZE):
+            id_list = ", ".join(f"'{aid}'" for aid in batch)
+            soql = (
+                f"SELECT AccountId, MIN(CloseDate) "
+                f"FROM Opportunity "
+                f"WHERE AccountId IN ({id_list}) "
+                f"AND IsClosed = false "
+                f"AND IsDeleted = false "
+                f"GROUP BY AccountId"
+            )
+            try:
+                r = self._request(
+                    "GET",
+                    f"{self._api_base()}/query",
+                    params={"q": soql},
+                    timeout=30,
+                )
+                if r.status_code == 200:
+                    for rec in r.json().get("records", []):
+                        dates[rec["AccountId"]] = rec.get("expr0")
+                else:
+                    logger.warning("[salesforce] Renewal date query returned %d", r.status_code)
+            except Exception as exc:
+                logger.warning("[salesforce] Renewal date batch failed: %s", exc)
+        return dates
 
     @staticmethod
     def _chunks(lst: List[str], size: int):
