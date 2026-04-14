@@ -95,7 +95,7 @@ function StepBadge({ n, done }: { n: number; done?: boolean }) {
 
 const POLL_MS = 3000;
 
-function CrmTrainSection({ mode }: { mode: 'hubspot' | 'salesforce' }) {
+function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; syncCount: number }) {
   const [sufficiency, setSufficiency] = useState<CrmDataSufficiencyResponse | null>(null);
   const [loadingSufficiency, setLoadingSufficiency] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -104,15 +104,16 @@ function CrmTrainSection({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   const [error, setError] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load sufficiency on mount
+  // Re-fetch sufficiency whenever sync completes (syncCount increments after each sync)
   useEffect(() => {
     let cancelled = false;
+    setLoadingSufficiency(true);
     api.crmDataSufficiency(mode)
       .then((res) => { if (!cancelled) setSufficiency(res); })
       .catch((e: any) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoadingSufficiency(false); });
     return () => { cancelled = true; };
-  }, [mode]);
+  }, [mode, syncCount]);
 
   // Poll training job
   useEffect(() => {
@@ -266,6 +267,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   const [provider, setProvider] = useState<ProviderInfo | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [accounts, setAccounts] = useState<IntegrationAccount[]>([]);
+  const [syncCount, setSyncCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [scoring, setScoring] = useState(false);
@@ -369,6 +371,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
       const result = await api.syncIntegration(mode);
       showToast(`Synced ${result.accounts_synced} accounts from ${brand.name}`);
       await loadData();
+      setSyncCount((c) => c + 1); // triggers CrmTrainSection to re-fetch sufficiency
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -561,7 +564,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
           <p className="text-xs text-[var(--color-text-muted)] mb-3">
             Build a calibrated model using your {brand.name} account data. Mark at least 10 accounts as churned in the Accounts page first.
           </p>
-          <CrmTrainSection mode={mode} />
+          <CrmTrainSection mode={mode} syncCount={syncCount} />
         </div>
 
         {/* ── Step 4: Score accounts ── */}

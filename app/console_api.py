@@ -2416,9 +2416,11 @@ def trigger_sync(provider: str, tenant_id: str = Depends(get_tenant_id)):
             )
         result = sync_connector(provider)
 
-    # In DEMO_MODE, seed realistic signals + outcome labels for freshly imported
-    # accounts so the CRM training sufficiency gate passes without manual labeling.
-    if result.accounts_synced > 0 and DEMO_MODE:
+    # In DEMO_MODE, seed realistic signals + outcome labels so the CRM training
+    # sufficiency gate passes without manual labeling.  Run unconditionally on
+    # every sync — accounts_synced can be 0 when existing accounts are re-upserted
+    # without changes, but we still need outcomes seeded for those accounts.
+    if DEMO_MODE:
         try:
             auto_seed_if_needed(tenant_id, source=provider)
         except Exception as exc:
