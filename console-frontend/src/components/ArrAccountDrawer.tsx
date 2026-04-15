@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import {
   X, Loader2, AlertCircle, ChevronRight,
-  Users, Shield, Activity, Info,
+  Activity, Info,
 } from 'lucide-react';
 import { api, type ArrAccountDetails, type ArrRankedAccount } from '../lib/api';
 import { formatCurrency } from '../lib/format';
