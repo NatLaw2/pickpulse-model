@@ -118,6 +118,62 @@ def account_count(source: Optional[str] = None, tenant_id: str = DEFAULT_TENANT)
         return 0
 
 
+def clear_provider_data(source: str, tenant_id: str) -> Dict[str, int]:
+    """Delete all Supabase rows for a CRM provider's accounts.
+
+    Clears in dependency order to avoid foreign-key violations:
+      churn_scores_daily → account_signals_daily → account_outcomes → accounts
+
+    Called by reset_demo so that a demo reset produces a truly clean state
+    and the idempotency guard in DemoDataLoader works correctly on next sync.
+
+    Returns a dict of ``{table_name: rows_deleted}`` for logging.
+    """
+    try:
+        sb = get_client()
+        acct_res = (
+            sb.table("accounts")
+            .select("id")
+            .eq("tenant_id", tenant_id)
+            .eq("source", source)
+            .execute()
+        )
+        account_ids = [r["id"] for r in (acct_res.data or []) if r.get("id")]
+        if not account_ids:
+            return {"accounts": 0, "scores": 0, "signals": 0, "outcomes": 0}
+
+        BATCH = 200
+        counts: Dict[str, int] = {"scores": 0, "signals": 0, "outcomes": 0, "accounts": 0}
+
+        # Delete scores
+        for i in range(0, len(account_ids), BATCH):
+            batch = account_ids[i : i + BATCH]
+            res = sb.table("churn_scores_daily").delete().eq("tenant_id", tenant_id).in_("account_id", batch).execute()
+            counts["scores"] += len(res.data) if res.data else 0
+
+        # Delete signals
+        for i in range(0, len(account_ids), BATCH):
+            batch = account_ids[i : i + BATCH]
+            res = sb.table("account_signals_daily").delete().eq("tenant_id", tenant_id).in_("account_id", batch).execute()
+            counts["signals"] += len(res.data) if res.data else 0
+
+        # Delete outcomes
+        for i in range(0, len(account_ids), BATCH):
+            batch = account_ids[i : i + BATCH]
+            res = sb.table("account_outcomes").delete().eq("tenant_id", tenant_id).in_("account_id", batch).execute()
+            counts["outcomes"] += len(res.data) if res.data else 0
+
+        # Delete accounts
+        res = sb.table("accounts").delete().eq("tenant_id", tenant_id).eq("source", source).execute()
+        counts["accounts"] += len(res.data) if res.data else 0
+
+        logger.info("clear_provider_data: %s tenant=%s deleted=%s", source, tenant_id[:8], counts)
+        return counts
+    except Exception as exc:
+        logger.warning("clear_provider_data: failed for source=%s: %s", source, exc)
+        return {}
+
+
 def clear_scores_for_source(source: str, tenant_id: str = DEFAULT_TENANT) -> int:
     """Delete all churn_scores_daily rows for accounts belonging to `source`.
 

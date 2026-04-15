@@ -385,6 +385,21 @@ def reset_demo(tenant_id: str = Depends(get_tenant_id)):
     store.delete_tenant_predictions(tenant_id)
     cleared.append("predictions_live")
 
+    # 8. In demo mode, clear all Supabase CRM data for synthetic providers so
+    #    the next demo run starts from a truly clean state.  Without this, the
+    #    DemoDataLoader's idempotency guard would find the old synthetic accounts
+    #    and skip re-loading, which prevents cross-provider switching from
+    #    working cleanly (e.g., HubSpot → reset → Salesforce).
+    if DEMO_MODE:
+        for _provider in ("hubspot", "salesforce"):
+            try:
+                _counts = storage_repo.clear_provider_data(_provider, tenant_id)
+                logger.info("[reset] cleared %s CRM data: %s", _provider, _counts)
+                if any(v > 0 for v in _counts.values()):
+                    cleared.append(f"crm_{_provider}")
+            except Exception as _exc:
+                logger.warning("[reset] clear_provider_data(%s) failed: %s", _provider, _exc)
+
     return {"status": "reset", "tenant_id": tenant_id, "cleared": cleared}
 
 
