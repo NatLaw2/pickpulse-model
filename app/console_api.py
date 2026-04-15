@@ -54,6 +54,7 @@ from .integrations import registry as connector_registry
 from .integrations.sync import sync_connector, sync_all
 from .integrations.scoring import score_accounts
 from .demo_seed import auto_seed_if_needed
+from .demo import DemoModeResolver
 try:
     from .integrations import service as integration_service
 except Exception:
@@ -144,6 +145,10 @@ UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 SAMPLE_DIR = os.path.join(DATA_DIR, "sample")
 MODULE_NAME = "churn"
 DEMO_MODE = os.environ.get("DEMO_MODE", "").lower() in ("true", "1")
+
+# Central demo/live mode resolver.  All CRM demo-mode logic routes through here.
+# See app/demo/resolver.py for the provider resolution table.
+demo_resolver = DemoModeResolver(demo_mode=DEMO_MODE)
 
 # Ensure subdirectories exist at startup.
 # Do NOT call makedirs on DATA_DIR itself — on Render, /data is the persistent
@@ -1244,14 +1249,11 @@ def crm_data_sufficiency(
         raise HTTPException(status_code=400, detail=f"Unknown source '{source}'. Must be 'hubspot' or 'salesforce'.")
     seed_warning: Optional[str] = None
     if DEMO_MODE:
-        try:
-            seed_result = auto_seed_if_needed(tenant_id, source=source)
-            if seed_result == -1:
-                seed_warning = "Demo outcome seeding failed — check server logs. Training may be blocked."
-                logger.warning("[demo_seed] sufficiency pre-seed returned failure for source=%s tenant=%s", source, tenant_id)
-        except Exception as exc:
-            seed_warning = f"Demo seed error: {exc}"
-            logger.warning("[demo_seed] sufficiency pre-seed raised: %s", exc)
+        # Ensure demo dataset is loaded (idempotent — no-op if already present).
+        load_result = demo_resolver.ensure_demo_data(tenant_id, provider=source)
+        if load_result.errors:
+            seed_warning = f"Demo data load error: {'; '.join(load_result.errors)}"
+            logger.warning("[demo_resolver] sufficiency pre-load errors: %s", load_result.errors)
     try:
         from app.crm_training import build_crm_training_dataset, check_data_sufficiency
         df, stats = build_crm_training_dataset(tenant_id=tenant_id, source=source)
@@ -1286,10 +1288,10 @@ def crm_train(
 
     # Build and validate the training dataset synchronously (fast enough for request time)
     if DEMO_MODE:
-        try:
-            auto_seed_if_needed(tenant_id, source=source)
-        except Exception as exc:
-            logger.warning("[demo_seed] train pre-seed failed: %s", exc)
+        # Ensure demo dataset is loaded (idempotent — no-op if already present).
+        load_result = demo_resolver.ensure_demo_data(tenant_id, provider=source)
+        if load_result.errors:
+            logger.warning("[demo_resolver] train pre-load errors: %s", load_result.errors)
     try:
         from app.crm_training import build_crm_training_dataset, check_data_sufficiency
         df, stats = build_crm_training_dataset(tenant_id=tenant_id, source=source)
@@ -2412,9 +2414,40 @@ def disconnect_integration(provider: str, tenant_id: str = Depends(get_tenant_id
 
 @app.post("/api/integrations/{provider}/sync")
 def trigger_sync(provider: str, tenant_id: str = Depends(get_tenant_id)):
-    """Trigger a sync for a provider."""
+    """Trigger a sync for a provider.
+
+    In demo mode, HubSpot and Salesforce bypass the live CRM pull entirely and
+    use a fixed seeded synthetic dataset instead.  The OAuth connection flow is
+    preserved; only the data ingestion step is replaced.
+    """
     from app.integrations.models import SyncResult as _SyncResult
 
+    # ------------------------------------------------------------------
+    # Demo mode intercept (HubSpot / Salesforce only)
+    # ------------------------------------------------------------------
+    # When running in demo mode, load the provider-specific synthetic dataset
+    # directly into Supabase instead of pulling live CRM data.  This ensures:
+    #   • The rest of the pipeline (train / score / ARR CC) operates on the
+    #     same Supabase tables and requires zero downstream changes.
+    #   • Live CRM data can never contaminate the demo tenant.
+    #   • The result is deterministic and repeatable across demo runs.
+    if demo_resolver.should_use_synthetic(provider):
+        logger.info("[sync] DEMO MODE: loading synthetic %s dataset for tenant %s…", provider, tenant_id[:8])
+        load_result = demo_resolver.ensure_demo_data(tenant_id, provider)
+        if load_result.errors:
+            logger.error("[sync] Demo data load errors: %s", load_result.errors)
+        return {
+            "status": "synced",
+            "accounts_synced": load_result.account_count,
+            "signals_synced": load_result.signal_count,
+            "errors": load_result.errors,
+            "duration_seconds": 0,
+            "demo_mode": True,
+        }
+
+    # ------------------------------------------------------------------
+    # Live mode — real CRM ingestion (unchanged)
+    # ------------------------------------------------------------------
     if integration_service:
         # Service layer handles OAuth providers — never fall back to legacy for these.
         # Any internal exception is caught here and returned as a SyncResult error
@@ -2433,16 +2466,6 @@ def trigger_sync(provider: str, tenant_id: str = Depends(get_tenant_id)):
                 detail=f"Connector '{provider}' not configured or not enabled.",
             )
         result = sync_connector(provider)
-
-    # In DEMO_MODE, seed realistic signals + outcome labels so the CRM training
-    # sufficiency gate passes without manual labeling.  Run unconditionally on
-    # every sync — accounts_synced can be 0 when existing accounts are re-upserted
-    # without changes, but we still need outcomes seeded for those accounts.
-    if DEMO_MODE:
-        try:
-            auto_seed_if_needed(tenant_id, source=provider)
-        except Exception as exc:
-            logger.warning("[demo_seed] post-sync seed failed: %s", exc)
 
     return {
         "status": "synced" if not result.errors else "partial",
@@ -2888,11 +2911,10 @@ def trigger_live_scoring(
     if acct_count == 0:
         raise HTTPException(status_code=400, detail="No accounts in database. Sync an integration first.")
 
-    # In demo mode, auto-seed engagement signals if none exist yet so that
-    # scoring produces a realistic risk distribution without a manual CLI step.
-    print(f"[demo_seed] trigger_live_scoring: DEMO_MODE={DEMO_MODE} tenant={tenant_id[:8]}…")  # TEMP
-    if DEMO_MODE:
-        auto_seed_if_needed(tenant_id=tenant_id)
+    # In demo mode, ensure signals/outcomes are present before scoring.
+    # This is a safety-net only — data should already be loaded from trigger_sync.
+    if DEMO_MODE and effective_source in ("hubspot", "salesforce"):
+        demo_resolver.ensure_demo_data(tenant_id, provider=effective_source)
 
     try:
         scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir, source=effective_source)
@@ -2980,19 +3002,29 @@ def get_latest_scores(
 @app.post("/api/integrations/{connector_name}/run-demo")
 def run_demo(connector_name: str, tenant_id: str = Depends(get_tenant_id)):
     """One-click: validate connector → sync → score. Returns combined result."""
-    # Try new sync first, fall back to legacy
-    try:
-        if not integration_service:
-            raise RuntimeError("service unavailable")
-        sync_result = integration_service.trigger_sync(tenant_id, connector_name)
-    except Exception:
-        cfg = connector_registry.get_config(connector_name)
-        if not cfg or not cfg.enabled:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Connector '{connector_name}' is not configured. Call /connect first.",
-            )
-        sync_result = sync_connector(connector_name)
+    # In demo mode, CRM providers use synthetic datasets — load directly.
+    if demo_resolver.should_use_synthetic(connector_name):
+        load_result = demo_resolver.ensure_demo_data(tenant_id, provider=connector_name)
+        sync_result = type("_SR", (), {
+            "accounts_synced": load_result.account_count,
+            "signals_synced": load_result.signal_count,
+            "errors": load_result.errors,
+            "duration_seconds": 0,
+        })()
+    else:
+        # Try new sync first, fall back to legacy
+        try:
+            if not integration_service:
+                raise RuntimeError("service unavailable")
+            sync_result = integration_service.trigger_sync(tenant_id, connector_name)
+        except Exception:
+            cfg = connector_registry.get_config(connector_name)
+            if not cfg or not cfg.enabled:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Connector '{connector_name}' is not configured. Call /connect first.",
+                )
+            sync_result = sync_connector(connector_name)
 
     # Score (only if we have accounts + a trained model)
     scored = 0
@@ -3010,7 +3042,8 @@ def run_demo(connector_name: str, tenant_id: str = Depends(get_tenant_id)):
     acct_count = storage_repo.account_count(tenant_id=tenant_id)
 
     if model_exists and acct_count > 0:
-        if DEMO_MODE:
+        if DEMO_MODE and not demo_resolver.should_use_synthetic(connector_name):
+            # CSV demo path — still uses the original signal seeder.
             auto_seed_if_needed(tenant_id=tenant_id)
         try:
             # Pass connector_name as source so only this provider's accounts are
