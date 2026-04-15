@@ -539,28 +539,30 @@ def check_data_sufficiency(
     retained = stats.get("total_retained", 0)
     primary_churned = stats.get("primary_churned", 0)
 
-    # In demo mode, relax the total-rows floor to the actual dataset size so
-    # small demo tenants (< 30 accounts) aren't permanently blocked.
+    # In demo mode, relax thresholds to the actual dataset size so small demo
+    # tenants (< 30 accounts) aren't permanently blocked.
     effective_min_total = min(MIN_TOTAL_LABELED, total) if demo_mode else MIN_TOTAL_LABELED
+    effective_min_positive = min(MIN_POSITIVE_LABELED, max(2, churned)) if demo_mode else MIN_POSITIVE_LABELED
+    effective_min_negative = min(MIN_NEGATIVE_LABELED, max(2, retained)) if demo_mode else MIN_NEGATIVE_LABELED
 
     issues: List[str] = []
 
-    if primary_churned == 0:
+    if not demo_mode and primary_churned == 0:
         issues.append(
             "No verified churned accounts found. Open the Accounts page and mark "
             "at least one account as 'Churned' to provide ground-truth labels."
         )
 
-    if churned < MIN_POSITIVE_LABELED:
-        needed = MIN_POSITIVE_LABELED - churned
+    if churned < effective_min_positive:
+        needed = effective_min_positive - churned
         issues.append(
-            f"Need {MIN_POSITIVE_LABELED} churned examples — have {churned}. "
+            f"Need {effective_min_positive} churned examples — have {churned}. "
             f"Mark {needed} more account(s) as Churned."
         )
 
-    if retained < MIN_NEGATIVE_LABELED:
+    if retained < effective_min_negative:
         issues.append(
-            f"Need {MIN_NEGATIVE_LABELED} retained examples — have {retained}."
+            f"Need {effective_min_negative} retained examples — have {retained}."
         )
 
     if total < effective_min_total:

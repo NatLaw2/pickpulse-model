@@ -20,7 +20,7 @@ from .arr_command_center import build_command_center, get_account_details
 
 logger = logging.getLogger("pickpulse.arr_command_center_api")
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 @router.get("/arr-command-center")

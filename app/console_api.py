@@ -1169,7 +1169,7 @@ def _execute_crm_training_job(
             df = df.drop(columns=["label_source"])
 
         metadata = train_model(df, mod, val_frac=val_frac, tenant_id=tenant_id,
-                               run_id=run_id, version_str=version_str)
+                               run_id=run_id, version_str=version_str, min_rows=10)
 
         if "error" in metadata:
             raise RuntimeError(metadata.get("message", metadata["error"]))

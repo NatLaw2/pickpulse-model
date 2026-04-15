@@ -22,6 +22,7 @@ def train_model(
     tenant_id: str | None = None,
     run_id: str | None = None,
     version_str: str | None = None,
+    min_rows: int = 50,
 ) -> Dict[str, Any]:
     """Train a binary classifier for the given module.
 
@@ -68,9 +69,9 @@ def train_model(
     n = len(df)
     print(f"[train] Dataset: {n} rows")
 
-    if n < 50:
+    if n < min_rows:
         return {"error": "insufficient_data", "n_rows": n,
-                "message": f"Need at least 50 rows, got {n}."}
+                "message": f"Need at least {min_rows} rows, got {n}."}
 
     # Build features
     X, y, feature_names, feature_meta = prepare_features(df, module, fit=True)

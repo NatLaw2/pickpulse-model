@@ -161,8 +161,10 @@ def _seed_outcomes_if_needed(
         # Ensure at least _MIN_DEMO_CHURNED accounts are labeled churned
         # regardless of cohort ratio (cohort math fails with <40 accounts).
         high_n = max(_MIN_DEMO_CHURNED, round(_TARGET_RATIOS[0] * total / 20))
-        # Never exceed total accounts (leave at least _MIN_DEMO_RETAINED retained)
-        high_n = min(high_n, max(0, total - _MIN_DEMO_RETAINED))
+        # Cap at half the total to always leave some retained examples.
+        # check_data_sufficiency adapts its threshold in demo_mode, so we don't
+        # need to guarantee _MIN_DEMO_RETAINED — just avoid all-churned datasets.
+        high_n = min(high_n, max(1, total // 2))
 
         rows = []
         today = date.today().isoformat()
