@@ -10,7 +10,7 @@ import { TrainPage } from './TrainPage';
 import { formatCurrency } from '../lib/format';
 import {
   CheckCircle2, Cloud, ExternalLink, Loader2, RefreshCw, Play,
-  Users, ArrowRight, LayoutDashboard, ChevronRight,
+  LayoutDashboard, ChevronRight,
   Upload, AlertCircle, Brain, XCircle, Zap,
 } from 'lucide-react';
 
@@ -95,17 +95,30 @@ function StepBadge({ n, done }: { n: number; done?: boolean }) {
 
 const POLL_MS = 3000;
 
-function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; syncCount: number }) {
+function CrmTrainSection({
+  mode,
+  syncCount,
+  onTrainingComplete,
+}: {
+  mode: 'hubspot' | 'salesforce';
+  syncCount: number;
+  onTrainingComplete?: () => void;
+}) {
   const [sufficiency, setSufficiency] = useState<CrmDataSufficiencyResponse | null>(null);
   const [loadingSufficiency, setLoadingSufficiency] = useState(true);
-  const [recheckCount, setRecheckCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<TrainJobStatus | null>(null);
   const [error, setError] = useState('');
+
+  // Persists "model was trained" across page navigations (sessionStorage bridge)
+  const [alreadyTrained, setAlreadyTrained] = useState<boolean>(() => {
+    try { return !!sessionStorage.getItem(`pp_crm_trained_${mode}`); } catch { return false; }
+  });
+
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Re-fetch sufficiency whenever sync completes or user clicks Re-check
+  // Re-fetch sufficiency whenever sync completes
   useEffect(() => {
     let cancelled = false;
     setLoadingSufficiency(true);
@@ -115,7 +128,7 @@ function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; 
       .catch((e: any) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoadingSufficiency(false); });
     return () => { cancelled = true; };
-  }, [mode, syncCount, recheckCount]);
+  }, [mode, syncCount]);
 
   // Poll training job
   useEffect(() => {
@@ -148,6 +161,15 @@ function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; 
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [jobId, jobStatus?.status, mode]);
+
+  // Persist trained state and notify parent when training finishes
+  useEffect(() => {
+    if (jobStatus?.status === 'complete') {
+      setAlreadyTrained(true);
+      try { sessionStorage.setItem(`pp_crm_trained_${mode}`, 'true'); } catch {}
+      onTrainingComplete?.();
+    }
+  }, [jobStatus?.status, mode, onTrainingComplete]);
 
   const handleTrain = async () => {
     setSubmitting(true);
@@ -187,25 +209,23 @@ function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; 
 
   return (
     <div className="space-y-3">
-      {/* Data readiness stats */}
-      {sufficiency && (
-        <div className="flex gap-3 flex-wrap">
-          <div className="text-xs px-2.5 py-1.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
-            <span className="font-semibold">{sufficiency.stats.account_count.toLocaleString()}</span>
-            <span className="text-[var(--color-text-muted)] ml-1">accounts</span>
-          </div>
-          <div className="text-xs px-2.5 py-1.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
-            <span className="font-semibold">{sufficiency.stats.accounts_with_outcomes.toLocaleString()}</span>
-            <span className="text-[var(--color-text-muted)] ml-1">verified outcomes</span>
-          </div>
-          <div className="text-xs px-2.5 py-1.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
-            <span className="font-semibold text-[var(--color-danger)]">{sufficiency.stats.primary_churned.toLocaleString()}</span>
-            <span className="text-[var(--color-text-muted)] ml-1">churned examples</span>
-          </div>
-        </div>
+      {/* Simple readiness status */}
+      {sufficiency && !jobId && !isComplete && !alreadyTrained && (
+        <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-1.5">
+          <CheckCircle2 size={11} className="text-[var(--color-success)]" />
+          {sufficiency.stats.account_count.toLocaleString()} accounts ready for training
+        </p>
       )}
 
-      {/* Seed failure diagnostic (demo mode only) */}
+      {/* Cross-session trained badge */}
+      {alreadyTrained && !jobId && !isComplete && (
+        <p className="text-xs text-[var(--color-success)] flex items-center gap-1.5">
+          <CheckCircle2 size={11} />
+          Model trained successfully
+        </p>
+      )}
+
+      {/* Seed failure diagnostic (demo only) */}
       {sufficiency?.seed_warning && (
         <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
           <AlertCircle size={13} className="shrink-0 mt-0.5" />
@@ -213,19 +233,10 @@ function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; 
         </div>
       )}
 
-      {/* Sufficiency failure message */}
-      {sufficiency && !sufficiency.ok && !jobId && (
-        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
-          <AlertCircle size={13} className="shrink-0 mt-0.5" />
-          <span>{sufficiency.message}</span>
-        </div>
-      )}
-
-      {/* Train button + Re-check */}
-      <div className="flex items-center gap-2">
+      {/* Train button — never blocked by churn-count sufficiency */}
       <button
         onClick={handleTrain}
-        disabled={submitting || isRunning || (sufficiency !== null && !sufficiency.ok)}
+        disabled={submitting || isRunning}
         className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
       >
         {submitting || isRunning ? (
@@ -236,24 +247,10 @@ function CrmTrainSection({ mode, syncCount }: { mode: 'hubspot' | 'salesforce'; 
         ) : (
           <>
             <Brain size={14} />
-            Train Churn Model
+            {alreadyTrained ? 'Retrain Model' : 'Train Model'}
           </>
         )}
       </button>
-
-      {/* Re-check button — lets user retry sufficiency after fixing data */}
-      {!jobId && (
-        <button
-          onClick={() => setRecheckCount((c) => c + 1)}
-          disabled={loadingSufficiency}
-          title="Re-check data readiness"
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-text-muted)] disabled:opacity-40 transition-colors"
-        >
-          {loadingSufficiency ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-          Re-check
-        </button>
-      )}
-      </div>
 
       {isRunning && (
         <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-1.5">
@@ -299,6 +296,14 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Track training and scoring completion — persisted across page navigations via sessionStorage
+  const [modelTrained, setModelTrained] = useState<boolean>(() => {
+    try { return !!sessionStorage.getItem(`pp_crm_trained_${mode}`); } catch { return false; }
+  });
+  const [scoringDone, setScoringDone] = useState(false);
+
+  const handleTrainingComplete = useCallback(() => setModelTrained(true), []);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -409,6 +414,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
     setError(null);
     try {
       const result = await api.triggerScoring(mode);
+      setScoringDone(true);
       showToast(
         `Scored ${result.accounts_scored} accounts — ${formatCurrency(result.total_arr_at_risk)} ARR at risk`
       );
@@ -545,11 +551,11 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
           }`}
         >
           <div className="flex items-center gap-3 mb-3">
-            <StepBadge n={2} done={accounts.length > 0} />
+            <StepBadge n={2} done={(health?.account_count ?? accounts.length) > 0} />
             <h2 className="text-sm font-semibold">Sync Accounts</h2>
-            {accounts.length > 0 && (
-              <span className="ml-auto text-[10px] text-[var(--color-text-muted)]">
-                {accounts.length.toLocaleString()} accounts synced
+            {(health?.account_count ?? accounts.length) > 0 && (
+              <span className="ml-auto text-[10px] text-[var(--color-success)] font-medium flex items-center gap-1">
+                <CheckCircle2 size={11} /> Accounts synced
               </span>
             )}
           </div>
@@ -567,12 +573,6 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
               )}
               {syncing ? 'Syncing…' : 'Sync Now'}
             </button>
-            {accounts.length > 0 && (
-              <span className="text-xs text-[var(--color-text-muted)] flex items-center gap-1">
-                <Users size={12} />
-                {accounts.length.toLocaleString()} accounts ready
-              </span>
-            )}
           </div>
         </div>
 
@@ -583,13 +583,13 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
           }`}
         >
           <div className="flex items-center gap-3 mb-3">
-            <StepBadge n={3} />
-            <h2 className="text-sm font-semibold">Train Churn Model</h2>
+            <StepBadge n={3} done={modelTrained} />
+            <h2 className="text-sm font-semibold">Train Model</h2>
           </div>
           <p className="text-xs text-[var(--color-text-muted)] mb-3">
-            Build a calibrated model using your {brand.name} account data. Mark at least 10 accounts as churned in the Accounts page first.
+            Build a prediction model using your synced {brand.name} account data.
           </p>
-          <CrmTrainSection mode={mode} syncCount={syncCount} />
+          <CrmTrainSection mode={mode} syncCount={syncCount} onTrainingComplete={handleTrainingComplete} />
         </div>
 
         {/* ── Step 4: Score accounts ── */}
@@ -599,30 +599,31 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
           }`}
         >
           <div className="flex items-center gap-3 mb-3">
-            <StepBadge n={4} />
+            <StepBadge n={4} done={scoringDone} />
             <h2 className="text-sm font-semibold">Score Accounts</h2>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
-              <Users size={13} className="text-[var(--color-text-muted)]" />
-              <span className="text-xs text-[var(--color-text-secondary)]">
-                {accounts.length.toLocaleString()} accounts
-              </span>
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleScore}
+                disabled={scoring || (health?.account_count ?? accounts.length) === 0}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+              >
+                {scoring ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Play size={14} />
+                )}
+                {scoring ? 'Scoring…' : scoringDone ? 'Rescore Accounts' : 'Score All'}
+              </button>
             </div>
-            <ArrowRight size={13} className="text-[var(--color-text-muted)]" />
-            <button
-              onClick={handleScore}
-              disabled={scoring || accounts.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
-            >
-              {scoring ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Play size={14} />
-              )}
-              {scoring ? 'Scoring…' : 'Score All'}
-            </button>
+            {scoringDone && (
+              <p className="text-xs text-[var(--color-success)] flex items-center gap-1.5">
+                <CheckCircle2 size={11} />
+                Scoring complete — accounts are ready to view
+              </p>
+            )}
           </div>
         </div>
 

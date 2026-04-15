@@ -15,7 +15,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   AlertTriangle, RefreshCw, Loader2, AlertCircle,
   ChevronUp, ChevronDown, ChevronsUpDown, Info,
-  DollarSign, Users, TrendingDown, BarChart2,
+  DollarSign, BarChart2,
 } from 'lucide-react';
 import { api, type ArrCommandCenterResponse, type ArrRankedAccount } from '../lib/api';
 import { ArrAccountDrawer } from '../components/ArrAccountDrawer';
@@ -47,38 +47,6 @@ function sortAccounts(accounts: ArrRankedAccount[], key: SortKey, dir: SortDir):
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
-
-function SummaryCard({
-  label,
-  value,
-  sub,
-  icon,
-  partial,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  partial?: boolean;
-}) {
-  return (
-    <div className="flex-1 min-w-[170px] p-5 rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-[var(--color-text-muted)]">{icon}</span>
-        <span className="text-xs font-semibold tracking-wide uppercase text-[var(--color-text-muted)]">
-          {label}
-        </span>
-        {partial && (
-          <span title="Partial data — see coverage notes" className="text-[var(--color-warning)] cursor-help">
-            <Info size={11} />
-          </span>
-        )}
-      </div>
-      <p className="text-2xl font-bold text-[var(--color-text)] leading-none">{value}</p>
-      {sub && <p className="text-xs text-[var(--color-text-muted)] mt-1.5">{sub}</p>}
-    </div>
-  );
-}
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
   if (col !== sortKey) return <ChevronsUpDown size={11} className="text-[var(--color-border)]" />;
@@ -177,10 +145,16 @@ export function ArrCommandCenterPage() {
     });
   }, []);
 
-  const sortedAccounts = useMemo(() => {
+  // Always anchor the view to the top 20 accounts by ARR × risk.
+  // The user can re-sort within this fixed set, but the composition never changes.
+  const top20 = useMemo(() => {
     if (!data?.accounts) return [];
-    return sortAccounts(data.accounts, sortKey, sortDir);
-  }, [data?.accounts, sortKey, sortDir]);
+    return sortAccounts(data.accounts, 'weighted_risk_value', 'desc').slice(0, 20);
+  }, [data?.accounts]);
+
+  const sortedAccounts = useMemo(() => {
+    return sortAccounts(top20, sortKey, sortDir);
+  }, [top20, sortKey, sortDir]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -232,31 +206,19 @@ export function ArrCommandCenterPage() {
         </div>
       )}
 
-      {/* ── Summary bar ── */}
-      <div className="flex gap-4 flex-wrap">
-        <SummaryCard
-          label="ARR at Risk"
-          value={formatCurrency(s.arr_at_risk)}
-          sub={
-            s.arr_at_risk_is_partial
-              ? `Based on ${s.accounts_with_arr} of ${s.total_scored_accounts} accounts with ARR`
-              : `Across ${s.accounts_with_arr} scored account${s.accounts_with_arr !== 1 ? 's' : ''}`
-          }
-          icon={<DollarSign size={14} />}
-          partial={s.arr_at_risk_is_partial}
-        />
-        <SummaryCard
-          label="Priority Accounts"
-          value={s.priority_account_count.toString()}
-          sub="Risk ≥ 25% — highest attention needed"
-          icon={<Users size={14} />}
-        />
-        <SummaryCard
-          label="Average Risk"
-          value={`${s.avg_risk_pct.toFixed(1)}%`}
-          sub={`Across ${s.total_scored_accounts} scored accounts`}
-          icon={<TrendingDown size={14} />}
-        />
+      {/* ── ARR at risk context line ── */}
+      <div className="flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
+        <DollarSign size={15} className="text-[var(--color-text-muted)] shrink-0" />
+        <span className="text-sm font-semibold text-[var(--color-text)]">{formatCurrency(s.arr_at_risk)}</span>
+        <span className="text-xs text-[var(--color-text-muted)]">total ARR at risk across top 20 accounts</span>
+        {s.arr_at_risk_is_partial && (
+          <span
+            title={`Based on ${s.accounts_with_arr} of ${s.total_scored_accounts} accounts with ARR data`}
+            className="text-[var(--color-warning)] cursor-help"
+          >
+            <Info size={12} />
+          </span>
+        )}
       </div>
 
       {/* ── Ranked table ── */}
@@ -267,12 +229,9 @@ export function ArrCommandCenterPage() {
               Accounts That Need Attention
             </h2>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-              Ranked by weighted revenue risk. Click any row to see details and recommended actions.
+              Top {sortedAccounts.length} by ARR × risk. Click any row to see why and what to do next.
             </p>
           </div>
-          <span className="text-xs text-[var(--color-text-muted)]">
-            {sortedAccounts.length} account{sortedAccounts.length !== 1 ? 's' : ''}
-          </span>
         </div>
 
         <div className="rounded-2xl border border-[var(--color-border)] overflow-hidden">
@@ -403,7 +362,7 @@ function AccountRow({
       <td className="py-3 pl-4 pr-4">
         <div className="flex flex-wrap gap-1">
           {account.top_drivers.length > 0 ? (
-            account.top_drivers.map((d, i) => (
+            account.top_drivers.slice(0, 3).map((d, i) => (
               <span
                 key={i}
                 className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/8 border border-red-500/15 text-red-400 max-w-[160px] truncate"
@@ -429,7 +388,7 @@ function PageHeader({ onRefresh, refreshing }: { onRefresh: () => void; refreshi
       <div>
         <h1 className="text-xl font-bold text-[var(--color-text)]">ARR Command Center</h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-1">
-          Revenue at risk, ranked by impact. Powered by live predictions.
+          Your 20 highest-risk accounts by ARR impact — focus here first.
         </p>
       </div>
       <button
