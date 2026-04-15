@@ -3000,7 +3000,7 @@ def trigger_live_scoring(
 
 @app.get("/api/integrations/scores/latest")
 def get_latest_scores(
-    limit: int = Query(200),
+    limit: int = Query(10000),
     source: Optional[str] = Query(None),
     tenant_id: str = Depends(get_tenant_id),
 ):

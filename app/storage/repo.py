@@ -328,11 +328,27 @@ def insert_scores(scores: List[ChurnScore], tenant_id: str = DEFAULT_TENANT) -> 
         return 0
 
     sb = get_client()
-    rows = []
     today = date.today().isoformat()
 
+    # Batch-fetch external_id → account UUID in one pass to avoid N+1 DB queries.
+    _BATCH = 400
+    external_ids = [s.external_id for s in scores]
+    id_map: Dict[str, str] = {}
+    for i in range(0, len(external_ids), _BATCH):
+        batch_ext = external_ids[i : i + _BATCH]
+        res = (
+            sb.table("accounts")
+            .select("id,external_id")
+            .eq("tenant_id", tenant_id)
+            .in_("external_id", batch_ext)
+            .execute()
+        )
+        for row in res.data or []:
+            id_map[row["external_id"]] = row["id"]
+
+    rows = []
     for score in scores:
-        account_id = get_account_id(score.external_id, tenant_id=tenant_id)
+        account_id = id_map.get(score.external_id)
         if not account_id:
             continue
         rows.append({
@@ -353,16 +369,19 @@ def insert_scores(scores: List[ChurnScore], tenant_id: str = DEFAULT_TENANT) -> 
     if not rows:
         return 0
 
-    res = sb.table("churn_scores_daily").upsert(
-        rows,
-        on_conflict="tenant_id,account_id,score_date",
-    ).execute()
+    total = 0
+    for i in range(0, len(rows), _BATCH):
+        res = sb.table("churn_scores_daily").upsert(
+            rows[i : i + _BATCH],
+            on_conflict="tenant_id,account_id,score_date",
+        ).execute()
+        total += len(res.data) if res.data else len(rows[i : i + _BATCH])
 
-    return len(res.data) if res.data else 0
+    return total
 
 
 def latest_scores(
-    limit: int = 200,
+    limit: int = 10000,
     tenant_id: str = DEFAULT_TENANT,
     source: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
@@ -376,10 +395,6 @@ def latest_scores(
     try:
         sb = get_client()
 
-        # Over-fetch when a source filter is applied so the Python-side filter
-        # doesn't silently truncate results from the desired provider.
-        db_limit = 10000 if source else limit
-
         # Get latest scores ordered by risk
         res = (
             sb.table("churn_scores_daily")
@@ -387,7 +402,7 @@ def latest_scores(
             .eq("tenant_id", tenant_id)
             .order("score_date", desc=True)
             .order("churn_risk_pct", desc=True)
-            .limit(db_limit)
+            .limit(limit)
             .execute()
         )
 
@@ -476,7 +491,7 @@ def bulk_latest_signals(tenant_id: str = DEFAULT_TENANT) -> Dict[str, Dict[str, 
             .select("account_id, signal_key, signal_value, signal_text, signal_date")
             .eq("tenant_id", tenant_id)
             .order("signal_date", desc=True)
-            .limit(10000)
+            .limit(500000)
             .execute()
         )
         if not res.data:
