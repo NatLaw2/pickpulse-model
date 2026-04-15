@@ -64,6 +64,7 @@ from .explain import router as explain_router
 from .executive_summary import router as executive_summary_router
 from .revenue_impact import compute_revenue_impact
 from .expansion_demo import router as expansion_demo_router
+from .arr_command_center_api import router as arr_command_center_router
 try:
     from .hubspot_card import router as hubspot_card_router
     _hubspot_card_available = True
@@ -84,6 +85,7 @@ app.include_router(outreach_router)
 app.include_router(explain_router)
 app.include_router(executive_summary_router)
 app.include_router(expansion_demo_router)
+app.include_router(arr_command_center_router)
 if _hubspot_card_available:
     app.include_router(hubspot_card_router)
 

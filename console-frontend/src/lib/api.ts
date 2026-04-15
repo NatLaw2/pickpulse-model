@@ -369,6 +369,15 @@ export const api = {
   // Demo reset
   resetDemo: () =>
     request<DemoResetResponse>('/demo/reset', { method: 'POST' }),
+
+  // -----------------------------------------------------------------------
+  // ARR Command Center
+  // -----------------------------------------------------------------------
+  arrCommandCenter: () =>
+    request<ArrCommandCenterResponse>('/arr-command-center'),
+
+  accountCommandCenterDetails: (accountId: string) =>
+    request<ArrAccountDetails>(`/accounts/${encodeURIComponent(accountId)}/command-center-details`),
 };
 
 // -----------------------------------------------------------------------
@@ -1270,4 +1279,83 @@ export interface ExpansionDemoResponse {
     top_opportunities: ExpansionAccount[];
     matrix_points: MatrixPoint[];
   };
+}
+
+// -------------------------------------------------------------------------
+// ARR Command Center types
+// -------------------------------------------------------------------------
+
+export interface ArrRankedAccount {
+  account_id: string;
+  external_id: string;
+  name: string;
+  arr: number | null;
+  churn_risk_pct: number;
+  weighted_risk_value: number | null;
+  days_until_renewal: number | null;
+  top_drivers: ArrDriver[];
+  confidence_level: string | null;
+  source: string;
+  has_arr: boolean;
+  has_renewal: boolean;
+  missing_fields: string[];
+}
+
+export interface ArrDriver {
+  label: string;
+  direction: 'increases_risk' | 'decreases_risk';
+  feature: string;
+  value: number | null;
+  retained_mean: number | null;
+  churned_mean: number | null;
+}
+
+export interface ArrSummary {
+  arr_at_risk: number;
+  arr_at_risk_is_partial: boolean;
+  total_scored_accounts: number;
+  accounts_with_arr: number;
+  accounts_with_renewal: number;
+  priority_account_count: number;
+  avg_risk_pct: number;
+  coverage_notes: string[];
+}
+
+export interface ArrCommandCenterResponse {
+  has_predictions: boolean;
+  summary: ArrSummary | null;
+  accounts: ArrRankedAccount[];
+}
+
+export interface ArrIntervention {
+  title: string;
+  description: string;
+  owner_role: string;
+  signals: string[];
+}
+
+export interface ArrAccountDetails {
+  account: {
+    account_id: string;
+    external_id: string;
+    name: string;
+    arr: number | null;
+    churn_risk_pct: number;
+    confidence_level: string | null;
+    source: string;
+    score_date: string;
+  };
+  drivers: Array<{
+    label: string;
+    description: string;
+    direction: 'increases_risk' | 'decreases_risk';
+    feature: string;
+    value: number | null;
+    retained_mean: number | null;
+    churned_mean: number | null;
+  }>;
+  signals: Record<string, number | string | null>;
+  interventions: ArrIntervention[];
+  missing_fields: string[];
+  data_quality_notes: string[];
 }

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Brain,
   Crosshair, Code2, FileText, ShieldAlert, LogOut,
-  RotateCcw, Loader2, FlaskConical, Settings2,
+  RotateCcw, Loader2, FlaskConical, Settings2, Target,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDataset } from '../lib/DatasetContext';
@@ -15,6 +15,7 @@ import { useActiveMode, type ActiveMode } from '../lib/ActiveModeContext';
 // Primary navigation — never includes Data Sources (accessed via Welcome page)
 const mainLinks = [
   { to: '/', icon: LayoutDashboard, label: 'Overview' },
+  { to: '/arr-command-center', icon: Target, label: 'ARR Command Center' },
   { to: '/predict', icon: Crosshair, label: 'Accounts' },
   { to: '/reports', icon: FileText, label: 'Reports' },
 ];

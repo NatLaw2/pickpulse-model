@@ -8,6 +8,7 @@ import { ApiDocsPage } from './pages/ApiDocsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ExpansionDemoPage } from './pages/ExpansionDemoPage';
 import { WorkflowPage } from './pages/WorkflowPage';
+import { ArrCommandCenterPage } from './pages/ArrCommandCenterPage';
 import { DatasetProvider } from './lib/DatasetContext';
 import { PredictionProvider } from './lib/PredictionContext';
 import { ExecutiveSummaryProvider } from './lib/ExecutiveSummaryContext';
@@ -41,6 +42,7 @@ function AppContent() {
           <Route path="/model" element={<ModelPage />} />
           <Route path="/api-docs" element={<ApiDocsPage />} />
           <Route path="/expansion-demo" element={<ExpansionDemoPage />} />
+          <Route path="/arr-command-center" element={<ArrCommandCenterPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
