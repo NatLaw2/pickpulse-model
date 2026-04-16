@@ -53,7 +53,13 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
     let message = body;
     try {
       const parsed = JSON.parse(body);
-      if (parsed?.detail) message = parsed.detail;
+      if (parsed?.detail) {
+        if (typeof parsed.detail === 'string') {
+          message = parsed.detail;
+        } else if (Array.isArray(parsed.detail)) {
+          message = parsed.detail.map((e: any) => e.msg || JSON.stringify(e)).join('; ');
+        }
+      }
     } catch { /* not JSON — use raw body */ }
     throw new Error(`${res.status}: ${message}`);
   }

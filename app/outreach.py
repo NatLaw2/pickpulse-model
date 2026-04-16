@@ -63,9 +63,9 @@ class DraftEmailRequest(BaseModel):
     contact_name: Optional[str] = Field(None, max_length=200)
     contact_email: Optional[str] = Field(None, max_length=200)
     churn_risk_pct: float
-    arr: float
-    arr_at_risk: float
-    days_until_renewal: int
+    arr: Optional[float] = None
+    arr_at_risk: Optional[float] = None
+    days_until_renewal: Optional[int] = None
     recommended_action: Optional[str] = Field(None, max_length=500)
     risk_driver_summary: Optional[str] = Field(None, max_length=500)
     tier: Optional[str] = Field(None, max_length=50)
@@ -125,9 +125,11 @@ def _build_user_prompt(req: DraftEmailRequest) -> str:
     lines = [
         f"Account: {req.customer_name or req.account_id}",
         f"Contact name: {contact}",
-        f"ARR: ${req.arr:,.0f}",
-        f"Days until renewal: {req.days_until_renewal}",
     ]
+    if req.arr is not None:
+        lines.append(f"ARR: ${req.arr:,.0f}")
+    if req.days_until_renewal is not None:
+        lines.append(f"Days until renewal: {req.days_until_renewal}")
     if req.risk_driver_summary:
         lines.append(f"Recent engagement signals: {req.risk_driver_summary}")
     if req.recommended_action:

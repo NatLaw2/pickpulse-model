@@ -338,6 +338,15 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
       const activeProvider = providerList.find((p) => p.provider === mode) ?? null;
       setProvider(activeProvider);
 
+      // Always fetch accounts from Supabase — integrationAccounts queries the DB
+      // directly (not the CRM API), so it works regardless of OAuth/connection state.
+      // This is essential in demo mode where no real CRM connection exists but
+      // 2000 synthetic accounts have been loaded into Supabase by trigger_sync.
+      const acctRes = await api
+        .integrationAccounts(mode)
+        .catch(() => ({ accounts: [], total: 0, showing: 0 }));
+      setAccounts(acctRes.accounts ?? []);
+
       if (
         activeProvider &&
         (activeProvider.enabled ||
@@ -347,14 +356,6 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
         try {
           const h = await api.integrationHealth(mode);
           setHealth(h);
-          // Load accounts if connected OR if any accounts are already in the DB
-          // (e.g. sync succeeded but a subsequent health/test_connection call failed)
-          if (h.connected || (h.account_count && h.account_count > 0)) {
-            const acctRes = await api
-              .integrationAccounts(mode)
-              .catch(() => ({ accounts: [], total: 0, showing: 0 }));
-            setAccounts(acctRes.accounts ?? []);
-          }
         } catch {
           /* health check can fail when not yet connected */
         }
