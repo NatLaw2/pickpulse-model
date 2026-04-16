@@ -25,24 +25,6 @@ const BRAND = {
     descColor: 'text-[#FF7A59]',
     borderClass: 'border-[#FF7A59]/30',
     bgClass: 'from-[#FF7A59]/6 to-transparent',
-    // lg = full wordmark for the Setup page header banner
-    // sm = sprocket-only symbol for compact icon slots
-    icon: (size: 'sm' | 'lg' = 'sm') =>
-      size === 'lg' ? (
-        <img
-          src="/logos/hubspot-wordmark.png"
-          alt="HubSpot"
-          className="h-9 w-auto object-contain shrink-0"
-          draggable={false}
-        />
-      ) : (
-        <img
-          src="/logos/hubspot-sprocket.png"
-          alt="HubSpot"
-          className="w-7 h-7 object-contain shrink-0"
-          draggable={false}
-        />
-      ),
   },
   salesforce: {
     name: 'Salesforce',
@@ -50,16 +32,6 @@ const BRAND = {
     descColor: 'text-[#00A1E0]',
     borderClass: 'border-[#00A1E0]/30',
     bgClass: 'from-[#00A1E0]/6 to-transparent',
-    // lg = full wordmark (cloud IS the Salesforce symbol, so same asset either way)
-    // sm = same cloud at compact size
-    icon: (size: 'sm' | 'lg' = 'sm') => (
-      <img
-        src="/logos/salesforce-wordmark.png"
-        alt="Salesforce"
-        className={size === 'lg' ? 'h-10 w-auto object-contain shrink-0' : 'w-7 h-7 object-contain shrink-0'}
-        draggable={false}
-      />
-    ),
   },
 } as const;
 
@@ -478,12 +450,10 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
       <div
         className={`mb-6 rounded-2xl p-5 bg-gradient-to-br ${brand.bgClass} border ${brand.borderClass}`}
       >
-        <div className="flex flex-col gap-1.5">
-          {brand.icon('lg')}
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Connect, sync, train, and score your {brand.name} accounts
-          </p>
-        </div>
+        <h1 className="text-xl font-bold">{brand.name} Workflow</h1>
+        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+          Connect, sync, train, and score your {brand.name} accounts
+        </p>
       </div>
 
       {/* Error banner */}
