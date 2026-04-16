@@ -9,7 +9,7 @@ import { DatasetsPage } from './DatasetsPage';
 import { TrainPage } from './TrainPage';
 import { formatCurrency } from '../lib/format';
 import {
-  CheckCircle2, Cloud, ExternalLink, Loader2, RefreshCw, Play,
+  CheckCircle2, ExternalLink, Loader2, RefreshCw, Play,
   LayoutDashboard, ChevronRight,
   Upload, AlertCircle, Brain, XCircle, Zap,
 } from 'lucide-react';
@@ -25,29 +25,24 @@ const BRAND = {
     descColor: 'text-[#FF7A59]',
     borderClass: 'border-[#FF7A59]/30',
     bgClass: 'from-[#FF7A59]/6 to-transparent',
-    icon: (size: 'sm' | 'lg' = 'sm') => (
-      <div
-        className={`rounded-xl flex items-center justify-center shrink-0 ${size === 'lg' ? 'w-10 h-10' : 'w-7 h-7'}`}
-        style={{ background: '#FF7A59' }}
-      >
-        <svg
-          width={size === 'lg' ? 22 : 16}
-          height={size === 'lg' ? 22 : 16}
-          viewBox="0 0 20 20"
-          fill="none"
-        >
-          <circle cx="10" cy="10" r="3.5" fill="white" />
-          <circle cx="10" cy="3" r="1.5" fill="white" />
-          <circle cx="10" cy="17" r="1.5" fill="white" />
-          <circle cx="3" cy="10" r="1.5" fill="white" />
-          <circle cx="17" cy="10" r="1.5" fill="white" />
-          <circle cx="5.05" cy="5.05" r="1.5" fill="white" />
-          <circle cx="14.95" cy="14.95" r="1.5" fill="white" />
-          <circle cx="14.95" cy="5.05" r="1.5" fill="white" />
-          <circle cx="5.05" cy="14.95" r="1.5" fill="white" />
-        </svg>
-      </div>
-    ),
+    // lg = full wordmark for the Setup page header banner
+    // sm = sprocket-only symbol for compact icon slots
+    icon: (size: 'sm' | 'lg' = 'sm') =>
+      size === 'lg' ? (
+        <img
+          src="/logos/hubspot-wordmark.png"
+          alt="HubSpot"
+          className="h-9 w-auto object-contain shrink-0"
+          draggable={false}
+        />
+      ) : (
+        <img
+          src="/logos/hubspot-sprocket.png"
+          alt="HubSpot"
+          className="w-7 h-7 object-contain shrink-0"
+          draggable={false}
+        />
+      ),
   },
   salesforce: {
     name: 'Salesforce',
@@ -55,17 +50,15 @@ const BRAND = {
     descColor: 'text-[#00A1E0]',
     borderClass: 'border-[#00A1E0]/30',
     bgClass: 'from-[#00A1E0]/6 to-transparent',
+    // lg = full wordmark (cloud IS the Salesforce symbol, so same asset either way)
+    // sm = same cloud at compact size
     icon: (size: 'sm' | 'lg' = 'sm') => (
-      <div
-        className={`rounded-xl flex items-center justify-center shrink-0 ${size === 'lg' ? 'w-10 h-10' : 'w-7 h-7'}`}
-        style={{ background: '#00A1E0' }}
-      >
-        <Cloud
-          size={size === 'lg' ? 22 : 15}
-          color="white"
-          strokeWidth={2.5}
-        />
-      </div>
+      <img
+        src="/logos/salesforce-wordmark.png"
+        alt="Salesforce"
+        className={size === 'lg' ? 'h-10 w-auto object-contain shrink-0' : 'w-7 h-7 object-contain shrink-0'}
+        draggable={false}
+      />
     ),
   },
 } as const;
@@ -485,14 +478,11 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
       <div
         className={`mb-6 rounded-2xl p-5 bg-gradient-to-br ${brand.bgClass} border ${brand.borderClass}`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-1.5">
           {brand.icon('lg')}
-          <div>
-            <h1 className="text-xl font-bold">{brand.name} Workflow</h1>
-            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-              Connect, sync, train, and score your {brand.name} accounts
-            </p>
-          </div>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Connect, sync, train, and score your {brand.name} accounts
+          </p>
         </div>
       </div>
 

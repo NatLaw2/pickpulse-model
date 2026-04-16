@@ -1,39 +1,32 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cloud, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { useActiveMode, type ActiveMode } from '../lib/ActiveModeContext';
 import { usePredictions } from '../lib/PredictionContext';
 
-// Inline HubSpot asterisk icon — no external assets
+// Real brand wordmark logos (transparent PNG, served from /public/logos/)
 function HubSpotIcon() {
   return (
-    <div
-      className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-      style={{ background: '#FF7A59' }}
-    >
-      <svg width="26" height="26" viewBox="0 0 20 20" fill="none">
-        <circle cx="10" cy="10" r="3.5" fill="white" />
-        <circle cx="10" cy="3" r="1.5" fill="white" />
-        <circle cx="10" cy="17" r="1.5" fill="white" />
-        <circle cx="3" cy="10" r="1.5" fill="white" />
-        <circle cx="17" cy="10" r="1.5" fill="white" />
-        <circle cx="5.05" cy="5.05" r="1.5" fill="white" />
-        <circle cx="14.95" cy="14.95" r="1.5" fill="white" />
-        <circle cx="14.95" cy="5.05" r="1.5" fill="white" />
-        <circle cx="5.05" cy="14.95" r="1.5" fill="white" />
-      </svg>
+    <div className="h-12 flex items-center justify-center mx-auto mb-4">
+      <img
+        src="/logos/hubspot-wordmark.png"
+        alt="HubSpot"
+        className="h-8 w-auto object-contain"
+        draggable={false}
+      />
     </div>
   );
 }
 
-// Salesforce cloud icon — Salesforce blue
 function SalesforceIcon() {
   return (
-    <div
-      className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-      style={{ background: '#00A1E0' }}
-    >
-      <Cloud size={26} color="white" strokeWidth={2.2} />
+    <div className="h-12 flex items-center justify-center mx-auto mb-4">
+      <img
+        src="/logos/salesforce-wordmark.png"
+        alt="Salesforce"
+        className="h-10 w-auto object-contain"
+        draggable={false}
+      />
     </div>
   );
 }
