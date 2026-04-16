@@ -303,13 +303,12 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   });
   const [scoringDone, setScoringDone] = useState(false);
 
-  const handleTrainingComplete = useCallback(() => setModelTrained(true), []);
-
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 5000);
   };
 
+  // loadData declared before handleTrainingComplete so the callback can depend on it.
   const loadData = useCallback(async () => {
     try {
       const intRes = await api.integrations().catch(() => ({ providers: [], connectors: [] }));
@@ -366,6 +365,13 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
       setLoading(false);
     }
   }, [mode]);
+
+  const handleTrainingComplete = useCallback(() => {
+    setModelTrained(true);
+    // Refresh accounts + health immediately after training so Score All
+    // reflects the latest state without requiring a page navigation.
+    loadData();
+  }, [loadData]);
 
   // Detect OAuth return (redirected back from provider)
   useEffect(() => {
@@ -594,9 +600,12 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
         </div>
 
         {/* ── Step 4: Score accounts ── */}
+        {/* Gate on combined account count: prefer health.account_count (DB total) but fall
+            back to accounts.length (the fetched page). Use || not ?? so a literal 0 from
+            the health endpoint doesn't override a non-zero accounts array. */}
         <div
           className={`bg-white border border-[var(--color-border)] rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-opacity ${
-            accounts.length === 0 ? 'opacity-40 pointer-events-none' : ''
+            (health?.account_count || accounts.length) === 0 ? 'opacity-40 pointer-events-none' : ''
           }`}
         >
           <div className="flex items-center gap-3 mb-3">
@@ -608,7 +617,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleScore}
-                disabled={scoring || (health?.account_count ?? accounts.length) === 0}
+                disabled={scoring || (health?.account_count || accounts.length) === 0}
                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
               >
                 {scoring ? (
