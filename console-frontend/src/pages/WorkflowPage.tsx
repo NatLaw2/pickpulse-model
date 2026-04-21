@@ -93,10 +93,8 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   const [trainStatus, setTrainStatus] = useState<TrainJobStatus | null>(null);
   const [scoringResult, setScoringResult] = useState<ScoringResponse | null>(null);
 
-  // Persists trained state across navigations via sessionStorage
-  const [modelTrained, setModelTrained] = useState<boolean>(() => {
-    try { return !!sessionStorage.getItem(`pp_crm_trained_${mode}`); } catch { return false; }
-  });
+  // Confirmed from backend during loadData; never seeded from sessionStorage.
+  const [modelTrained, setModelTrained] = useState(false);
 
   // Guard against duplicate concurrent flow invocations
   const flowActiveRef = useRef(false);
@@ -143,6 +141,15 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
           setHealth(h);
         } catch { /* health check can fail when not yet connected */ }
       }
+
+      // Confirm trained-model status from the backend — never infer it from
+      // stale client-side state.  The CRM module is named `${mode}_churn`.
+      try {
+        const modules = await api.modules();
+        const crmModule = modules.find((m) => m.name === `${mode}_churn`);
+        setModelTrained(!!crmModule?.has_model);
+      } catch { /* if the check fails, leave modelTrained=false */ }
+
     } catch { /* ignore top-level errors */ } finally {
       setLoading(false);
     }
@@ -247,7 +254,6 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
       });
       await pollTrainingUntilDone(accepted.job_id);
       setModelTrained(true);
-      try { sessionStorage.setItem(`pp_crm_trained_${mode}`, 'true'); } catch {}
     } catch (e: any) {
       if (e.message === 'Cancelled') { flowActiveRef.current = false; return; }
       setFlowError({ stage: 'training', message: e.message });
