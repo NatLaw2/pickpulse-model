@@ -289,7 +289,13 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   };
 
   // ── Derived step states ────────────────────────────────────────────────────
-  const flowActive = flowStage === 'syncing' || flowStage === 'training' || flowStage === 'scoring';
+  // Declared as standalone booleans first so they can be used in JSX without
+  // triggering TS control-flow narrowing conflicts inside syncDone/trainDone.
+  const isSyncing = flowStage === 'syncing';
+  const isTraining = flowStage === 'training';
+  const isScoring = flowStage === 'scoring';
+
+  const flowActive = isSyncing || isTraining || isScoring;
 
   const syncDone =
     flowStage === 'training' || flowStage === 'scoring' || flowStage === 'done' ||
@@ -399,7 +405,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
           <div className="flex items-center gap-3 mb-3">
             <StepBadge n={2} done={syncDone} active={flowStage === 'syncing'} />
             <h2 className="text-sm font-semibold">Sync Accounts</h2>
-            {syncDone && flowStage !== 'syncing' && (
+            {syncDone && !isSyncing && (
               <span className="ml-auto text-[10px] text-[var(--color-success)] font-medium flex items-center gap-1">
                 <CheckCircle2 size={11} />
                 {syncResult
@@ -465,7 +471,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
               Training model on {brand.name} account data…
             </p>
           )}
-          {trainDone && flowStage !== 'training' && (
+          {trainDone && !isTraining && (
             <p className="text-xs text-[var(--color-success)] flex items-center gap-1.5">
               <CheckCircle2 size={11} />
               Model trained
@@ -659,7 +665,10 @@ function CsvWorkflow() {
   }, [dataset, runCsvScoring]);
 
   // ── Derived step states ────────────────────────────────────────────────────
-  const csvFlowActive = csvFlowStage === 'training' || csvFlowStage === 'scoring';
+  const isCsvTraining = csvFlowStage === 'training';
+  const isCsvScoring = csvFlowStage === 'scoring';
+
+  const csvFlowActive = isCsvTraining || isCsvScoring;
 
   const csvTrainDone =
     csvFlowStage === 'scoring' || csvFlowStage === 'done' ||
@@ -737,7 +746,7 @@ function CsvWorkflow() {
             </p>
           )}
 
-          {csvTrainDone && csvFlowStage !== 'training' && (
+          {csvTrainDone && !isCsvTraining && (
             <p className="text-xs text-[var(--color-success)] flex items-center gap-1.5">
               <CheckCircle2 size={11} />
               Model trained
