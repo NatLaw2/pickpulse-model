@@ -6,7 +6,7 @@ import { usePredictions } from '../lib/PredictionContext';
 import { api } from '../lib/api';
 import type {
   ProviderInfo, HealthResponse, IntegrationAccount,
-  TrainJobStatus, ScoringResponse, SyncResponse,
+  TrainJobStatus, ScoringResponse, SyncResponse, ReadinessReport,
 } from '../lib/api';
 import { DatasetsPage } from './DatasetsPage';
 import { formatCurrency } from '../lib/format';
@@ -68,10 +68,187 @@ const POLL_MS = 3_000;
 const REDIRECT_DELAY_MS = 800;
 
 // ---------------------------------------------------------------------------
+// Data Quality Section — shown after sync, in reviewing / mapping states
+// ---------------------------------------------------------------------------
+
+interface DataQualitySectionProps {
+  readiness: ReadinessReport | null;
+  isMapping: boolean;
+  mappingField: string;
+  setMappingField: (f: string) => void;
+  selectedValues: string[];
+  setSelectedValues: (v: string[]) => void;
+  savingMapping: boolean;
+  onStartMapping: () => void;
+  onSaveMapping: () => void;
+  onCancelMapping: () => void;
+  onTrain: () => void;
+}
+
+function DataQualitySection({
+  readiness, isMapping, mappingField, setMappingField,
+  selectedValues, setSelectedValues, savingMapping,
+  onStartMapping, onSaveMapping, onCancelMapping, onTrain,
+}: DataQualitySectionProps) {
+
+  if (!readiness) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+        <Loader2 size={11} className="animate-spin" /> Analyzing data quality…
+      </div>
+    );
+  }
+
+  const {
+    total_accounts, churned_detected, pct_with_signals, pct_with_arr,
+    expected_confidence, eligibility, eligibility_message, candidate_fields,
+  } = readiness;
+
+  const selectedCandidate = candidate_fields.find((f) => f.field_name === mappingField);
+
+  const confidenceColor =
+    expected_confidence === 'High' ? 'text-[var(--color-success)]' :
+    expected_confidence === 'Medium' ? 'text-amber-500' :
+    'text-[var(--color-danger)]';
+
+  // ── Label mapping form ───────────────────────────────────────────────────
+  if (isMapping) {
+    return (
+      <div className="space-y-4">
+        <p className="text-xs font-semibold text-[var(--color-text-primary)]">Map Churn Labels</p>
+        <div className="space-y-1.5">
+          <label className="text-[11px] text-[var(--color-text-muted)]">
+            Field that indicates a customer has churned
+          </label>
+          <select
+            value={mappingField}
+            onChange={(e) => { setMappingField(e.target.value); setSelectedValues([]); }}
+            className="w-full text-xs border border-[var(--color-border)] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          >
+            <option value="">Select a field…</option>
+            {candidate_fields.map((f) => (
+              <option key={f.field_name} value={f.field_name}>
+                {f.field_name} — {f.account_count_with_field} accounts
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedCandidate && (
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-[var(--color-text-muted)]">
+              Values that mean "churned" (select all that apply)
+            </label>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {selectedCandidate.sample_values.map((val) => (
+                <label key={val} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectedValues.includes(val)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedValues([...selectedValues, val]);
+                      else setSelectedValues(selectedValues.filter((v) => v !== val));
+                    }}
+                    className="rounded"
+                  />
+                  <span className="font-mono text-[11px]">{val}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onSaveMapping}
+            disabled={savingMapping || !mappingField || selectedValues.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+          >
+            {savingMapping && <Loader2 size={11} className="animate-spin" />}
+            Save & Apply Mapping
+          </button>
+          <button
+            onClick={onCancelMapping}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Data quality report ──────────────────────────────────────────────────
+  return (
+    <div className="space-y-3">
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { label: 'Accounts synced', value: total_accounts.toLocaleString() },
+          { label: 'Churned detected', value: churned_detected.toLocaleString() },
+          { label: 'Signal coverage', value: `${(pct_with_signals * 100).toFixed(0)}%` },
+          { label: 'ARR populated', value: `${(pct_with_arr * 100).toFixed(0)}%` },
+        ].map(({ label, value }) => (
+          <div key={label} className="bg-[var(--color-bg-secondary)] rounded-xl p-3">
+            <p className="text-[10px] text-[var(--color-text-muted)] mb-0.5">{label}</p>
+            <p className="text-sm font-semibold">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Expected confidence */}
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-[var(--color-text-muted)]">Expected model confidence:</span>
+        <span className={`text-[11px] font-semibold ${confidenceColor}`}>{expected_confidence}</span>
+      </div>
+
+      {/* Eligibility message */}
+      <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{eligibility_message}</p>
+
+      {/* CTAs */}
+      {(eligibility === 'ready' || eligibility === 'low_signal_coverage') && (
+        <button
+          onClick={onTrain}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+        >
+          <Brain size={14} />
+          {eligibility === 'low_signal_coverage' ? 'Train Now — Low Confidence' : 'Train Now'}
+        </button>
+      )}
+
+      {(eligibility === 'needs_outcome_mapping' || eligibility === 'insufficient_churn') && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={onStartMapping}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+          >
+            Map Churn Labels
+          </button>
+          {eligibility === 'insufficient_churn' && (
+            <button
+              onClick={onTrain}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+            >
+              Train Anyway
+            </button>
+          )}
+        </div>
+      )}
+
+      {eligibility === 'insufficient_data' && (
+        <p className="text-xs text-[var(--color-danger)] flex items-center gap-1.5">
+          <AlertCircle size={11} /> Sync more accounts before training.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // CRM Workflow (HubSpot or Salesforce)
 // ---------------------------------------------------------------------------
 
-type CrmFlowStage = 'idle' | 'syncing' | 'training' | 'scoring' | 'done' | 'error';
+type CrmFlowStage = 'idle' | 'syncing' | 'reviewing' | 'mapping' | 'training' | 'scoring' | 'done' | 'error';
 
 function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   const brand = BRAND[mode];
@@ -95,6 +272,12 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
 
   // Confirmed from backend during loadData; never seeded from sessionStorage.
   const [modelTrained, setModelTrained] = useState(false);
+
+  // ── Phase 2: readiness + label mapping state ───────────────────────────────
+  const [readiness, setReadiness] = useState<ReadinessReport | null>(null);
+  const [mappingField, setMappingField] = useState('');
+  const [selectedValues, setSelectedValues] = useState<string[]>([]);
+  const [savingMapping, setSavingMapping] = useState(false);
 
   // Guard against duplicate concurrent flow invocations
   const flowActiveRef = useRef(false);
@@ -220,7 +403,7 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
     }
   }, [mode, setPredictions, navigate]);
 
-  // ── Main orchestration: Sync → Train → Score → Navigate ───────────────────
+  // ── Phase 1 of flow: Sync → Analyze (pauses for user review) ─────────────
   const handleRunFlow = useCallback(async () => {
     if (flowActiveRef.current) return;
     flowActiveRef.current = true;
@@ -229,8 +412,8 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
     setSyncResult(null);
     setTrainStatus(null);
     setScoringResult(null);
+    setReadiness(null);
 
-    // Stage 1: Sync
     setFlowStage('syncing');
     try {
       const result = await api.syncIntegration(mode);
@@ -243,7 +426,20 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
       return;
     }
 
-    // Stage 2: Train
+    // Move to reviewing state — user must confirm readiness before training
+    setFlowStage('reviewing');
+    flowActiveRef.current = false;  // release lock so user can interact
+    try {
+      const r = await api.readiness(mode);
+      setReadiness(r);
+    } catch { /* non-critical — reviewing state still shows without data */ }
+  }, [mode, loadData]);
+
+  // ── Phase 2 of flow: Train → Score → Navigate (user-triggered) ────────────
+  const handleStartTraining = useCallback(async () => {
+    if (flowActiveRef.current) return;
+    flowActiveRef.current = true;
+    setFlowError(null);
     setFlowStage('training');
     try {
       const accepted = await api.crmTrain(mode, 0.2);
@@ -261,10 +457,28 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
       flowActiveRef.current = false;
       return;
     }
-
-    // Stage 3: Score → Navigate
     await runScoring();
-  }, [mode, loadData, pollTrainingUntilDone, runScoring]);
+  }, [mode, pollTrainingUntilDone, runScoring]);
+
+  // ── Save label mapping + re-import outcomes ────────────────────────────────
+  const handleSaveMapping = useCallback(async () => {
+    if (!mappingField || selectedValues.length === 0) return;
+    setSavingMapping(true);
+    try {
+      const res = await api.saveLabelMapping(mode, {
+        field_name: mappingField,
+        churned_values: selectedValues,
+      });
+      if (res.readiness) setReadiness(res.readiness);
+      setFlowStage('reviewing');
+      setMappingField('');
+      setSelectedValues([]);
+    } catch (e: any) {
+      setFlowError({ stage: 'mapping', message: e.message });
+    } finally {
+      setSavingMapping(false);
+    }
+  }, [mode, mappingField, selectedValues]);
 
   // ── Connect / Disconnect ───────────────────────────────────────────────────
   const handleConnect = async () => {
@@ -295,15 +509,18 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
   };
 
   // ── Derived step states ────────────────────────────────────────────────────
-  // Declared as standalone booleans first so they can be used in JSX without
-  // triggering TS control-flow narrowing conflicts inside syncDone/trainDone.
-  const isSyncing = flowStage === 'syncing';
-  const isTraining = flowStage === 'training';
-  const isScoring = flowStage === 'scoring';
+  const isSyncing   = flowStage === 'syncing';
+  const isReviewing = flowStage === 'reviewing';
+  const isMapping   = flowStage === 'mapping';
+  const isTraining  = flowStage === 'training';
+  const isScoring   = flowStage === 'scoring';
 
+  // reviewing/mapping are interactive pauses — not "active" for button-disable purposes
   const flowActive = isSyncing || isTraining || isScoring;
+  const isDataQualityVisible = isReviewing || isMapping;
 
   const syncDone =
+    isReviewing || isMapping ||
     flowStage === 'training' || flowStage === 'scoring' || flowStage === 'done' ||
     (flowStage === 'error' && flowError?.stage !== 'syncing' && hasAccounts);
 
@@ -442,15 +659,15 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
             </div>
           )}
 
-          {/* Primary action — only shown when not actively running */}
-          {!flowActive && flowStage !== 'error' && (
+          {/* Primary action — hidden during active flow or label mapping form */}
+          {!flowActive && !isMapping && flowStage !== 'error' && (
             <button
               onClick={handleRunFlow}
               disabled={!isConnected}
               className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
             >
               <RefreshCw size={14} />
-              {hasAccounts || flowStage === 'done' ? 'Resync Now' : 'Sync Now'}
+              {hasAccounts || flowStage === 'done' || isReviewing ? 'Resync Now' : 'Sync Now'}
             </button>
           )}
         </div>
@@ -468,10 +685,33 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
 
           {flowStage === 'idle' && !modelTrained && (
             <p className="text-xs text-[var(--color-text-muted)]">
-              Model will be trained automatically after sync.
+              Sync your accounts first — we'll analyze data quality before training.
             </p>
           )}
-          {flowStage === 'training' && (
+          {flowStage === 'idle' && modelTrained && (
+            <p className="text-xs text-[var(--color-success)] flex items-center gap-1.5">
+              <CheckCircle2 size={11} /> Model trained from previous session
+            </p>
+          )}
+
+          {/* ── Data Quality Report + Label Mapping (reviewing / mapping) ── */}
+          {isDataQualityVisible && (
+            <DataQualitySection
+              readiness={readiness}
+              isMapping={isMapping}
+              mappingField={mappingField}
+              setMappingField={setMappingField}
+              selectedValues={selectedValues}
+              setSelectedValues={setSelectedValues}
+              savingMapping={savingMapping}
+              onStartMapping={() => { setFlowStage('mapping'); setMappingField(''); setSelectedValues([]); }}
+              onSaveMapping={handleSaveMapping}
+              onCancelMapping={() => setFlowStage('reviewing')}
+              onTrain={handleStartTraining}
+            />
+          )}
+
+          {isTraining && (
             <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-1.5">
               <Loader2 size={11} className="animate-spin" />
               Training model on {brand.name} account data…
@@ -497,6 +737,11 @@ function CrmWorkflow({ mode }: { mode: 'hubspot' | 'salesforce' }) {
                 <RefreshCw size={11} /> Retry from sync
               </button>
             </div>
+          )}
+          {flowStage === 'error' && flowError?.stage === 'mapping' && (
+            <p className="text-xs text-[var(--color-danger)] flex items-center gap-1.5">
+              <XCircle size={11} /> {flowError.message}
+            </p>
           )}
         </div>
 

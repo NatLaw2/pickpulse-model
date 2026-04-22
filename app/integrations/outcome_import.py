@@ -110,6 +110,22 @@ _DETECT_FNS: Dict[str, Callable[[dict], Optional[Tuple[str, Optional[str]]]]] = 
 }
 
 
+def _make_custom_detector(
+    mapping: dict,
+) -> Callable[[dict], Optional[Tuple[str, Optional[str]]]]:
+    """Build a detector function from a saved label mapping."""
+    field_name = mapping.get("field_name", "")
+    churned_lower = {str(v).lower().strip() for v in mapping.get("churned_values", [])}
+
+    def detect(raw_data: dict) -> Optional[Tuple[str, Optional[str]]]:
+        val = str(raw_data.get(field_name) or "").lower().strip()
+        if val and val in churned_lower:
+            return "churned", None
+        return None
+
+    return detect
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -138,7 +154,23 @@ def import_outcomes_from_accounts(
     int
         Number of new outcome records written this run.
     """
-    detect_fn = _DETECT_FNS.get(source)
+    # Use custom label mapping if one has been saved for this provider
+    detect_fn: Optional[Callable[[dict], Optional[Tuple[str, Optional[str]]]]] = None
+    try:
+        from app.integrations.readiness import load_label_mapping
+        custom = load_label_mapping(tenant_id, source)
+        if custom:
+            detect_fn = _make_custom_detector(custom)
+            logger.info(
+                "[outcome_import] using custom mapping for %s: %s=%s",
+                source, custom.get("field_name"), custom.get("churned_values"),
+            )
+    except Exception as exc:
+        logger.warning("[outcome_import] could not load custom mapping: %s", exc)
+
+    if detect_fn is None:
+        detect_fn = _DETECT_FNS.get(source)
+
     if not detect_fn:
         logger.debug("[outcome_import] No detector for source '%s' — skipping", source)
         return 0

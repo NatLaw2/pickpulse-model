@@ -25,7 +25,7 @@ if _SENTRY_DSN:
     )
 
 logger = logging.getLogger("pickpulse.api")
-from pydantic import BaseModel as PydanticBaseModel
+from pydantic import BaseModel as PydanticBaseModel, Field, field_validator
 
 
 class FieldMappingItem(PydanticBaseModel):
@@ -2800,6 +2800,107 @@ def integration_data_quality(provider: str, tenant_id: str = Depends(get_tenant_
         records.append(record)
 
     return audit_records(records, fields=scored_fields)
+
+
+@app.get("/api/integrations/{provider}/readiness")
+def integration_readiness(provider: str, tenant_id: str = Depends(get_tenant_id)):
+    """Data quality report and training eligibility for a synced CRM provider.
+
+    Works for both HubSpot and Salesforce. Queries only already-synced data —
+    no live CRM API calls. Returns:
+      - total_accounts, churned_detected, pct_with_signals, pct_with_arr
+      - expected_confidence: High / Medium / Low (deterministic thresholds)
+      - eligibility: ready | needs_outcome_mapping | insufficient_churn |
+                     low_signal_coverage | insufficient_data
+      - candidate_fields: raw_data fields suitable for custom label mapping
+      - label_mapping: currently saved custom mapping, if any
+    """
+    from app.integrations.readiness import compute_readiness
+    try:
+        return compute_readiness(tenant_id, provider)
+    except Exception as exc:
+        logger.warning("[readiness] compute failed for %s tenant=%s: %s", provider, tenant_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/integrations/{provider}/label-mapping")
+def get_label_mapping(provider: str, tenant_id: str = Depends(get_tenant_id)):
+    """Return the saved custom label mapping for this provider, or empty dict if none."""
+    from app.integrations.readiness import load_label_mapping
+    return load_label_mapping(tenant_id, provider) or {}
+
+
+class LabelMappingRequest(PydanticBaseModel):
+    field_name: str = Field(..., max_length=200)
+    churned_values: List[str] = Field(..., min_length=1)
+
+    @field_validator("field_name")
+    @classmethod
+    def strip_field_name(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("churned_values")
+    @classmethod
+    def strip_values(cls, v: List[str]) -> List[str]:
+        cleaned = [s.strip() for s in v if s.strip()]
+        if not cleaned:
+            raise ValueError("churned_values must contain at least one non-empty string")
+        return cleaned
+
+
+@app.post("/api/integrations/{provider}/label-mapping")
+def save_label_mapping_endpoint(
+    provider: str,
+    body: LabelMappingRequest,
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Save a custom churn label mapping and re-import outcomes using the new definition.
+
+    Workflow:
+      1. Persist mapping to disk ({DATA_DIR}/outputs/{tenant_id}/label_mapping_{provider}.json)
+      2. Delete all auto-imported outcomes for this tenant
+      3. Re-run outcome import on all synced accounts with the new mapping
+      4. Return updated readiness report
+    """
+    from app.integrations.readiness import save_label_mapping, compute_readiness
+    from app.integrations.outcome_import import import_outcomes_from_accounts
+    from app.integrations.models import Account
+    from app.storage import repo
+
+    mapping = save_label_mapping(tenant_id, provider, body.field_name, body.churned_values)
+
+    outcomes_reimported = 0
+    try:
+        repo.delete_auto_imported_outcomes(tenant_id)
+        accounts_db = repo.list_accounts(source=provider, limit=10_000, tenant_id=tenant_id)
+        accounts = [
+            Account(
+                external_id=a["external_id"],
+                source=provider,
+                name=a.get("name") or a.get("external_id", ""),
+                raw_data=a.get("raw_data") or {},
+            )
+            for a in accounts_db
+            if a.get("external_id")
+        ]
+        outcomes_reimported = import_outcomes_from_accounts(accounts, provider, tenant_id)
+        logger.info(
+            "[label-mapping] re-imported %d outcomes for %s tenant=%s",
+            outcomes_reimported, provider, tenant_id,
+        )
+    except Exception as exc:
+        logger.warning("[label-mapping] re-import failed: %s", exc)
+
+    try:
+        readiness = compute_readiness(tenant_id, provider)
+    except Exception:
+        readiness = None
+
+    return {
+        "mapping": mapping,
+        "outcomes_reimported": outcomes_reimported,
+        "readiness": readiness,
+    }
 
 
 @app.get("/api/integrations/{provider}/events")

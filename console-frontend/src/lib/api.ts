@@ -271,6 +271,18 @@ export const api = {
 
   syncIntegration: (name: string) => request<SyncResponse>(`/integrations/${name}/sync`, { method: 'POST' }),
 
+  readiness: (provider: string) =>
+    request<ReadinessReport>(`/integrations/${provider}/readiness`),
+
+  getLabelMapping: (provider: string) =>
+    request<LabelMapping | null>(`/integrations/${provider}/label-mapping`),
+
+  saveLabelMapping: (provider: string, body: { field_name: string; churned_values: string[] }) =>
+    request<SaveLabelMappingResponse>(
+      `/integrations/${provider}/label-mapping`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   syncStatus: (provider: string) => request<SyncStatusResponse>(`/integrations/${provider}/sync/status`),
 
   getFieldMappings: (provider: string) =>
@@ -1139,6 +1151,38 @@ export interface SyncResponse {
   outcomes_imported: number;
   errors: string[];
   duration_seconds: number;
+}
+
+export interface CandidateField {
+  field_name: string;
+  sample_values: string[];
+  account_count_with_field: number;
+}
+
+export interface LabelMapping {
+  provider: string;
+  field_name: string;
+  churned_values: string[];
+  updated_at: string;
+}
+
+export interface ReadinessReport {
+  provider: string;
+  total_accounts: number;
+  churned_detected: number;
+  pct_with_signals: number;
+  pct_with_arr: number;
+  expected_confidence: 'High' | 'Medium' | 'Low';
+  eligibility: 'ready' | 'needs_outcome_mapping' | 'insufficient_churn' | 'low_signal_coverage' | 'insufficient_data';
+  eligibility_message: string;
+  label_mapping: LabelMapping | null;
+  candidate_fields: CandidateField[];
+}
+
+export interface SaveLabelMappingResponse {
+  mapping: LabelMapping;
+  outcomes_reimported: number;
+  readiness: ReadinessReport | null;
 }
 
 export interface IntegrationAccount {

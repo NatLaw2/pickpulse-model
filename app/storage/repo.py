@@ -631,6 +631,29 @@ def record_outcome(
         return False
 
 
+def delete_auto_imported_outcomes(tenant_id: str) -> int:
+    """Delete all auto-imported churn outcomes for this tenant.
+
+    Used when a custom label mapping is saved and outcomes need to be re-detected.
+    Preserves manually-added outcomes (notes do not match the auto-import pattern).
+    """
+    try:
+        sb = get_client()
+        res = (
+            sb.table("account_outcomes")
+            .delete()
+            .eq("tenant_id", tenant_id)
+            .like("notes", "Auto-imported from%")
+            .execute()
+        )
+        deleted = len(res.data) if res.data else 0
+        logger.info("delete_auto_imported_outcomes: removed %d for tenant %s", deleted, tenant_id)
+        return deleted
+    except Exception as exc:
+        logger.warning("delete_auto_imported_outcomes: failed (%s)", exc)
+        return 0
+
+
 def upsert_outcome(
     external_id: str,
     outcome_type: str,
