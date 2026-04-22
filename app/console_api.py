@@ -2486,6 +2486,7 @@ def trigger_sync(provider: str, tenant_id: str = Depends(get_tenant_id)):
         "status": "synced" if not result.errors else "partial",
         "accounts_synced": result.accounts_synced,
         "signals_synced": result.signals_synced,
+        "outcomes_imported": getattr(result, "outcomes_imported", 0),
         "errors": result.errors,
         "duration_seconds": result.duration_seconds,
     }

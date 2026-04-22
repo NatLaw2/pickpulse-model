@@ -560,6 +560,17 @@ def trigger_sync(tenant_id: str, provider: str) -> SyncResult:
             error_message=str(exc),
         )
 
+    # Auto-import churn outcomes from CRM account fields
+    if accounts and result.accounts_synced > 0:
+        try:
+            from app.integrations.outcome_import import import_outcomes_from_accounts
+            result.outcomes_imported = import_outcomes_from_accounts(
+                accounts, provider, tenant_id
+            )
+            logger.info("[sync] imported %d outcomes for %s", result.outcomes_imported, provider)
+        except Exception as exc:
+            logger.warning("[sync] outcome import failed for %s: %s", provider, exc)
+
     # Sync signals
     if result.accounts_synced > 0:
         update_sync_state(integration_id, "signals", status="running")

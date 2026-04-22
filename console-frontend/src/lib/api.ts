@@ -1136,6 +1136,7 @@ export interface SyncResponse {
   status: string;
   accounts_synced: number;
   signals_synced: number;
+  outcomes_imported: number;
   errors: string[];
   duration_seconds: number;
 }
