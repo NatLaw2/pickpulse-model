@@ -1175,6 +1175,7 @@ export interface ReadinessReport {
   expected_confidence: 'High' | 'Medium' | 'Low';
   eligibility: 'ready' | 'needs_outcome_mapping' | 'insufficient_churn' | 'low_signal_coverage' | 'insufficient_data';
   eligibility_message: string;
+  training_enabled: boolean;
   label_mapping: LabelMapping | null;
   candidate_fields: CandidateField[];
 }

@@ -2857,7 +2857,7 @@ def save_label_mapping_endpoint(
     """Save a custom churn label mapping and re-import outcomes using the new definition.
 
     Workflow:
-      1. Persist mapping to disk ({DATA_DIR}/outputs/{tenant_id}/label_mapping_{provider}.json)
+      1. Upsert mapping to crm_label_mappings Supabase table (tenant_id, provider unique key)
       2. Delete all auto-imported outcomes for this tenant
       3. Re-run outcome import on all synced accounts with the new mapping
       4. Return updated readiness report

@@ -103,6 +103,7 @@ function DataQualitySection({
     total_accounts, churned_detected, pct_with_signals, pct_with_arr,
     expected_confidence, eligibility, eligibility_message, candidate_fields,
   } = readiness;
+  // training_enabled is read directly from readiness object in the CTA block below
 
   const selectedCandidate = candidate_fields.find((f) => f.field_name === mappingField);
 
@@ -205,8 +206,8 @@ function DataQualitySection({
       {/* Eligibility message */}
       <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">{eligibility_message}</p>
 
-      {/* CTAs */}
-      {(eligibility === 'ready' || eligibility === 'low_signal_coverage') && (
+      {/* CTAs — gated strictly by eligibility */}
+      {readiness.training_enabled && (
         <button
           onClick={onTrain}
           className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
@@ -217,21 +218,18 @@ function DataQualitySection({
       )}
 
       {(eligibility === 'needs_outcome_mapping' || eligibility === 'insufficient_churn') && (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="space-y-2">
           <button
             onClick={onStartMapping}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
           >
             Map Churn Labels
           </button>
-          {eligibility === 'insufficient_churn' && (
-            <button
-              onClick={onTrain}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-            >
-              Train Anyway
-            </button>
-          )}
+          <p className="text-[11px] text-[var(--color-text-muted)]">
+            {eligibility === 'needs_outcome_mapping'
+              ? 'Training is disabled until at least one churned account is identified.'
+              : `Training requires at least 20 churned accounts. ${churned_detected} detected so far.`}
+          </p>
         </div>
       )}
 
