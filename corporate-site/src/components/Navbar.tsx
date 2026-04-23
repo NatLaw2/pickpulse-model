@@ -3,10 +3,9 @@ import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 
 const links = [
-  { to: '/modules', label: 'Modules' },
-  { to: '/modules/churn', label: 'Churn' },
+  { to: '/', label: 'Home' },
+  { to: '/onboarding', label: 'How It Works' },
   { to: '/about', label: 'About' },
-  { to: '/onboarding', label: 'Onboarding' },
   { to: '/contact', label: 'Contact' },
 ];
 
@@ -14,15 +13,14 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
+    <header className="sticky top-0 z-50 bg-[#0D0F12]/95 backdrop-blur-md border-b border-white/[0.08]">
       <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-sm">
-            P
-          </div>
-          <span className="text-lg font-bold text-slate-900 tracking-tight">
-            PickPulse<span className="text-indigo-600"> Intelligence</span>
-          </span>
+        <Link to="/" className="flex items-center">
+          <img
+            src="/PickPulse Logo.png"
+            alt="PickPulse Intelligence"
+            className="h-16 brightness-110"
+          />
         </Link>
 
         {/* Desktop nav */}
@@ -32,7 +30,9 @@ export function Navbar() {
               key={to}
               to={to}
               className={({ isActive }) =>
-                `text-sm font-medium transition-colors ${isActive ? 'text-indigo-600' : 'text-slate-600 hover:text-slate-900'}`
+                `text-sm font-medium transition-colors ${
+                  isActive ? 'text-white' : 'text-slate-400 hover:text-white'
+                }`
               }
             >
               {label}
@@ -40,51 +40,54 @@ export function Navbar() {
           ))}
           <a
             href="https://demo.pickpulse.co"
-            className="px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors"
+            className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
           >
             Sign In
           </a>
           <Link
             to="/demo"
-            className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+            className="px-5 py-2 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-400 transition-colors shadow-lg shadow-teal-500/20"
           >
-            Request a Demo
+            Book a Demo
           </Link>
         </nav>
 
-        {/* Mobile toggle */}
-        <button className="md:hidden p-2" onClick={() => setOpen(!open)}>
+        <button
+          className="md:hidden p-2 text-slate-400 hover:text-white transition-colors"
+          onClick={() => setOpen(!open)}
+        >
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
-      {/* Mobile nav */}
       {open && (
-        <div className="md:hidden border-t border-slate-200 bg-white px-6 py-4 space-y-3">
+        <div className="md:hidden border-t border-white/[0.08] bg-[#0D0F12] px-6 py-5 space-y-1">
           {links.map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}
               onClick={() => setOpen(false)}
-              className="block text-sm font-medium text-slate-700 hover:text-indigo-600"
+              className="block py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-colors"
             >
               {label}
             </NavLink>
           ))}
-          <a
-            href="https://demo.pickpulse.co"
-            onClick={() => setOpen(false)}
-            className="block text-center px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-xl"
-          >
-            Sign In
-          </a>
-          <Link
-            to="/demo"
-            onClick={() => setOpen(false)}
-            className="block text-center px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold"
-          >
-            Request a Demo
-          </Link>
+          <div className="pt-4 border-t border-white/[0.08] space-y-3 mt-2">
+            <a
+              href="https://demo.pickpulse.co"
+              onClick={() => setOpen(false)}
+              className="block text-center px-4 py-2.5 text-sm font-medium text-slate-400 border border-white/[0.12] rounded-lg hover:text-white hover:border-white/20 transition-colors"
+            >
+              Sign In
+            </a>
+            <Link
+              to="/demo"
+              onClick={() => setOpen(false)}
+              className="block text-center px-5 py-2.5 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-400 transition-colors"
+            >
+              Book a Demo
+            </Link>
+          </div>
         </div>
       )}
     </header>
