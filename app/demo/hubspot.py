@@ -77,40 +77,42 @@ _TIERS = [
     ("LOW",     1000, 0.03),
 ]
 
-# Signal distribution parameters per tier:
+# Signal distribution parameters per tier.
+# Wider std values create realistic within-tier variance so the ML model
+# produces a continuous probability distribution rather than 4 hard bands.
 # key -> (mean, std, lo, hi)
 _SIG_PARAMS: dict[str, dict[str, tuple[float, float, float, float]]] = {
     "HIGH": {
-        "days_since_last_login": (68.0,  18.0,  35.0, 120.0),
-        "monthly_logins":        ( 1.0,   0.8,   0.0,   3.0),
-        "nps_score":             ( 2.8,   1.0,   1.0,   5.0),
-        "support_tickets":       ( 5.5,   1.5,   2.0,   9.0),
-        "days_until_renewal":    (20.0,  10.0,   5.0,  45.0),
-        "seats":                 ( 4.0,   2.0,   1.0,  10.0),
+        "days_since_last_login": (72.0,  28.0,  25.0, 140.0),
+        "monthly_logins":        ( 1.2,   1.2,   0.0,   5.0),
+        "nps_score":             ( 2.8,   1.4,   1.0,   6.0),
+        "support_tickets":       ( 5.5,   2.2,   1.0,  12.0),
+        "days_until_renewal":    (22.0,  16.0,   2.0,  60.0),
+        "seats":                 ( 4.0,   2.8,   1.0,  14.0),
     },
     "MED_HIGH": {
-        "days_since_last_login": (42.0,  12.0,  18.0,  70.0),
-        "monthly_logins":        ( 3.0,   1.5,   0.0,   7.0),
-        "nps_score":             ( 5.0,   1.0,   3.0,   7.0),
-        "support_tickets":       ( 3.2,   1.0,   1.0,   6.0),
-        "days_until_renewal":    (55.0,  20.0,  15.0, 100.0),
-        "seats":                 ( 6.0,   3.0,   2.0,  15.0),
+        "days_since_last_login": (42.0,  18.0,  10.0,  85.0),
+        "monthly_logins":        ( 3.2,   2.2,   0.0,   9.0),
+        "nps_score":             ( 5.0,   1.5,   2.5,   7.5),
+        "support_tickets":       ( 3.2,   1.6,   0.0,   8.0),
+        "days_until_renewal":    (58.0,  28.0,  10.0, 120.0),
+        "seats":                 ( 6.5,   4.0,   1.0,  20.0),
     },
     "MED": {
-        "days_since_last_login": (22.0,  10.0,   6.0,  45.0),
-        "monthly_logins":        ( 7.0,   2.5,   2.0,  14.0),
-        "nps_score":             ( 6.8,   0.8,   5.0,   8.5),
-        "support_tickets":       ( 1.5,   0.8,   0.0,   3.0),
-        "days_until_renewal":    (130.0, 50.0,  45.0, 250.0),
-        "seats":                 ( 9.0,   4.0,   3.0,  22.0),
+        "days_since_last_login": (22.0,  14.0,   2.0,  60.0),
+        "monthly_logins":        ( 7.0,   3.5,   1.0,  18.0),
+        "nps_score":             ( 6.8,   1.2,   4.0,   9.0),
+        "support_tickets":       ( 1.5,   1.2,   0.0,   5.0),
+        "days_until_renewal":    (130.0, 65.0,  30.0, 280.0),
+        "seats":                 ( 9.0,   5.5,   2.0,  30.0),
     },
     "LOW": {
-        "days_since_last_login": ( 4.0,   3.0,   0.0,  14.0),
-        "monthly_logins":        (17.0,   5.0,   8.0,  35.0),
-        "nps_score":             ( 8.8,   0.6,   7.5,  10.0),
-        "support_tickets":       ( 0.3,   0.5,   0.0,   2.0),
-        "days_until_renewal":    (220.0, 75.0,  90.0, 400.0),
-        "seats":                 (14.0,   5.0,   4.0,  45.0),
+        "days_since_last_login": ( 4.0,   4.5,   0.0,  22.0),
+        "monthly_logins":        (18.0,   7.0,   5.0,  40.0),
+        "nps_score":             ( 8.8,   0.9,   6.5,  10.0),
+        "support_tickets":       ( 0.3,   0.6,   0.0,   3.0),
+        "days_until_renewal":    (225.0, 90.0,  60.0, 420.0),
+        "seats":                 (15.0,   7.0,   3.0,  55.0),
     },
 }
 
@@ -122,15 +124,17 @@ _AUTO_RENEW_PROB: dict[str, float] = {
     "LOW":      0.95,
 }
 
-# Plan mix weights: [Starter, Professional, Enterprise]
-_PLAN_WEIGHTS_HIGH = [0.55, 0.30, 0.15]
-_PLAN_WEIGHTS_LOW  = [0.20, 0.45, 0.35]
+# Plan mix weights: [Starter, Professional, Enterprise, Strategic]
+_PLAN_WEIGHTS_HIGH = [0.50, 0.30, 0.15, 0.05]
+_PLAN_WEIGHTS_LOW  = [0.18, 0.40, 0.32, 0.10]
 
 # ARR log-normal params: (mu, sigma, lo, hi)
+# Enterprise cap raised to $1.5M; Strategic tier added for large logos ($500k–$3M).
 _PLAN_ARR: dict[str, tuple[float, float, float, float]] = {
-    "Starter":      (math.log(18_000),  0.45,  5_000,  45_000),
-    "Professional": (math.log(55_000),  0.40, 20_000, 130_000),
-    "Enterprise":   (math.log(160_000), 0.38, 70_000, 400_000),
+    "Starter":      (math.log(18_000),  0.55,   5_000,   60_000),
+    "Professional": (math.log(65_000),  0.50,  18_000,  400_000),
+    "Enterprise":   (math.log(200_000), 0.48,  70_000, 1_500_000),
+    "Strategic":    (math.log(900_000), 0.45, 400_000, 3_200_000),
 }
 
 
@@ -142,7 +146,7 @@ def _lerp_weights(tier: str, frac: float) -> list[float]:
     """Interpolate plan weights between high-risk and low-risk poles."""
     hi = _PLAN_WEIGHTS_HIGH
     lo = _PLAN_WEIGHTS_LOW
-    return [hi[i] * (1 - frac) + lo[i] * frac for i in range(3)]
+    return [hi[i] * (1 - frac) + lo[i] * frac for i in range(4)]
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +217,7 @@ class HubSpotDemoDataset:
             # Interpolate between high-risk and low-risk plan weights
             tier_frac = {"HIGH": 0.0, "MED_HIGH": 0.25, "MED": 0.65, "LOW": 1.0}[tier]
             plan_weights = _lerp_weights(tier, tier_frac)
-            plan = str(rng.choice(["Starter", "Professional", "Enterprise"], p=plan_weights))
+            plan = str(rng.choice(["Starter", "Professional", "Enterprise", "Strategic"], p=plan_weights))
             arr_mu, arr_sigma, arr_lo, arr_hi = _PLAN_ARR[plan]
             arr_raw = float(np.exp(rng.normal(arr_mu, arr_sigma)))
             arr = float(np.clip(arr_raw, arr_lo, arr_hi))

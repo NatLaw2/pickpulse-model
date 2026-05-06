@@ -1374,10 +1374,48 @@ export interface ArrSummary {
   coverage_notes: string[];
 }
 
+export interface ArrForecastScenario {
+  arr: number;
+  arr_lost: number;
+  assumption?: string;
+}
+
+export interface ArrForecast90d {
+  current_arr: number;
+  horizon_days: number;
+  accounts_in_window: number;
+  expected: ArrForecastScenario;
+  best_case: ArrForecastScenario;
+  worst_case: ArrForecastScenario;
+}
+
+export interface RenewalBucket {
+  account_count: number;
+  arr_total: number;
+  arr_at_risk: number;
+  high_risk_count: number;
+}
+
+export interface RenewalTimeline {
+  next_30d: RenewalBucket;
+  next_60d: RenewalBucket;
+  next_90d: RenewalBucket;
+  next_180d: RenewalBucket;
+}
+
+export interface PortfolioConcentration {
+  top10_arr: number;
+  top10_pct_of_total: number;
+  top10_arr_at_risk: number;
+}
+
 export interface ArrCommandCenterResponse {
   has_predictions: boolean;
   summary: ArrSummary | null;
   accounts: ArrRankedAccount[];
+  forecast?: ArrForecast90d;
+  renewal_timeline?: RenewalTimeline;
+  concentration?: PortfolioConcentration;
 }
 
 export interface ArrIntervention {

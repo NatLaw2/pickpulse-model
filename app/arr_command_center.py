@@ -417,10 +417,103 @@ def build_command_center(
         "coverage_notes": coverage_notes,
     }
 
+    # ── 6. 90-Day Forecast Scenarios ─────────────────────────────────────────
+    # Only accounts with ARR + renewal within 90 days enter the forecast.
+    FORECAST_HORIZON = 90
+    current_arr = sum(r["arr"] for r in enriched if r["arr"] is not None)
+    renewing_90d = [
+        r for r in enriched
+        if r["arr"] is not None
+        and r["days_until_renewal"] is not None
+        and 0 <= r["days_until_renewal"] <= FORECAST_HORIZON
+    ]
+
+    expected_loss = sum(r["arr"] * r["churn_risk_pct"] / 100 for r in renewing_90d)
+    # Best case: intervention saves 40% of at-risk ARR
+    best_loss = expected_loss * 0.60
+    # Worst case: additional latent churn from accounts just above renewal window
+    nearly_due = [
+        r for r in enriched
+        if r["arr"] is not None
+        and r["days_until_renewal"] is not None
+        and FORECAST_HORIZON < r["days_until_renewal"] <= FORECAST_HORIZON + 30
+        and r["churn_risk_pct"] >= 40
+    ]
+    tail_risk = sum(r["arr"] * r["churn_risk_pct"] / 100 for r in nearly_due) * 0.3
+    worst_loss = expected_loss + tail_risk
+
+    forecast = {
+        "current_arr": round(current_arr, 2),
+        "horizon_days": FORECAST_HORIZON,
+        "accounts_in_window": len(renewing_90d),
+        "expected": {
+            "arr": round(current_arr - expected_loss, 2),
+            "arr_lost": round(expected_loss, 2),
+        },
+        "best_case": {
+            "arr": round(current_arr - best_loss, 2),
+            "arr_lost": round(best_loss, 2),
+            "assumption": "40% of at-risk ARR saved through intervention",
+        },
+        "worst_case": {
+            "arr": round(current_arr - worst_loss, 2),
+            "arr_lost": round(worst_loss, 2),
+            "assumption": "Expected losses plus latent churn from near-window high-risk accounts",
+        },
+    }
+
+    # ── 7. Renewal Risk Timeline ──────────────────────────────────────────────
+    def _renewal_bucket(accounts: List[Dict], lo: int, hi: int) -> Dict:
+        bucket = [
+            r for r in accounts
+            if r["days_until_renewal"] is not None
+            and lo <= r["days_until_renewal"] <= hi
+        ]
+        arr_total = sum(r["arr"] for r in bucket if r["arr"] is not None)
+        arr_at_risk_b = sum(
+            r["arr"] * r["churn_risk_pct"] / 100
+            for r in bucket
+            if r["arr"] is not None
+        )
+        high_risk_count = sum(1 for r in bucket if r["churn_risk_pct"] >= 40)
+        return {
+            "account_count": len(bucket),
+            "arr_total": round(arr_total, 2),
+            "arr_at_risk": round(arr_at_risk_b, 2),
+            "high_risk_count": high_risk_count,
+        }
+
+    renewal_timeline = {
+        "next_30d":  _renewal_bucket(enriched,  0,  30),
+        "next_60d":  _renewal_bucket(enriched, 31,  60),
+        "next_90d":  _renewal_bucket(enriched, 61,  90),
+        "next_180d": _renewal_bucket(enriched, 91, 180),
+    }
+
+    # ── 8. Portfolio Concentration ────────────────────────────────────────────
+    arr_accounts = sorted(
+        [r for r in enriched if r["arr"] is not None],
+        key=lambda r: r["arr"],
+        reverse=True,
+    )
+    top10_arr = sum(r["arr"] for r in arr_accounts[:10])
+    concentration_pct = round(100 * top10_arr / current_arr, 1) if current_arr > 0 else 0.0
+
+    concentration = {
+        "top10_arr": round(top10_arr, 2),
+        "top10_pct_of_total": concentration_pct,
+        "top10_arr_at_risk": round(
+            sum(r["arr"] * r["churn_risk_pct"] / 100 for r in arr_accounts[:10]), 2
+        ),
+    }
+
     return {
         "has_predictions": True,
         "summary": summary,
         "accounts": ranked,
+        "forecast": forecast,
+        "renewal_timeline": renewal_timeline,
+        "concentration": concentration,
     }
 
 

@@ -5,6 +5,7 @@ import { api, isNoDatasetError, isNoModelError, type ChurnPrediction } from '../
 import { useDataset } from '../lib/DatasetContext';
 import { usePredictions } from '../lib/PredictionContext';
 import { useExecutiveSummary } from '../lib/ExecutiveSummaryContext';
+import { useActiveMode } from '../lib/ActiveModeContext';
 import { AccountDetailDrawer } from '../components/AccountDetailDrawer';
 import { riskLabel } from '../lib/risk';
 import { formatCurrency } from '../lib/format';
@@ -22,6 +23,8 @@ export function PredictPage() {
   const navigate = useNavigate();
   const { dataset } = useDataset();
   const { predictions: result, setPredictions, loadCached, loading: contextLoading } = usePredictions();
+  const { mode } = useActiveMode();
+  const isCrmMode = mode === 'hubspot' || mode === 'salesforce';
 
   // Sorting state — default by ARR at Risk DESC
   const [sortKey, setSortKey] = useState<SortKey>('arr_at_risk');
@@ -103,8 +106,10 @@ export function PredictPage() {
     }
   };
 
-  // Determine empty states
-  const noDataset = !dataset || (error && isNoDatasetError(error));
+  // Determine empty states.
+  // In CRM mode there is never a CSV dataset, so `dataset` is always null —
+  // suppress the "No dataset" empty state and show a CRM-specific message instead.
+  const noDataset = !isCrmMode && (!dataset || (error && isNoDatasetError(error)));
   const noModel = error && isNoModelError(error) && !noDataset;
   const realError = error && !isNoDatasetError(error) && !isNoModelError(error);
 
@@ -205,6 +210,23 @@ export function PredictPage() {
             className="btn-primary px-5 py-2.5 text-white rounded-xl text-sm font-medium"
           >
             Go to Train
+          </button>
+        </div>
+      )}
+
+      {/* CRM mode: no scores yet — direct user to rescore */}
+      {isCrmMode && !result && !contextLoading && (
+        <div className="bg-white border border-[var(--color-border)] rounded-2xl p-8 mb-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+          <Database size={32} className="mx-auto mb-3 text-[var(--color-text-muted)]" />
+          <h3 className="font-semibold mb-2">No scored accounts yet</h3>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-5 max-w-md mx-auto">
+            Train your model, then sync your CRM to score all accounts and see predictions here.
+          </p>
+          <button
+            onClick={() => navigate('/integrations')}
+            className="btn-primary px-5 py-2.5 text-white rounded-xl text-sm font-medium"
+          >
+            Go to Integrations
           </button>
         </div>
       )}

@@ -1245,6 +1245,23 @@ def _execute_crm_training_job(
                          metadata={"module": module_name, "version": metadata.get("version"),
                                    "artifact_path": artifact_dir})
 
+        # Auto-score the portfolio immediately after training so the Accounts
+        # page populates without requiring a separate "Rescore All" step.
+        provider = module_name.replace("_churn", "")
+        if provider in ("hubspot", "salesforce"):
+            try:
+                auto_scores = score_accounts(tenant_id=tenant_id, artifact_dir=artifact_dir, source=provider)
+                _set_active_source(tenant_id, provider)
+                logger.info(
+                    "[crm-train] Auto-scored %d accounts after training (provider=%s, tenant=%s)",
+                    len(auto_scores), provider, tenant_id[:8],
+                )
+            except Exception as score_exc:
+                logger.warning(
+                    "[crm-train] Auto-score after training failed (provider=%s): %s",
+                    provider, score_exc,
+                )
+
     except Exception as exc:
         traceback.print_exc()
         failed_at = datetime.now(timezone.utc)
