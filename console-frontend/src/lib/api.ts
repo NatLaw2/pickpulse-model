@@ -1178,6 +1178,7 @@ export interface ReadinessReport {
   training_enabled: boolean;
   label_mapping: LabelMapping | null;
   candidate_fields: CandidateField[];
+  warnings: string[];
 }
 
 export interface SaveLabelMappingResponse {

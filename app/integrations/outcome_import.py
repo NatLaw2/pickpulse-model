@@ -47,20 +47,28 @@ def _safe_date(value: object) -> Optional[str]:
     return s[:10] if len(s) >= 10 else None
 
 
-def _scan_for_churn_field(raw_data: dict) -> Optional[str]:
+def _scan_for_churn_field(raw_data: dict) -> tuple:
     """Scan raw_data for any custom field with 'churn' in the key that has a
-    truthy, non-negative value.  Returns the field value as an ISO date string
-    when it looks like a date, otherwise None (caller uses today's date).
+    truthy, non-negative value.
+
+    Returns (found: bool, date: Optional[str]).
+      - found=True  means a matching field was detected regardless of value format.
+      - date is an ISO date string when the value parses as one, else None.
+
+    Previously returned Optional[str] which conflated "no match" with "match but
+    no date" — causing short truthy values like "true" / "yes" to be silently
+    ignored.  This tuple form lets callers detect churn even when the field value
+    is not a date.
     """
     for key, val in raw_data.items():
         if "churn" not in key.lower():
             continue
         if not val or val in ("false", "0", "", "no", "False", "No"):
             continue
-        # If the value looks like a date, use it as effective_date
+        # Matching field found — try to extract a date, but treat as churn regardless.
         date_str = _safe_date(val)
-        return date_str  # may be None — caller handles that
-    return None
+        return True, date_str
+    return False, None
 
 
 # ---------------------------------------------------------------------------
@@ -79,11 +87,10 @@ def detect_hubspot_outcome(raw_data: dict) -> Optional[Tuple[str, Optional[str]]
     if any(kw in lead_status for kw in _HS_CHURNED_STATUS_KEYWORDS):
         return "churned", None
 
-    # 3. Custom churn field scan
-    date_val = _scan_for_churn_field(raw_data)
-    if date_val is not None:  # _scan returned something (even empty string from a match)
-        # Re-check: _scan returns None when no key matched, so this branch
-        # only fires when a matching key was found.
+    # 3. Custom churn field scan — use found flag so short truthy values
+    #    like "true" / "yes" / "1" are not silently dropped (pre-fix bug).
+    found, date_val = _scan_for_churn_field(raw_data)
+    if found:
         return "churned", date_val
 
     return None
@@ -96,9 +103,9 @@ def detect_salesforce_outcome(raw_data: dict) -> Optional[Tuple[str, Optional[st
     if account_type == "Former Customer":
         return "churned", _safe_date(raw_data.get("LastActivityDate"))
 
-    # 2. Custom churn field scan
-    date_val = _scan_for_churn_field(raw_data)
-    if date_val is not None:
+    # 2. Custom churn field scan — use found flag so short truthy values are not missed.
+    found, date_val = _scan_for_churn_field(raw_data)
+    if found:
         return "churned", date_val
 
     return None

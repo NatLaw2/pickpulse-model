@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -18,6 +19,23 @@ logger = logging.getLogger(__name__)
 
 # Default tenant for single-tenant mode
 DEFAULT_TENANT = "00000000-0000-0000-0000-000000000000"
+
+# ---------------------------------------------------------------------------
+# Per-integration token refresh lock
+# Prevents two concurrent syncs for the same integration from racing to
+# refresh the access token simultaneously (second call would use an already-
+# rotated refresh token and fail, leaving the token in a bad state).
+# ---------------------------------------------------------------------------
+_refresh_locks: Dict[str, threading.Lock] = {}
+_refresh_locks_mutex = threading.Lock()
+
+
+def _get_refresh_lock(integration_id: str) -> threading.Lock:
+    """Return (creating if needed) the per-integration refresh lock."""
+    with _refresh_locks_mutex:
+        if integration_id not in _refresh_locks:
+            _refresh_locks[integration_id] = threading.Lock()
+        return _refresh_locks[integration_id]
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -345,54 +363,87 @@ def get_decrypted_token(
 
 
 def _try_refresh_token(integration_id: str) -> Optional[str]:
-    """Attempt to refresh an OAuth access token using the refresh token."""
-    sb = get_client()
+    """Attempt to refresh an OAuth access token using the refresh token.
 
-    # Get integration to find provider
-    int_res = sb.table("integrations").select("provider").eq(
-        "id", integration_id
-    ).limit(1).execute()
-    if not int_res.data:
+    Protected by a per-integration lock so concurrent syncs cannot race to
+    refresh simultaneously (which would invalidate the refresh token mid-flight).
+    If another thread is already refreshing, this call blocks briefly then
+    re-reads the freshly-stored token instead of making a duplicate request.
+    """
+    lock = _get_refresh_lock(integration_id)
+
+    if not lock.acquire(blocking=True, timeout=15):
+        # Could not acquire lock within 15s — another refresh is stalled.
+        # Return None and let the caller use the (possibly stale) existing token.
+        logger.warning(
+            "Token refresh lock timeout for %s — skipping duplicate refresh", integration_id
+        )
         return None
-    provider = int_res.data[0]["provider"]
-
-    # Get refresh token
-    rt_res = sb.table("integration_tokens").select("*").eq(
-        "integration_id", integration_id
-    ).eq("token_type", "refresh").limit(1).execute()
-    if not rt_res.data:
-        return None
-
-    refresh_token = decrypt_token(rt_res.data[0]["encrypted_value"], rt_res.data[0]["iv"])
 
     try:
-        tokens = oauth_module.refresh_access_token(provider, refresh_token)
-    except Exception as exc:
-        logger.warning("Token refresh failed for %s: %s", integration_id, exc)
-        return None
+        # Re-read the token while holding the lock; another thread may have
+        # already refreshed it while we were waiting.
+        sb = get_client()
+        recheck = sb.table("integration_tokens").select("*").eq(
+            "integration_id", integration_id
+        ).eq("token_type", "access").limit(1).execute()
+        if recheck.data:
+            row = recheck.data[0]
+            if row.get("expires_at"):
+                expires_at_dt = datetime.fromisoformat(
+                    row["expires_at"].replace("Z", "+00:00")
+                )
+                if expires_at_dt - datetime.now(timezone.utc) >= timedelta(minutes=5):
+                    # Token was refreshed by another thread — return the fresh value.
+                    logger.debug("Token for %s already refreshed by another thread", integration_id)
+                    return decrypt_token(row["encrypted_value"], row["iv"])
 
-    # Store new access token
-    new_access = tokens["access_token"]
-    ct, iv = encrypt_token(new_access)
-    expires_at = None
-    if tokens.get("expires_in"):
-        expires_at = (
-            datetime.now(timezone.utc) + timedelta(seconds=tokens["expires_in"])
-        ).isoformat()
+        # Proceed with refresh — we hold the lock.
+        int_res = sb.table("integrations").select("provider").eq(
+            "id", integration_id
+        ).limit(1).execute()
+        if not int_res.data:
+            return None
+        provider = int_res.data[0]["provider"]
 
-    sb.table("integration_tokens").upsert(
-        {
-            "integration_id": integration_id,
-            "token_type": "access",
-            "encrypted_value": ct,
-            "iv": iv,
-            "expires_at": expires_at,
-        },
-        on_conflict="integration_id,token_type",
-    ).execute()
+        rt_res = sb.table("integration_tokens").select("*").eq(
+            "integration_id", integration_id
+        ).eq("token_type", "refresh").limit(1).execute()
+        if not rt_res.data:
+            return None
 
-    log_event(integration_id, "token_refreshed", {})
-    return new_access
+        refresh_token = decrypt_token(rt_res.data[0]["encrypted_value"], rt_res.data[0]["iv"])
+
+        try:
+            tokens = oauth_module.refresh_access_token(provider, refresh_token)
+        except Exception as exc:
+            logger.warning("Token refresh failed for %s: %s", integration_id, exc)
+            return None
+
+        new_access = tokens["access_token"]
+        ct, iv = encrypt_token(new_access)
+        expires_at = None
+        if tokens.get("expires_in"):
+            expires_at = (
+                datetime.now(timezone.utc) + timedelta(seconds=tokens["expires_in"])
+            ).isoformat()
+
+        sb.table("integration_tokens").upsert(
+            {
+                "integration_id": integration_id,
+                "token_type": "access",
+                "encrypted_value": ct,
+                "iv": iv,
+                "expires_at": expires_at,
+            },
+            on_conflict="integration_id,token_type",
+        ).execute()
+
+        log_event(integration_id, "token_refreshed", {})
+        return new_access
+
+    finally:
+        lock.release()
 
 
 # ---------------------------------------------------------------------------

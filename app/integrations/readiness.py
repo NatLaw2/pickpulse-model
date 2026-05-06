@@ -35,6 +35,68 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger("pickpulse.readiness")
 
 # ---------------------------------------------------------------------------
+# DB constraint health cache
+# Set by app startup check; read by compute_readiness to surface warnings.
+# None = not yet checked; True = constraint OK; False = constraint missing.
+# ---------------------------------------------------------------------------
+_sf_constraint_ok: Optional[bool] = None
+
+
+_PROBE_TENANT = "__constraint_probe__"
+_PROBE_ACCT_UUID = "00000000-0000-0000-0000-ffffffffffff"  # guaranteed non-existent
+
+
+def verify_sf_constraint() -> bool:
+    """Probe the account_outcomes source CHECK constraint for 'salesforce'.
+
+    Strategy: attempt an INSERT with source='salesforce' and a non-existent
+    account UUID. PostgreSQL checks table constraints before FK constraints, so:
+      - CHECK allows 'salesforce' → FK violation fires (expected) → constraint OK ✓
+      - CHECK rejects 'salesforce' → CHECK violation fires first  → constraint BAD ✗
+
+    Result is cached for the process lifetime — the constraint cannot change
+    without a migration and a server restart.
+    """
+    global _sf_constraint_ok
+    if _sf_constraint_ok is not None:
+        return bool(_sf_constraint_ok)
+
+    try:
+        from app.storage.db import get_client
+        sb = get_client()
+        sb.table("account_outcomes").insert({
+            "tenant_id": _PROBE_TENANT,
+            "account_id": _PROBE_ACCT_UUID,
+            "outcome_type": "churned",
+            "source": "salesforce",
+            "effective_date": "2000-01-01",
+        }).execute()
+        # If we somehow reach here, a row was written — delete it immediately.
+        try:
+            sb.table("account_outcomes").delete().eq(
+                "tenant_id", _PROBE_TENANT
+            ).execute()
+        except Exception:
+            pass
+        _sf_constraint_ok = True
+    except Exception as exc:
+        err_str = str(exc).lower()
+        if "check" in err_str or "violates check constraint" in err_str:
+            _sf_constraint_ok = False
+            logger.warning(
+                "[readiness] SALESFORCE CONSTRAINT MISSING: account_outcomes source CHECK "
+                "does not allow 'salesforce'. Salesforce outcome imports will silently fail. "
+                "Apply migration supabase/migrations/20260414_account_outcomes_fixes.sql "
+                "in your Supabase SQL editor immediately."
+            )
+        else:
+            # FK violation or other error — CHECK allowed 'salesforce', which is correct.
+            _sf_constraint_ok = True
+            logger.debug("[readiness] Salesforce source constraint OK (FK probe as expected)")
+
+    return bool(_sf_constraint_ok)
+
+# ---------------------------------------------------------------------------
 # Eligibility constants
 # ---------------------------------------------------------------------------
 ELIGIBILITY_READY              = "ready"
@@ -43,14 +105,20 @@ ELIGIBILITY_INSUFFICIENT_CHURN = "insufficient_churn"
 ELIGIBILITY_LOW_SIGNALS        = "low_signal_coverage"
 ELIGIBILITY_INSUFFICIENT_DATA  = "insufficient_data"
 
-# Minimum churned examples to allow training
-_MIN_TOTAL   = 10
-_MIN_CHURNED = 20   # below this → training disabled regardless of signal coverage
-_MIN_SIGNAL  = 0.15
-
-# Confidence thresholds (only applied when eligibility is ready or low_signal_coverage)
-_HIGH_CHURNED, _HIGH_SIGNAL, _HIGH_TOTAL       = 50, 0.70, 200
-_MEDIUM_CHURNED, _MEDIUM_SIGNAL, _MEDIUM_TOTAL = 20, 0.40, 50
+# Thresholds — imported from single source of truth.
+# DO NOT redefine these here; edit app/integrations/thresholds.py instead.
+from app.integrations.thresholds import (  # noqa: E402
+    MIN_TOTAL_ACCOUNTS as _MIN_TOTAL,
+    MIN_CHURNED as _MIN_CHURNED,
+    MIN_SIGNAL_PCT as _MIN_SIGNAL,
+    HIGH_CHURNED as _HIGH_CHURNED,
+    HIGH_SIGNAL as _HIGH_SIGNAL,
+    HIGH_TOTAL as _HIGH_TOTAL,
+    MEDIUM_CHURNED as _MEDIUM_CHURNED,
+    MEDIUM_SIGNAL as _MEDIUM_SIGNAL,
+    MEDIUM_TOTAL as _MEDIUM_TOTAL,
+    SF_ACCOUNT_LIMIT as _SF_ACCOUNT_LIMIT,
+)
 
 # Supabase IN-clause batch size
 _SIGNAL_BATCH = 500
@@ -386,6 +454,49 @@ def compute_readiness(tenant_id: str, provider: str) -> Dict[str, Any]:
         except Exception as exc:
             logger.warning("[readiness] candidate discovery failed: %s", exc)
 
+    # Build diagnostics warnings list — surfaced in API response and logs.
+    warnings: List[str] = []
+
+    if provider == "salesforce":
+        # P0: DB constraint — check if 'salesforce' is allowed in account_outcomes.source
+        try:
+            constraint_ok = verify_sf_constraint()
+            if not constraint_ok:
+                warnings.append(
+                    "DB constraint missing: account_outcomes.source does not include 'salesforce'. "
+                    "Salesforce outcome imports will silently fail. "
+                    "Apply migration 20260414_account_outcomes_fixes.sql in Supabase SQL editor."
+                )
+        except Exception:
+            pass  # constraint check failing is non-fatal for the readiness report
+
+        # P2: ARR data quality — AnnualRevenue ≠ SaaS ARR in Salesforce
+        if pct_with_arr < 0.10:
+            warnings.append(
+                f"ARR coverage is low ({pct_with_arr:.0%}). "
+                "Salesforce AnnualRevenue is company total revenue, not SaaS ARR. "
+                "Map a custom ARR field (e.g. MRR__c) to improve revenue accuracy."
+            )
+
+        # P2: Account limit — Salesforce connector caps at SF_ACCOUNT_LIMIT accounts
+        if total_accounts >= _SF_ACCOUNT_LIMIT:
+            warnings.append(
+                f"Account sync limit reached ({total_accounts} accounts). "
+                "Results may be incomplete — older accounts are excluded. "
+                "Contact support to increase the sync limit."
+            )
+
+    # All providers: churn detection warning
+    if total_accounts >= _MIN_TOTAL and churned_count == 0:
+        warnings.append(
+            "No churned accounts detected. "
+            "Use 'Map Churn Labels' to define which CRM field and values indicate a churned account."
+        )
+
+    if warnings:
+        for w in warnings:
+            logger.warning("[readiness] %s/%s: %s", provider, tenant_id, w)
+
     return {
         "provider": provider,
         "total_accounts": total_accounts,
@@ -398,4 +509,5 @@ def compute_readiness(tenant_id: str, provider: str) -> Dict[str, Any]:
         "training_enabled": elig in (ELIGIBILITY_READY, ELIGIBILITY_LOW_SIGNALS),
         "label_mapping": label_mapping,
         "candidate_fields": candidate_fields,
+        "warnings": warnings,
     }

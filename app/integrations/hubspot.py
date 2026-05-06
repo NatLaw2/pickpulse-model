@@ -419,14 +419,162 @@ class HubSpotConnector(BaseConnector):
     # Pull signals — mode-aware
     # ------------------------------------------------------------------
 
+    # Batch size for HubSpot batch APIs — max 100 per request per HubSpot docs.
+    _BATCH_SIZE = 100
+
     def pull_signals(self, external_ids: List[str]) -> List[AccountSignal]:
         """Pull engagement signals from HubSpot.
+
+        Tries batch API first (O(n/100) HTTP requests vs O(n) legacy).
+        Falls back to per-company legacy pull on any batch error so existing
+        behaviour is fully preserved.
 
         SaaS mode:  contacts count → seats proxy, deal count as activity proxy.
         Services mode: engagement recency (last activity date), deal activity,
                        ticket count, contact count as stakeholder coverage.
         """
         self._refresh_token_if_needed()
+        if not external_ids:
+            return []
+
+        try:
+            signals = self._pull_signals_batch(external_ids)
+            logger.info(
+                "[hubspot] Batch signal pull: %d signals for %d companies (mode=%s)",
+                len(signals), len(external_ids), self._business_mode,
+            )
+            return signals
+        except Exception as exc:
+            logger.warning(
+                "[hubspot] Batch signal pull failed (%s) — falling back to per-company pull. "
+                "This is slower but functionally equivalent.", exc,
+            )
+            return self._pull_signals_legacy(external_ids)
+
+    def _pull_signals_batch(self, external_ids: List[str]) -> List[AccountSignal]:
+        """Batch signal pull using HubSpot batch read APIs.
+
+        Reduces O(n) HTTP calls to O(n/100) by fetching:
+          - Company activity dates in bulk via /crm/v3/objects/companies/batch/read
+          - Association counts via /crm/v4/associations/companies/{type}/batch/read
+
+        Output structure is identical to _pull_signals_legacy.
+        """
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # 1. Batch-fetch company activity date properties
+        activity_map: Dict[str, Optional[str]] = {}
+        act_props = ["notes_last_activity_date", "hs_last_activity_date"]
+        if self._business_mode == "services":
+            act_props.append("notes_last_contacted")
+
+        for i in range(0, len(external_ids), self._BATCH_SIZE):
+            batch = external_ids[i : i + self._BATCH_SIZE]
+            r = self._request(
+                "POST",
+                f"{API_BASE}/crm/v3/objects/companies/batch/read",
+                json={
+                    "inputs": [{"id": eid} for eid in batch],
+                    "properties": act_props,
+                },
+                timeout=30,
+            )
+            r.raise_for_status()
+            for result in r.json().get("results", []):
+                eid = result.get("id")
+                props = result.get("properties", {})
+                last_act = None
+                for prop in act_props:
+                    val = props.get(prop)
+                    if val:
+                        last_act = val
+                        break
+                if eid:
+                    activity_map[eid] = last_act
+
+        # 2. Batch-fetch association counts for contacts, deals, (tickets for services)
+        assoc_types = ["contacts", "deals"]
+        if self._business_mode == "services":
+            assoc_types.append("tickets")
+
+        # assoc_counts[object_type][company_id] = count
+        assoc_counts: Dict[str, Dict[str, int]] = {t: {} for t in assoc_types}
+
+        for assoc_type in assoc_types:
+            for i in range(0, len(external_ids), self._BATCH_SIZE):
+                batch = external_ids[i : i + self._BATCH_SIZE]
+                try:
+                    r = self._request(
+                        "POST",
+                        f"{API_BASE}/crm/v4/associations/companies/{assoc_type}/batch/read",
+                        json={"inputs": [{"id": eid} for eid in batch]},
+                        timeout=30,
+                    )
+                    if r.status_code == 200:
+                        for entry in r.json().get("results", []):
+                            from_id = entry.get("from", {}).get("id")
+                            to_list = entry.get("to", [])
+                            if from_id:
+                                assoc_counts[assoc_type][from_id] = len(to_list)
+                    elif r.status_code == 404:
+                        # Object type not available in this portal (e.g. tickets)
+                        logger.debug("[hubspot] batch assoc %s: 404 — not available", assoc_type)
+                        break
+                except Exception as exc:
+                    logger.warning("[hubspot] batch assoc %s failed: %s", assoc_type, exc)
+
+        # 3. Build AccountSignal objects from collected data
+        from app.integrations.normalization import days_since as _days_since
+        signals: List[AccountSignal] = []
+        for eid in external_ids:
+            try:
+                last_act_str = activity_map.get(eid)
+                days_inactive = _days_since(last_act_str[:10] if last_act_str else None)
+
+                contact_count = assoc_counts["contacts"].get(eid, 0)
+                deal_count = assoc_counts["deals"].get(eid, 0)
+                ticket_count = assoc_counts.get("tickets", {}).get(eid, 0)
+
+                if self._business_mode == "services":
+                    signals.append(AccountSignal(
+                        external_id=eid,
+                        signal_date=today,
+                        seats=contact_count if contact_count > 0 else None,
+                        support_tickets=ticket_count if ticket_count > 0 else None,
+                        days_since_last_login=days_inactive,
+                        extra={
+                            "contact_count": contact_count,
+                            "deal_count": deal_count,
+                            "ticket_count": ticket_count,
+                            "days_since_last_activity": days_inactive,
+                            "engagement_frequency": None,  # not available in batch path
+                            "business_mode": "services",
+                        },
+                    ))
+                else:
+                    signals.append(AccountSignal(
+                        external_id=eid,
+                        signal_date=today,
+                        seats=contact_count if contact_count > 0 else None,
+                        support_tickets=None,
+                        days_since_last_login=days_inactive,
+                        extra={
+                            "contacts": contact_count,
+                            "deals": deal_count,
+                            "business_mode": "saas",
+                        },
+                    ))
+            except Exception as exc:
+                logger.warning("[hubspot] batch signal build failed for %s: %s", eid, exc)
+
+        return signals
+
+    def _pull_signals_legacy(self, external_ids: List[str]) -> List[AccountSignal]:
+        """Original per-company signal pull — O(n) HTTP calls.
+
+        Used as fallback when the batch path fails. Behaviour is identical
+        to the original pull_signals implementation.
+        """
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         signals: List[AccountSignal] = []
 
@@ -439,9 +587,12 @@ class HubSpotConnector(BaseConnector):
                 if signal:
                     signals.append(signal)
             except Exception as exc:
-                logger.warning("[hubspot] Signal pull failed for %s: %s", eid, exc)
+                logger.warning("[hubspot] Legacy signal pull failed for %s: %s", eid, exc)
 
-        logger.info("[hubspot] Pulled %d signals (mode=%s)", len(signals), self._business_mode)
+        logger.info(
+            "[hubspot] Legacy signal pull: %d signals for %d companies (mode=%s)",
+            len(signals), len(external_ids), self._business_mode,
+        )
         return signals
 
     def _pull_signal_saas(self, company_id: str, date: str) -> Optional[AccountSignal]:
@@ -590,9 +741,18 @@ class HubSpotConnector(BaseConnector):
     def _refresh_token_if_needed(self) -> None:
         """Proactively refresh the access token if it may be near expiry.
 
-        HubSpot tokens expire after 6 hours (21,600 s). We refresh when the
-        stored token is absent or when refresh_token is available and the
-        token is older than 5.5 hours.
+        HubSpot tokens expire after 6 hours (21,600 s). This in-memory path
+        uses token_acquired_at (set when the connector was instantiated) as a
+        proxy for token age.
+
+        IMPORTANT: service.py's get_decrypted_token is the authoritative refresh
+        path — it reads expires_at from the DB and calls _try_refresh_token (which
+        is lock-protected against concurrent refreshes). This method is a secondary
+        guard for long-running syncs where the token may approach expiry mid-pull.
+
+        Guard: if token_acquired_at == 0 (default on fresh instantiation), the
+        service.py path already ran this session — skip to avoid a duplicate
+        refresh that would race against any concurrent sync.
         """
         from app.integrations.oauth import refresh_access_token
 
@@ -606,6 +766,12 @@ class HubSpotConnector(BaseConnector):
         if not refresh_token:
             return
 
+        # If token_acquired_at is 0, this connector was freshly instantiated by
+        # service.py which already handled the refresh via its DB-backed path.
+        # Skip to prevent a duplicate refresh attempt.
+        if token_acquired_at == 0:
+            return
+
         age_s = time.time() - token_acquired_at
         if age_s < 19_800:  # 5.5 hours — still fresh
             return
@@ -614,9 +780,9 @@ class HubSpotConnector(BaseConnector):
             result = refresh_access_token("hubspot", refresh_token)
             self.config.extra["access_token"] = result["access_token"]
             self.config.extra["token_acquired_at"] = time.time()
-            logger.info("[hubspot] Access token refreshed successfully")
+            logger.info("[hubspot] Access token refreshed (in-memory path)")
         except Exception as exc:
-            logger.warning("[hubspot] Token refresh failed: %s", exc)
+            logger.warning("[hubspot] Token refresh failed (in-memory path): %s", exc)
 
     def ensure_churn_properties(self) -> None:
         """Idempotently create the PickPulse property group and custom properties."""

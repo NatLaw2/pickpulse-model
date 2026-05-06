@@ -132,6 +132,15 @@ async def _startup():
             "startup: shap package NOT installed — per-account SHAP drivers will be disabled. "
             "Add 'shap' to requirements.txt and redeploy."
         )
+    # Verify the Salesforce outcome source CHECK constraint is up-to-date.
+    # This probe runs once and caches the result; the warning surfaces in logs
+    # and in the /api/integrations/salesforce/readiness response.
+    if not DEMO_MODE:
+        try:
+            from .integrations.readiness import verify_sf_constraint
+            verify_sf_constraint()
+        except Exception as _exc:
+            logger.warning("startup: Salesforce constraint check failed: %s", _exc)
 
 
 # ---------------------------------------------------------------------------

@@ -59,12 +59,14 @@ import pandas as pd
 logger = logging.getLogger("pickpulse.crm_training")
 
 # ---------------------------------------------------------------------------
-# Sufficiency thresholds
+# Sufficiency thresholds — imported from single source of truth.
+# DO NOT redefine these here; edit app/integrations/thresholds.py instead.
 # ---------------------------------------------------------------------------
-
-MIN_TOTAL_LABELED: int = 30
-MIN_POSITIVE_LABELED: int = 10
-MIN_NEGATIVE_LABELED: int = 10
+from app.integrations.thresholds import (  # noqa: E402
+    MIN_TOTAL_LABELED,
+    MIN_POSITIVE_LABELED,
+    MIN_NEGATIVE_LABELED,
+)
 
 # Maximum days before outcome_date that a signal snapshot is still usable
 MAX_LOOKBACK_DAYS: int = 90
