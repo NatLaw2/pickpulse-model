@@ -1172,7 +1172,7 @@ export interface ReadinessReport {
   churned_detected: number;
   pct_with_signals: number;
   pct_with_arr: number;
-  expected_confidence: 'High' | 'Medium' | 'Low';
+  expected_confidence: 'Strong' | 'Moderate' | 'Limited';
   eligibility: 'ready' | 'needs_outcome_mapping' | 'insufficient_churn' | 'low_signal_coverage' | 'insufficient_data';
   eligibility_message: string;
   training_enabled: boolean;

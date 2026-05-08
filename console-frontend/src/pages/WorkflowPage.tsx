@@ -108,9 +108,9 @@ function DataQualitySection({
   const selectedCandidate = candidate_fields.find((f) => f.field_name === mappingField);
 
   const confidenceColor =
-    expected_confidence === 'High' ? 'text-[var(--color-success)]' :
-    expected_confidence === 'Medium' ? 'text-amber-500' :
-    'text-[var(--color-danger)]';
+    expected_confidence === 'Strong' ? 'text-[var(--color-success)]' :
+    expected_confidence === 'Moderate' ? 'text-amber-500' :
+    'text-[var(--color-text-muted)]';
 
   // ── Label mapping form ───────────────────────────────────────────────────
   if (isMapping) {
@@ -197,9 +197,9 @@ function DataQualitySection({
         ))}
       </div>
 
-      {/* Expected confidence */}
+      {/* Signal coverage tier */}
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-[var(--color-text-muted)]">Expected model confidence:</span>
+        <span className="text-[11px] text-[var(--color-text-muted)]">Behavioral signal coverage:</span>
         <span className={`text-[11px] font-semibold ${confidenceColor}`}>{expected_confidence}</span>
       </div>
 
@@ -213,7 +213,7 @@ function DataQualitySection({
           className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
         >
           <Brain size={14} />
-          {eligibility === 'low_signal_coverage' ? 'Train Now — Low Confidence' : 'Train Now'}
+          {eligibility === 'low_signal_coverage' ? 'Train Now — Limited Signals' : 'Train Now'}
         </button>
       )}
 

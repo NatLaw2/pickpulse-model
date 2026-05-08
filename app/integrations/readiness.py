@@ -18,10 +18,10 @@ Eligibility states
 insufficient_data      total < 10                          → training DISABLED
 needs_outcome_mapping  churned == 0                        → training DISABLED
 insufficient_churn     1 ≤ churned < 20                   → training DISABLED
-low_signal_coverage    churned ≥ 20, signal_pct < 0.15    → training ENABLED (Low confidence)
+low_signal_coverage    churned ≥ 20, signal_pct < 0.15    → training ENABLED (Limited signal coverage)
 ready                  churned ≥ 20, signal_pct ≥ 0.15    → training ENABLED
 
-Confidence tier (meaningful only when training is enabled)
+Signal coverage tier (shown in setup UI; describes data richness, not model quality)
 ------------------
 High    churned ≥ 50, signal_pct ≥ 0.70, total ≥ 200
 Medium  churned ≥ 20, signal_pct ≥ 0.40, total ≥ 50
@@ -325,11 +325,16 @@ def discover_candidate_fields(
 # ---------------------------------------------------------------------------
 
 def _confidence(total: int, churned: int, signal_pct: float) -> str:
+    """Return a signal coverage tier label.
+
+    Values are "Strong" / "Moderate" / "Limited" — describing data richness,
+    not model quality. Displayed in setup/readiness screens only.
+    """
     if churned >= _HIGH_CHURNED and signal_pct >= _HIGH_SIGNAL and total >= _HIGH_TOTAL:
-        return "High"
+        return "Strong"
     if churned >= _MEDIUM_CHURNED and signal_pct >= _MEDIUM_SIGNAL and total >= _MEDIUM_TOTAL:
-        return "Medium"
-    return "Low"
+        return "Moderate"
+    return "Limited"
 
 
 def _eligibility(total: int, churned: int, signal_pct: float) -> Tuple[str, str]:
@@ -357,8 +362,8 @@ def _eligibility(total: int, churned: int, signal_pct: float) -> Tuple[str, str]
         return (
             ELIGIBILITY_LOW_SIGNALS,
             f"{churned} churned accounts detected across {total} total. "
-            f"Signal coverage is low ({signal_pct:.0%}) — training will proceed "
-            "but predictions will be less reliable.",
+            f"Behavioral signal coverage is {signal_pct:.0%} — training is enabled. "
+            "Predictions will improve as more CRM activity data accumulates.",
         )
     return (
         ELIGIBILITY_READY,
